@@ -1,0 +1,22 @@
+# Node
+backend/node_modules/
+backend/.env
+
+#flutter
+mobile/**/build/
+mobile/**/.dart_tool/
+mobile/**/.flutter-plugins
+mobile/**/.flutter-plugins-dependencies
+
+#Android
+mobile/**/android/.gradle/
+mobile/**/android/local.properties
+mobile/**/android/key.properties
+
+#IDE
+.vscode/
+.idea/
+
+#OS
+.DS_Store
+Thumbs.db
