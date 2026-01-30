@@ -12,12 +12,34 @@ router.post("/request-otp", (req, res) => {
                otp: "123456", });
 });
 
-router.post("/verify-otp",(req, res) => {
-    const {phone, otp } = req.body;
+const supabase = require("../config/supabase");
+const { generateToken } = require("../services/jwt.service");
+
+router.post("/verify-otp", async (req, res) => {
+    const { phone, otp } = req.body;
     if(otp !== "123456"){
         return res.status(401).json({message: "Invalid OTP"});
     }
-    res.json({message:"OTP verifeid (mocked)"});
-});
+    // Check if user exists
+    const {data:existingUser } = await supabase
+        .from("users")
+        .select("*")
+        .eq("phone", phone)
+        .single();
+        let user = existingUser;
 
+    // Create user if not exists
+    if(!existingUser){
+        const {data: newUser} = await supabase
+            .from("users")
+            .insert([{phone}])
+            .single();
+        user = newUser;
+    }
+    const token = generateToken({
+        userId: user.id,
+        phone: user.phone
+    });
+    res.json({message:"Authenticated", token});
+});
 module.exports = router;
