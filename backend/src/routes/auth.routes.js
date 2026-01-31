@@ -41,5 +41,27 @@ router.post("/verify-otp", async (req, res) => {
         phone: user.phone
     });
     res.json({message:"Authenticated", token});
+
+    // ---------- AUTO-CREATE WALLET IF NOT EXISTS ----------
+    const { data: wallet, error: walletFetchError } = await supabase
+        .from("wallets")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+        if (walletFetchError) {
+            console.error("wallet fetch error:", walletFetchError);
+            return res.status(500).json({message: "Wallet check failed"});
+        }
+        if (!wallet) {
+            const {error: walletCreateError } = await supabase
+                .from("wallets")
+                .insert([{ user_id: user.id, balance: 0 }]);
+                if (walletCreateError) {
+                    console.error("wallet creation error:", walletCreateError);
+                    return res.status(500).json({ message: "Wallet creation failed" });
+                }
+        }
+        //-----------------------------------------------------------------//
 });
 module.exports = router;
