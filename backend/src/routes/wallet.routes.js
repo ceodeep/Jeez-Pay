@@ -2,6 +2,18 @@ const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabase");
 
+// ---- HELPER: check admin ----
+async function isAdmin(userId) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) return false;
+  return data.role === "admin";
+}
+
 // GET /wallet/balance
 router.get("/balance", async (req, res) => {
   try {
@@ -9,12 +21,11 @@ router.get("/balance", async (req, res) => {
 
     const { data: wallet, error } = await supabase
       .from("wallets")
-      .select("balance, id")
+      .select("balance")
       .eq("user_id", userId)
       .maybeSingle();
 
     if (error) {
-      console.error(error);
       return res.status(500).json({ message: "Failed to fetch wallet" });
     }
 
@@ -29,7 +40,7 @@ router.get("/balance", async (req, res) => {
   }
 });
 
-// GET /wallet/history
+// GET /wallet/history (last 50 transactions)
 router.get("/history", async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -48,10 +59,10 @@ router.get("/history", async (req, res) => {
       .from("transactions")
       .select("type, amount, description, created_at")
       .eq("wallet_id", wallet.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (error) {
-      console.error(error);
       return res.status(500).json({ message: "Failed to fetch transactions" });
     }
 
@@ -62,16 +73,28 @@ router.get("/history", async (req, res) => {
   }
 });
 
-// POST /wallet/credit  (admin action)
+// POST /wallet/credit (ADMIN ONLY)
 router.post("/credit", async (req, res) => {
   try {
+    const adminId = req.user.userId;
+
+    // Check admin
+    const admin = await isAdmin(adminId);
+    if (!admin) {
+      return res.status(403).json({ message: "Only admin can credit wallets" });
+    }
+
     const { userId, amount, description } = req.body;
 
     if (!userId || !amount) {
       return res.status(400).json({ message: "userId and amount required" });
     }
 
-    // Find user's wallet
+    if (Number(amount) <= 0) {
+      return res.status(400).json({ message: "Amount must be positive" });
+    }
+
+    // Find wallet
     const { data: wallet, error: walletErr } = await supabase
       .from("wallets")
       .select("id, balance")
@@ -84,7 +107,7 @@ router.post("/credit", async (req, res) => {
 
     const newBalance = wallet.balance + Number(amount);
 
-    // Insert transaction
+    // Create transaction
     const { error: txErr } = await supabase
       .from("transactions")
       .insert({
@@ -95,18 +118,16 @@ router.post("/credit", async (req, res) => {
       });
 
     if (txErr) {
-      console.error(txErr);
       return res.status(500).json({ message: "Transaction failed" });
     }
 
-    // Update wallet balance
+    // Update balance
     const { error: updateErr } = await supabase
       .from("wallets")
       .update({ balance: newBalance })
       .eq("id", wallet.id);
 
     if (updateErr) {
-      console.error(updateErr);
       return res.status(500).json({ message: "Balance update failed" });
     }
 
