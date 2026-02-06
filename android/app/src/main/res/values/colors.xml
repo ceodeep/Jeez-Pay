@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- PayPal-like palette -->
+    <color name="bg_main">#F5F8FF</color>
+    <color name="card_white">#FFFFFF</color>
+    <color name="paypal_blue">#0070E0</color>
+    <color name="primary_blue">#003087</color>
+    <color name="accent_blue">#009CDE</color>
+
+
+    <color name="card_stroke_soft">#E6EDF7</color>
+    <color name="divider_soft">#E9EFF8</color>
+    <color name="ring_blue_soft">#BFD7FF</color>
+    <color name="icon_muted">#8FA2BF</color>
+
+    <!-- Reuse your action circle color if you have it; else: -->
+    <color name="action_bg">#EAF3FF</color>
+
+    <color name="text_primary">#0B1A3A</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_tertiary">#9CA3AF</color>
+
+    <color name="success">#16A34A</color>
+    <color name="danger">#DC2626</color>
+
+    <color name="btn_bg">#F0F4FF</color>
+    <color name="divider">#E9EEF6</color>
+    <color name="card_stroke">#EEF1FA</color>
+
+    <!-- Bottom nav -->
+    <color name="nav_active_bg">#E6F2FF</color>
+    <color name="nav_ripple">#1A0070E0</color>
+
+    <color name="black">#000000</color>
+</resources>

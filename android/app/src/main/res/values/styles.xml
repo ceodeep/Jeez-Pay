@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+
+    <style name="JeezPayTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/card_white</item>
+        <item name="colorPrimaryVariant">@color/card_white</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+
+        <item name="android:statusBarColor">@color/bg_main</item>
+        <item name="android:navigationBarColor">@color/bg_main</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+
+    <style name="BottomNavStyle" parent="Widget.MaterialComponents.BottomNavigationView">
+        <item name="itemIconTint">@color/nav_selector</item>
+        <item name="itemTextColor">@color/nav_selector</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="android:background">@android:color/transparent</item>
+    </style>
+
+    <!-- Rounded active indicator like the screenshot -->
+
+
+    <style name="ShapeAppearance.JeezPay.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+</resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.JEEZPAY" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- PayPal-like clean palette -->
+        <item name="colorPrimary">@color/card_white</item>
+        <item name="colorPrimaryDark">@color/card_white</item>
+        <item name="colorOnPrimary">@color/text_primary</item>
+
+        <item name="android:windowBackground">@color/bg_main</item>
+
+        <!-- Status/Nav bar like RedotPay screenshot (light) -->
+        <item name="android:statusBarColor">@color/bg_main</item>
+        <item name="android:navigationBarColor">@color/bg_main</item>
+        <item name="android:windowLightStatusBar">true</item>
+
+        <!-- Keep cards modern -->
+        <item name="materialCardViewStyle">@style/Widget.MaterialComponents.CardView</item>
+    </style>
+
+</resources>
