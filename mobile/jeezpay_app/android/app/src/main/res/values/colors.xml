@@ -6,6 +6,8 @@
     <color name="paypal_blue">#0070E0</color>
     <color name="primary_blue">#003087</color>
     <color name="accent_blue">#009CDE</color>
+    <color name="bg_soft_blue">#EAF3FF</color>
+
 
 
     <color name="card_stroke_soft">#E6EDF7</color>
@@ -22,6 +24,10 @@
 
     <color name="success">#16A34A</color>
     <color name="danger">#DC2626</color>
+    <color name="paypal_blue_dark">#005FCC</color>
+    <color name="ripple_soft">#220070F3</color>
+
+
 
     <color name="btn_bg">#F0F4FF</color>
     <color name="divider">#E9EEF6</color>

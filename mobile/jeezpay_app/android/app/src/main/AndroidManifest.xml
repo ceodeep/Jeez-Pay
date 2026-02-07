@@ -9,14 +9,20 @@
         android:supportsRtl="true"
         android:theme="@style/JeezPayTheme">
 
+        <!-- AUTH is the ONLY launcher -->
         <activity
-            android:name=".MainActivity"
+            android:name=".AuthActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- MAIN must NOT be launcher -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
 
     </application>
 

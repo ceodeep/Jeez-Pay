@@ -3,14 +3,29 @@
 
 
     <style name="JeezPayTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/card_white</item>
-        <item name="colorPrimaryVariant">@color/card_white</item>
-        <item name="colorOnPrimary">@color/text_primary</item>
 
+        <!-- Real primary (used by Material internally) -->
+        <item name="colorPrimary">@color/paypal_blue</item>
+        <item name="colorPrimaryVariant">@color/paypal_blue_dark</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+
+        <!-- Surface & background -->
+        <item name="colorSurface">@color/card_white</item>
+        <item name="android:colorBackground">@color/bg_main</item>
+        <item name="android:windowBackground">@color/bg_main</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+
+        <!-- Status / Nav bars -->
         <item name="android:statusBarColor">@color/bg_main</item>
         <item name="android:navigationBarColor">@color/bg_main</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+
+        <!-- Disable ugly default ripples -->
+        <item name="colorControlHighlight">@color/ripple_soft</item>
+
     </style>
+
 
 
     <style name="BottomNavStyle" parent="Widget.MaterialComponents.BottomNavigationView">
