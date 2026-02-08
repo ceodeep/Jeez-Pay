@@ -1,17 +1,18 @@
 package com.jeezpay.app
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.jeezpay.app.adapters.WalletStripAdapter
-import android.content.Intent
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.jeezpay.app.adapters.WalletPickerAdapter
+import com.jeezpay.app.adapters.WalletStripAdapter
+import com.jeezpay.app.storage.SessionManager
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -49,21 +50,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textSend: TextView
     private lateinit var textHub: TextView
 
-    // wallets
-    private fun setupWalletStrip() {
-        rvWalletStrip.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-
-        walletStripAdapter = WalletStripAdapter(wallets, selectedCode) { picked ->
-            selectedCode = picked.code
-            prefs.edit().putString("selected_wallet", selectedCode).apply()
-            applySelectedWallet(selectedCode)
-            walletStripAdapter?.setSelected(selectedCode)
-        }
-
-        rvWalletStrip.adapter = walletStripAdapter
-    }
-
+    // wallet strip
     private lateinit var rvWalletStrip: RecyclerView
     private var walletStripAdapter: WalletStripAdapter? = null
 
@@ -79,22 +66,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val tvLogout = findViewById<TextView>(R.id.tvLogout)
-
-        tvLogout.setOnClickListener {
-            val prefs = getSharedPreferences("jeezpay_prefs", MODE_PRIVATE)
-
-            // Only log out session (keep PIN saved for demo convenience)
-            prefs.edit()
-                .putBoolean("logged_in", false)
-                .apply()
-
-            startActivity(Intent(this, AuthActivity::class.java))
-            finish()
-        }
-
 
         bindViews()
+
+        // logout
+        val tvLogout = findViewById<TextView>(R.id.tvLogout)
+        tvLogout.setOnClickListener {
+            doLogout()
+        }
+
         setupWallets()
         setupCurrencyPill()
         setupBalanceToggle()
@@ -110,6 +90,8 @@ class MainActivity : AppCompatActivity() {
 
         btnCurrency = findViewById(R.id.btnCurrency)
         imgCurrency = findViewById(R.id.imgCurrency)
+
+        // ✅ FIX: tvCurrency MUST bind to tvCurrency (TextView), NOT btnCurrency (LinearLayout)
         tvCurrency = findViewById(R.id.tvCurrency)
 
         actionText = findViewById(R.id.actionText)
@@ -128,20 +110,14 @@ class MainActivity : AppCompatActivity() {
         textCard = findViewById(R.id.textCard)
         textSend = findViewById(R.id.textSend)
         textHub = findViewById(R.id.textHub)
-        rvWalletStrip = findViewById(R.id.rvWalletStrip)
 
+        rvWalletStrip = findViewById(R.id.rvWalletStrip)
     }
 
     private fun setupWallets() {
-
-
-        // load saved state
         selectedCode = prefs.getString("selected_wallet", "USDT") ?: "USDT"
         isBalanceHidden = prefs.getBoolean("hide_balance", false)
 
-        // IMPORTANT:
-        // Replace/adjust icons you actually have in drawable.
-        // If you don't have flags yet, keep logo_usdt for all for now.
         wallets = mutableListOf(
             WalletBalance("USDT", "Tether", R.drawable.logo_usdt, 1250.00),
             WalletBalance("SSP", "South Sudan Pound", R.drawable.flag_ssp, 0.00),
@@ -153,6 +129,20 @@ class MainActivity : AppCompatActivity() {
         applySelectedWallet(selectedCode)
         applyBalanceVisibility()
         setupWalletStrip()
+    }
+
+    private fun setupWalletStrip() {
+        rvWalletStrip.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+
+        walletStripAdapter = WalletStripAdapter(wallets, selectedCode) { picked ->
+            selectedCode = picked.code
+            prefs.edit().putString("selected_wallet", selectedCode).apply()
+            applySelectedWallet(selectedCode)
+            walletStripAdapter?.setSelected(selectedCode)
+        }
+
+        rvWalletStrip.adapter = walletStripAdapter
     }
 
     private fun setupCurrencyPill() {
@@ -175,9 +165,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupActionButtons() {
         val btnSend = findViewById<View>(R.id.btnSend)
-
-        // If you still have btnReceive/btnHistory in this new grid, add them.
-        // In your current file, only btnSend exists from the old ones.
         btnSend.setOnClickListener {
             actionText.text = "Send clicked"
             actionText.visibility = View.VISIBLE
@@ -185,7 +172,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupCustomBottomNav() {
-        // Default screen: Home (index 0)
         selectTab(0)
 
         navHome.setOnClickListener { selectTab(0) }
@@ -197,8 +183,6 @@ class MainActivity : AppCompatActivity() {
     private fun selectTab(index: Int) {
         screenFlipper.displayedChild = index
 
-        // selected background only for home in your drawable style,
-        // but we will apply it dynamically:
         setTabSelected(navHome, iconHome, textHome, index == 0)
         setTabSelected(navCard, iconCard, textCard, index == 1)
         setTabSelected(navSend, iconSend, textSend, index == 2)
@@ -223,10 +207,8 @@ class MainActivity : AppCompatActivity() {
         imgCurrency.setImageResource(w.iconRes)
         tvCurrency.text = w.code
 
-        // update balance text based on hidden state
         applyBalanceVisibility()
         walletStripAdapter?.setSelected(code)
-
     }
 
     private fun applyBalanceVisibility() {
@@ -254,5 +236,20 @@ class MainActivity : AppCompatActivity() {
 
         dialog.setContentView(view)
         dialog.show()
+    }
+
+    private fun doLogout() {
+        // ✅ clear token + pin (REAL logout)
+        SessionManager(this).clearAll()
+
+        // ✅ optional: also clear UI prefs like hide_balance / selected_wallet
+        prefs.edit().clear().apply()
+
+        // ✅ go to Auth and clear backstack
+        val intent = Intent(this, AuthActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        finish()
     }
 }

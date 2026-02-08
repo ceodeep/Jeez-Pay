@@ -1,136 +1,96 @@
 package com.jeezpay.app
 
+
 import android.content.Intent
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
-import android.view.View
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import com.jeezpay.app.repository.AuthRepository
+import com.jeezpay.app.storage.SessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AuthActivity : AppCompatActivity() {
 
-    private val prefs by lazy { getSharedPreferences("jeezpay_prefs", MODE_PRIVATE) }
-
-    private lateinit var flipper: android.widget.ViewFlipper
-
-    // Screen 1
-    private lateinit var etPhone: EditText
-    private lateinit var btnContinue: MaterialButton
-
-    // Screen 2
-    private lateinit var tvOtpHint: TextView
-    private lateinit var etOtp: EditText
-    private lateinit var btnVerify: MaterialButton
-    private lateinit var btnBackOtp: View
-
-    // Screen 3
-    private lateinit var etPin: EditText
-    private lateinit var btnSetPin: MaterialButton
-    private lateinit var btnBackPin: View
-
-    private var phoneCache: String = ""
+    private lateinit var session: SessionManager
+    private val repo = AuthRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_auth)
 
-        // If already logged in, skip auth
-        if (prefs.getBoolean("logged_in", false)) {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+        session = SessionManager(this)
+
+        val existingToken = session.getToken()
+        val existingPin = session.getPin()
+        if (!existingToken.isNullOrBlank() && !existingPin.isNullOrBlank()) {
+            openMain()
             return
         }
 
-        setContentView(R.layout.activity_auth)
 
-        bind()
-        setupPhoneScreen()
-        setupOtpScreen()
-        setupPinScreen()
-    }
+        val flipper = findViewById<android.widget.ViewFlipper>(R.id.authFlipper)
 
-    private fun bind() {
-        flipper = findViewById(R.id.authFlipper)
+        val etPhone = findViewById<EditText>(R.id.etPhone)
+        val btnContinue = findViewById<MaterialButton>(R.id.btnContinue)
 
-        etPhone = findViewById(R.id.etPhone)
-        btnContinue = findViewById(R.id.btnContinue)
+        val btnBackOtp = findViewById<TextView>(R.id.btnBackOtp)
+        val tvOtpHint = findViewById<TextView>(R.id.tvOtpHint)
+        val etOtp = findViewById<EditText>(R.id.etOtp)
+        val btnVerify = findViewById<MaterialButton>(R.id.btnVerify)
 
-        tvOtpHint = findViewById(R.id.tvOtpHint)
-        etOtp = findViewById(R.id.etOtp)
-        btnVerify = findViewById(R.id.btnVerify)
-        btnBackOtp = findViewById(R.id.btnBackOtp)
+        val btnBackPin = findViewById<TextView>(R.id.btnBackPin)
+        val etPin = findViewById<EditText>(R.id.etPin)
+        val btnSetPin = findViewById<MaterialButton>(R.id.btnSetPin)
 
-        etPin = findViewById(R.id.etPin)
-        btnSetPin = findViewById(R.id.btnSetPin)
-        btnBackPin = findViewById(R.id.btnBackPin)
-    }
+        // Enable Continue when phone has text
+        etPhone.addTextChangedListener(SimpleTextWatcher {
+            btnContinue.isEnabled = etPhone.text.toString().trim().length >= 8
+        })
 
-    private fun setupPhoneScreen() {
-        btnContinue.isEnabled = false
+        // Enable Verify when OTP length is 6
+        etOtp.addTextChangedListener(SimpleTextWatcher {
+            btnVerify.isEnabled = etOtp.text.toString().trim().length == 6
+        })
 
-        etPhone.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val text = s?.toString()?.trim().orEmpty()
-                btnContinue.isEnabled = text.length >= 8
-            }
-            override fun afterTextChanged(s: Editable?) {}
+        // Enable Finish when PIN length is 4
+        etPin.addTextChangedListener(SimpleTextWatcher {
+            btnSetPin.isEnabled = etPin.text.toString().trim().length == 4
         })
 
         btnContinue.setOnClickListener {
-            phoneCache = etPhone.text.toString().trim()
-            tvOtpHint.text = "Enter the code sent to $phoneCache"
-            etOtp.setText("")
-            flipper.displayedChild = 1
+            val phone = etPhone.text.toString().trim()
+            requestOtp(phone, onSuccess = { maybeOtp ->
+                // Move to OTP screen
+                flipper.displayedChild = 1
+
+                // OPTIONAL: show mocked OTP in hint (remove later for production)
+                if (!maybeOtp.isNullOrBlank()) {
+                    tvOtpHint.text = "Mock OTP: $maybeOtp"
+                } else {
+                    tvOtpHint.text = "Enter the code sent to your phone"
+                }
+            })
         }
-    }
-
-    private fun setupOtpScreen() {
-        btnVerify.isEnabled = false
-
-        etOtp.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val code = s?.toString()?.trim().orEmpty()
-                btnVerify.isEnabled = code.length >= 4
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
 
         btnBackOtp.setOnClickListener {
             flipper.displayedChild = 0
         }
 
         btnVerify.setOnClickListener {
-            // MVP: OTP "logic-ready". We accept any 4+ digits.
-            // In backend integration later, you will verify via API.
+            val phone = etPhone.text.toString().trim()
+            val otp = etOtp.text.toString().trim()
 
-            // If PIN already exists -> login directly
-            val pinSaved = prefs.getString("pin_code", null)
-            if (pinSaved != null) {
-                prefs.edit().putBoolean("logged_in", true).apply()
-                goMain()
-            } else {
-                etPin.setText("")
-                btnSetPin.isEnabled = false
-                flipper.displayedChild = 2
-            }
+            verifyOtp(phone, otp, onSuccess = { token ->
+                session.saveToken(token)
+                flipper.displayedChild = 2 // go to PIN screen
+            })
         }
-    }
-
-    private fun setupPinScreen() {
-        btnSetPin.isEnabled = false
-
-        etPin.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val pin = s?.toString()?.trim().orEmpty()
-                btnSetPin.isEnabled = pin.length == 4
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
 
         btnBackPin.setOnClickListener {
             flipper.displayedChild = 1
@@ -138,17 +98,51 @@ class AuthActivity : AppCompatActivity() {
 
         btnSetPin.setOnClickListener {
             val pin = etPin.text.toString().trim()
-            if (pin.length == 4) {
-                prefs.edit()
-                    .putString("pin_code", pin)
-                    .putBoolean("logged_in", true)
-                    .apply()
-                goMain()
+            if (pin.length != 4) {
+                Toast.makeText(this, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // ✅ Save PIN locally (later we’ll encrypt/hash it)
+            session.savePin(pin)
+
+            openMain()
+        }
+    }
+
+    private fun requestOtp(phone: String, onSuccess: (String?) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val res = repo.requestOtp(phone)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                    onSuccess(res.otp)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, "Request OTP failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }
 
-    private fun goMain() {
+    private fun verifyOtp(phone: String, otp: String, onSuccess: (String) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val res = repo.verifyOtp(phone, otp)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                    onSuccess(res.token)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, "Verify failed: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun openMain() {
         startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
