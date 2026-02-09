@@ -3,16 +3,20 @@ const { jwtSecret } = require("../config/env");
 
 function authMiddleware(req, res, next) {
     const header = req.headers.authorization;
-    if (!header) {
-        return res.status(401).json({ message: "Missing token" });
+
+    if (!header || !header.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Unauthorized" });
     }
+
     const token = header.split(" ")[1];
-    try{
+
+    try {
         const decoded = jwt.verify(token, jwtSecret);
         req.user = decoded;
         next();
-    } catch {
-        res.status(401).json({ message: "Invalid token" });
+    } catch (err) {
+        console.error("JWT error:", err.message);
+        return res.status(401).json({ message: "Invalid token" });
     }
 }
 

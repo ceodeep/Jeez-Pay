@@ -7,6 +7,7 @@ import com.jeezpay.app.network.dto.VerifyOtpRequest
 import com.jeezpay.app.network.dto.VerifyOtpResponse
 
 class AuthRepository {
+    private val api = ApiClient.authApi
 
     suspend fun requestOtp(phone: String): RequestOtpResponse {
         return ApiClient.authApi.requestOtp(RequestOtpRequest(phone))

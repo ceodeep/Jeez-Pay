@@ -14,8 +14,7 @@ data class VerifyOtpRequest(
 // -------- RESPONSES --------
 
 data class RequestOtpResponse(
-    val message: String,
-    val otp: String? = null
+    val message: String
 )
 
 data class VerifyOtpResponse(

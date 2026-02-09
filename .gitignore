@@ -20,3 +20,5 @@ mobile/**/android/key.properties
 #OS
 .DS_Store
 Thumbs.db
+node_modules/
+.env

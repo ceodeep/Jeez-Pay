@@ -1,3 +1,5 @@
+const authMiddleware = require("../middlewares/auth.middleware");
+
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabase");
@@ -13,6 +15,7 @@ async function isAdmin(userId) {
   if (error || !data) return false;
   return data.role === "admin";
 }
+
 
 // GET /wallet/balance
 router.get("/balance", async (req, res) => {

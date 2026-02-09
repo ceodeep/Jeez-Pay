@@ -1,18 +1,19 @@
+const authMiddleware = require("../middlewares/auth.middleware");
 const express = require('express');
 const router = express.Router();
+const supabase = require("../config/supabase");
+const { generateToken } = require("../services/jwt.service");
 
 router.post("/request-otp", (req, res) => {
     const{phone} = req.body;
     if (!phone){
         return res.status(400).json({ message: "Phone required" });
     }
-
     // Mock OTP generation and sending
-    res.json({ message: "OTP sent (mocked)"});
+    res.json({ message: "Enter the code sent to your phone"});
 });
 
-const supabase = require("../config/supabase");
-const { generateToken } = require("../services/jwt.service");
+
 
 router.post("/verify-otp", async (req, res) => {
   try {
@@ -90,6 +91,13 @@ router.post("/verify-otp", async (req, res) => {
     console.error("verify-otp crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
+});
+// 🔐 Test protected route
+router.get("/me", authMiddleware, (req, res) => {
+    res.json({
+        message: "Authenticated",
+        user: req.user
+    });
 });
 
 module.exports = router;
