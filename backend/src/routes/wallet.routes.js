@@ -1,10 +1,8 @@
-const authMiddleware = require("../middlewares/auth.middleware");
-
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabase");
 
-// ---- HELPER: check admin ----
+// ---- helper: check admin ----
 async function isAdmin(userId) {
   const { data, error } = await supabase
     .from("users")
@@ -16,111 +14,179 @@ async function isAdmin(userId) {
   return data.role === "admin";
 }
 
+// ---- helper: normalize currency ----
+function normalizeCurrency(cur) {
+  return String(cur || "").trim().toUpperCase();
+}
 
-// GET /wallet/balance
-router.get("/balance", async (req, res) => {
+const DEFAULT_CURRENCIES = ["USDT", "SDG", "SSP", "EGP", "UGX"];
+
+// ---- helper: ensure a wallet exists for user+currency ----
+async function ensureWallet(userId, currency) {
+  currency = normalizeCurrency(currency);
+
+  const { data: wallet, error } = await supabase
+    .from("wallets")
+    .select("id, balance, currency")
+    .eq("user_id", userId)
+    .eq("currency", currency)
+    .maybeSingle();
+
+  if (error) return { wallet: null, error };
+
+  if (wallet) return { wallet, error: null };
+
+  const { data: created, error: createErr } = await supabase
+    .from("wallets")
+    .insert([{ user_id: userId, currency, balance: 0 }])
+    .select("id, balance, currency")
+    .single();
+
+  if (createErr) return { wallet: null, error: createErr };
+
+  return { wallet: created, error: null };
+}
+
+/**
+ * GET /wallet/balances
+ * Returns all balances for the logged-in user
+ * Response: { balances: [{currency, balance}] }
+ */
+router.get("/balances", async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const { data: wallet, error } = await supabase
+    // Optional: auto-seed missing currencies for existing users
+    // (If you already seeded via SQL, you can remove this loop)
+    for (const cur of DEFAULT_CURRENCIES) {
+      const { error } = await ensureWallet(userId, cur);
+      if (error) {
+        console.error("ensureWallet error:", error);
+        return res.status(500).json({ message: "Failed to ensure wallets" });
+      }
+    }
+
+    const { data, error } = await supabase
       .from("wallets")
-      .select("balance")
+      .select("currency, balance")
       .eq("user_id", userId)
-      .maybeSingle();
+      .order("currency", { ascending: true });
 
     if (error) {
-      return res.status(500).json({ message: "Failed to fetch wallet" });
+      console.error("balances fetch error:", error);
+      return res.status(500).json({ message: "Failed to fetch balances" });
     }
 
-    if (!wallet) {
-      return res.status(404).json({ message: "Wallet not found" });
-    }
-
-    res.json({ balance: wallet.balance });
+    return res.json({ balances: data || [] });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("balances crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// GET /wallet/history (last 50 transactions)
+/**
+ * GET /wallet/balance?currency=USDT
+ * (Optional helper) Returns one currency balance
+ */
+router.get("/balance", async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const currency = normalizeCurrency(req.query.currency || "USDT");
+
+    const { wallet, error } = await ensureWallet(userId, currency);
+    if (error) {
+      console.error("balance ensureWallet error:", error);
+      return res.status(500).json({ message: "Failed to fetch wallet" });
+    }
+
+    return res.json({ currency: wallet.currency, balance: wallet.balance });
+  } catch (err) {
+    console.error("balance crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/**
+ * GET /wallet/history?currency=USDT
+ * Returns last 50 transactions for the selected currency wallet
+ */
 router.get("/history", async (req, res) => {
   try {
     const userId = req.user.userId;
+    const currency = normalizeCurrency(req.query.currency || "USDT");
 
-    const { data: wallet, error: walletErr } = await supabase
-      .from("wallets")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (walletErr || !wallet) {
-      return res.status(404).json({ message: "Wallet not found" });
+    const { wallet, error } = await ensureWallet(userId, currency);
+    if (error) {
+      console.error("history ensureWallet error:", error);
+      return res.status(500).json({ message: "Wallet check failed" });
     }
 
-    const { data: txs, error } = await supabase
+    const { data: txs, error: txErr } = await supabase
       .from("transactions")
       .select("type, amount, description, created_at")
       .eq("wallet_id", wallet.id)
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (error) {
+    if (txErr) {
+      console.error("history tx fetch error:", txErr);
       return res.status(500).json({ message: "Failed to fetch transactions" });
     }
 
-    res.json({ transactions: txs || [] });
+    return res.json({
+      currency,
+      transactions: txs || [],
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("history crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// POST /wallet/credit (ADMIN ONLY)
+/**
+ * POST /wallet/credit (ADMIN ONLY)
+ * Body: { userId, currency, amount, description }
+ */
 router.post("/credit", async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    // Check admin
     const admin = await isAdmin(adminId);
     if (!admin) {
       return res.status(403).json({ message: "Only admin can credit wallets" });
     }
 
     const { userId, amount, description } = req.body;
+    const currency = normalizeCurrency(req.body.currency || "USDT");
 
-    if (!userId || !amount) {
+    if (!userId || amount == null) {
       return res.status(400).json({ message: "userId and amount required" });
     }
 
-    if (Number(amount) <= 0) {
-      return res.status(400).json({ message: "Amount must be positive" });
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ message: "Amount must be a positive number" });
     }
 
-    // Find wallet
-    const { data: wallet, error: walletErr } = await supabase
-      .from("wallets")
-      .select("id, balance")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (walletErr || !wallet) {
+    // Ensure wallet exists for that user+currency
+    const { wallet, error } = await ensureWallet(userId, currency);
+    if (error || !wallet) {
+      console.error("credit ensureWallet error:", error);
       return res.status(404).json({ message: "Wallet not found" });
     }
 
-    const newBalance = wallet.balance + Number(amount);
+    const newBalance = Number(wallet.balance) + numericAmount;
 
     // Create transaction
-    const { error: txErr } = await supabase
-      .from("transactions")
-      .insert({
-        wallet_id: wallet.id,
-        type: "credit",
-        amount: Number(amount),
-        description: description || "Admin top-up",
-      });
+    const { error: txErr } = await supabase.from("transactions").insert({
+      wallet_id: wallet.id,
+      type: "credit",
+      amount: numericAmount,
+      description: description || "Admin top-up",
+    });
 
     if (txErr) {
+      console.error("credit tx error:", txErr);
       return res.status(500).json({ message: "Transaction failed" });
     }
 
@@ -131,16 +197,19 @@ router.post("/credit", async (req, res) => {
       .eq("id", wallet.id);
 
     if (updateErr) {
+      console.error("credit update error:", updateErr);
       return res.status(500).json({ message: "Balance update failed" });
     }
 
-    res.json({
+    return res.json({
       message: "Wallet credited",
+      userId,
+      currency,
       newBalance,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Internal server error" });
+    console.error("credit crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 

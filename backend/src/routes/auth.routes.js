@@ -1,20 +1,26 @@
-const authMiddleware = require("../middlewares/auth.middleware");
-const express = require('express');
+const express = require("express");
 const router = express.Router();
+
 const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
+const authMiddleware = require("../middlewares/auth.middleware");
 
+// You can keep your currencies here
+const DEFAULT_CURRENCIES = ["USDT", "SDG", "SSP", "EGP", "UGX"];
+
+// ---- POST /auth/request-otp ----
 router.post("/request-otp", (req, res) => {
-    const{phone} = req.body;
-    if (!phone){
-        return res.status(400).json({ message: "Phone required" });
-    }
-    // Mock OTP generation and sending
-    res.json({ message: "Enter the code sent to your phone"});
+  const { phone } = req.body;
+
+  if (!phone) {
+    return res.status(400).json({ message: "Phone required" });
+  }
+
+  // Mock OTP generation and sending
+  return res.json({ message: "Enter the code sent to your phone" });
 });
 
-
-
+// ---- POST /auth/verify-otp ----
 router.post("/verify-otp", async (req, res) => {
   try {
     const { phone, otp } = req.body;
@@ -23,11 +29,12 @@ router.post("/verify-otp", async (req, res) => {
       return res.status(400).json({ message: "phone and otp required" });
     }
 
+    // Mock OTP check
     if (otp !== "123456") {
       return res.status(401).json({ message: "Invalid OTP" });
     }
 
-    // 1) Try fetch user (handle not-found safely)
+    // 1) Find user by phone
     const { data: existingUser, error: fetchErr } = await supabase
       .from("users")
       .select("*")
@@ -57,30 +64,24 @@ router.post("/verify-otp", async (req, res) => {
       user = newUser;
     }
 
-    // 3) Ensure wallet exists
-    const { data: wallet, error: walletFetchError } = await supabase
+    // 3) Seed currency wallets (PRO way: one upsert)
+    // NOTE: requires UNIQUE(user_id, currency) for best safety.
+    const seedRows = DEFAULT_CURRENCIES.map((currency) => ({
+      user_id: user.id,
+      currency,
+      balance: 0,
+    }));
+
+    const { error: seedErr } = await supabase
       .from("wallets")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      .upsert(seedRows, { onConflict: "user_id,currency" });
 
-    if (walletFetchError) {
-      console.error("Wallet fetch error:", walletFetchError);
-      return res.status(500).json({ message: "Wallet check failed" });
+    if (seedErr) {
+      console.error("Wallet seeding error:", seedErr);
+      return res.status(500).json({ message: "Wallet seeding failed" });
     }
 
-    if (!wallet) {
-      const { error: walletCreateError } = await supabase
-        .from("wallets")
-        .insert([{ user_id: user.id, balance: 0 }]);
-
-      if (walletCreateError) {
-        console.error("Wallet creation error:", walletCreateError);
-        return res.status(500).json({ message: "Wallet creation failed" });
-      }
-    }
-
-    // 4) Generate token and return
+    // 4) Generate token
     const token = generateToken({
       userId: user.id,
       phone: user.phone,
@@ -92,12 +93,13 @@ router.post("/verify-otp", async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
-// 🔐 Test protected route
+
+// ---- GET /auth/me (protected) ----
 router.get("/me", authMiddleware, (req, res) => {
-    res.json({
-        message: "Authenticated",
-        user: req.user
-    });
+  return res.json({
+    message: "Authenticated",
+    user: req.user,
+  });
 });
 
 module.exports = router;
