@@ -4,6 +4,8 @@ data class BalanceResponse(
     val balance: Double
 )
 
+
+
 data class TxItem(
     val type: String,
     val amount: Double,
@@ -12,7 +14,7 @@ data class TxItem(
 )
 
 data class HistoryResponse(
-    val transactions: List<TxItem> = emptyList()
+    val transactions: List<TransactionDto> = emptyList()
 )
 
 data class WalletBalanceResponse(

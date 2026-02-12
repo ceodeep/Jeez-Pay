@@ -19,6 +19,10 @@
         <!-- =========================
              HOME SCREEN (your current UI)
              ========================= -->
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    android:id="@+id/swipeRefreshLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
         <ScrollView
             android:id="@+id/scrollContent"
             android:layout_width="match_parent"
@@ -202,6 +206,7 @@
                             android:fontFamily="sans-serif-medium"
                             android:includeFontPadding="false"
                             android:layout_marginTop="8dp" />
+
 
                         <View
                             android:layout_width="match_parent"
@@ -561,6 +566,7 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+
                 <!-- RECENT TRANSACTIONS HEADER -->
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -614,7 +620,10 @@
                             android:id="@+id/rvTransactions"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:nestedScrollingEnabled="false"/>
+                            android:nestedScrollingEnabled="false"
+                            android:clipToPadding="false"
+                            android:paddingBottom="6dp"
+                            />
 
                         <!-- Keeps your existing ID for status updates -->
                         <TextView
@@ -633,6 +642,11 @@
 
             </LinearLayout>
         </ScrollView>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+
+
+
 
         <!-- =========================
              CARD SCREEN (placeholder)

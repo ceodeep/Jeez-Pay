@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabase");
+const authMiddleware = require("../middlewares/auth.middleware");
+
 
 // ---- helper: check admin ----
 async function isAdmin(userId) {
@@ -212,5 +214,115 @@ router.post("/credit", async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+// POST /wallet/transfer
+// Body: { toPhone, currency, amount, description }
+
+router.post("/transfer", authMiddleware, async (req, res) => {
+  try {
+    const senderId = req.user.userId;
+    const { phone, amount, currency } = req.body;
+
+    if (!phone || !amount || !currency) {
+      return res.status(400).json({
+        message: "phone, amount, currency required",
+      });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({
+        message: "Invalid amount",
+      });
+    }
+
+    // 1️⃣ Get sender wallet
+    const { data: senderWallet, error: senderErr } = await supabase
+      .from("wallets")
+      .select("*")
+      .eq("user_id", senderId)
+      .eq("currency", currency)
+      .single();
+
+    if (senderErr || !senderWallet) {
+      return res.status(400).json({ message: "Sender wallet not found" });
+    }
+
+    if (senderWallet.balance < amount) {
+      return res.status(400).json({ message: "Insufficient balance" });
+    }
+
+    // 2️⃣ Get receiver by phone
+    const { data: receiverUser, error: userErr } = await supabase
+      .from("users")
+      .select("*")
+      .eq("phone", phone)
+      .single();
+
+    if (userErr || !receiverUser) {
+      return res.status(400).json({ message: "Receiver not found" });
+    }
+
+    // 3️⃣ Get receiver wallet
+    const { data: receiverWallet, error: receiverErr } = await supabase
+      .from("wallets")
+      .select("*")
+      .eq("user_id", receiverUser.id)
+      .eq("currency", currency)
+      .single();
+
+    if (receiverErr || !receiverWallet) {
+      return res.status(400).json({ message: "Receiver wallet not found" });
+    }
+
+    // 4️⃣ Deduct sender
+    const { error: deductErr } = await supabase
+      .from("wallets")
+      .update({
+        balance: senderWallet.balance - amount,
+      })
+      .eq("id", senderWallet.id);
+
+    if (deductErr) {
+      return res.status(500).json({ message: "Failed to deduct sender" });
+    }
+
+    // 5️⃣ Add to receiver
+    const { error: addErr } = await supabase
+      .from("wallets")
+      .update({
+        balance: receiverWallet.balance + amount,
+      })
+      .eq("id", receiverWallet.id);
+
+    if (addErr) {
+      return res.status(500).json({ message: "Failed to credit receiver" });
+    }
+
+    // 6️⃣ Create transactions
+    await supabase.from("transactions").insert([
+      {
+        wallet_id: senderWallet.id,
+        type: "DEBIT",
+        amount,
+        description: `Sent to ${phone}`,
+      },
+      {
+        wallet_id: receiverWallet.id,
+        type: "CREDIT",
+        amount,
+        description: `Received from ${req.user.phone}`,
+      },
+    ]);
+
+    return res.json({ message: "Transfer successful" });
+  } catch (err) {
+    console.error("Transfer error:", err);
+    return res.status(500).json({ message: "Transfer failed" });
+  }
+});
+
+
+
+
 
 module.exports = router;
