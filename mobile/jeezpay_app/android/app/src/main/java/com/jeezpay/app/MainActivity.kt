@@ -1,5 +1,8 @@
 package com.jeezpay.app
 
+import retrofit2.HttpException
+import org.json.JSONObject
+
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -71,6 +74,38 @@ class MainActivity : AppCompatActivity() {
         // You already have nf in your file, so use it
         return "${nf.format(amount)} $code"
     }
+    private fun normalizePhoneSudan(raw: String): String {
+        val p = raw.trim()
+        val digits = p.replace(Regex("\\D"), "")
+
+        return when {
+            digits.startsWith("0") && digits.length >= 10 -> "+249" + digits.substring(1)
+            digits.startsWith("249") -> "+249" + digits.substring(3)
+            p.startsWith("+") && digits.length >= 8 -> "+" + digits
+            digits.length == 9 -> "+249$digits"
+            else -> p
+        }
+    }
+
+
+    private fun getMyPhoneFromJwt(): String? {
+        val token = SessionManager(this).getToken() ?: return null
+
+        return try {
+            val parts = token.split(".")
+            if (parts.size < 2) return null
+
+            val payload = String(
+                android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE)
+            )
+
+            org.json.JSONObject(payload).optString("phone", null)
+
+        } catch (_: Exception) {
+            null
+        }
+    }
+
 
     private fun fetchBalance(currency: String) {
         setBalanceLoading()
@@ -173,7 +208,7 @@ class MainActivity : AppCompatActivity() {
 
         // Transactions recycler
         rvTransactions.layoutManager = LinearLayoutManager(this)
-        txAdapter = TransactionsAdapter()
+        txAdapter = TransactionsAdapter(selectedCode)
         rvTransactions.adapter = txAdapter
 
         // logout
@@ -230,6 +265,8 @@ class MainActivity : AppCompatActivity() {
             WalletBalance("EGP", "Egyptian Pound", R.drawable.flag_egp, 0.0),
             WalletBalance("UGX", "Ugandan Shilling", R.drawable.flag_ugx, 0.0)
         )
+        txAdapter.setCurrency(selectedCode)
+
 
         applySelectedWallet(selectedCode)
         applyBalanceVisibility()
@@ -248,7 +285,6 @@ class MainActivity : AppCompatActivity() {
 
             // ✅ Important: reload balance + transactions for the newly selected currency
             fetchBalanceAndHistory()
-            refreshSelectedCurrency()
         }
 
         rvWalletStrip.adapter = walletStripAdapter
@@ -264,7 +300,6 @@ class MainActivity : AppCompatActivity() {
 
                 // ✅ reload for chosen currency
                 fetchBalanceAndHistory()
-                refreshSelectedCurrency()
             }
         }
     }
@@ -293,13 +328,143 @@ class MainActivity : AppCompatActivity() {
         val etDesc = view.findViewById<android.widget.EditText>(R.id.etSendDesc)
         val btn = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSendNow)
 
+        val spCountry = view.findViewById<android.widget.Spinner>(R.id.spCountryCode)
+        val tvHint = view.findViewById<TextView>(R.id.tvSendPhoneHint)
+
+        // ---- Country codes (you can add more later) ----
+        val countryItems = listOf(
+            "Sudan (+249)",
+            "South Sudan (+211)",
+            "Egypt (+20)",
+            "Uganda (+256)"
+        )
+        val countryCodes = mapOf(
+            "Sudan (+249)" to "+249",
+            "South Sudan (+211)" to "+211",
+            "Egypt (+20)" to "+20",
+            "Uganda (+256)" to "+256"
+        )
+
+        spCountry.adapter = android.widget.ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            countryItems
+        )
+
+        // Default to Sudan (+249)
+        spCountry.setSelection(0)
+
+        val myPhone = getMyPhoneFromJwt() // uses SessionManager token
+
+        fun showHint(text: String, isError: Boolean = false) {
+            tvHint.visibility = View.VISIBLE
+            tvHint.text = text
+            tvHint.setTextColor(
+                if (isError) getColor(android.R.color.holo_red_dark)
+                else getColor(R.color.text_tertiary)
+            )
+        }
+
+        fun hideHint() {
+            tvHint.text = ""
+            tvHint.visibility = View.GONE
+        }
+
+        fun normalizeWithSelectedCountry(raw: String): String {
+            val p = raw.trim()
+            val digits = p.replace("\\D".toRegex(), "")
+
+            val selectedLabel = spCountry.selectedItem?.toString() ?: "Sudan (+249)"
+            val cc = countryCodes[selectedLabel] ?: "+249"
+
+            // If already starts with +
+            if (p.startsWith("+") && digits.isNotBlank()) return "+$digits"
+
+            // If starts with 00 (international)
+            if (digits.startsWith("00") && digits.length > 2) return "+" + digits.substring(2)
+
+            // If user typed country code without plus (e.g. 249xxxxxxxxx)
+            if (digits.startsWith(cc.replace("+", ""))) return cc + digits.removePrefix(cc.replace("+", ""))
+
+            // If user typed local starting 0 (0xxxxxxxxx) -> drop 0 then prefix cc
+            if (digits.startsWith("0") && digits.length >= 10) return cc + digits.substring(1)
+
+            // If they typed just digits (no 0) -> prefix cc
+            if (digits.length in 7..12) return cc + digits
+
+            // fallback
+            return p
+        }
+
+        fun isSendingToSelf(normalizedTarget: String): Boolean {
+            if (myPhone.isNullOrBlank()) return false
+            val mine = normalizeWithSelectedCountry(myPhone) // normalize mine too
+            return mine == normalizedTarget
+        }
+
+        fun validateLive() {
+            val raw = etPhone.text.toString()
+            if (raw.isBlank()) {
+                hideHint()
+                btn.isEnabled = true
+                return
+            }
+
+            val normalized = normalizeWithSelectedCountry(raw)
+
+            // Show a friendly preview
+            showHint("Will send to: $normalized")
+
+            // Disable if sending to self
+            if (isSendingToSelf(normalized)) {
+                btn.isEnabled = false
+                showHint("You can’t send money to your own number.", isError = true)
+            } else {
+                btn.isEnabled = true
+            }
+        }
+
+        // Re-check when typing or changing country
+        etPhone.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                validateLive()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
+        spCountry.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: android.widget.AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                validateLive()
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
+
+        // Initial state
+        validateLive()
+
         btn.setOnClickListener {
-            val phone = etPhone.text.toString().trim()
+            val phoneRaw = etPhone.text.toString().trim()
+            val phone = normalizeWithSelectedCountry(phoneRaw)
+
             val amount = etAmount.text.toString().trim().toDoubleOrNull()
             val desc = etDesc.text.toString().trim().ifEmpty { null }
 
-            if (phone.isBlank() || amount == null || amount <= 0) {
-                android.widget.Toast.makeText(this, "Enter valid phone + amount", android.widget.Toast.LENGTH_SHORT).show()
+            if (phoneRaw.isBlank() || amount == null || amount <= 0) {
+                Toast.makeText(this, "Enter valid phone + amount", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Final safety block
+            if (isSendingToSelf(phone)) {
+                btn.isEnabled = false
+                showHint("You can’t send money to your own number.", isError = true)
                 return@setOnClickListener
             }
 
@@ -307,14 +472,17 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val res = walletRepo.transfer(phone, selectedCode, amount, desc)
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(this@MainActivity, res.message, android.widget.Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, res.message, Toast.LENGTH_SHORT).show()
                         dialog.dismiss()
-                        // refresh UI after transfer
                         fetchBalanceAndHistory()
                     }
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(this@MainActivity, "Transfer failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Transfer failed: ${e.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }
@@ -323,6 +491,7 @@ class MainActivity : AppCompatActivity() {
         dialog.setContentView(view)
         dialog.show()
     }
+
 
 
     private fun setupCustomBottomNav() {
@@ -412,7 +581,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         fetchBalanceAndHistory()
-        refreshSelectedCurrency()
+
     }
 
     /**
@@ -423,35 +592,48 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun fetchBalanceAndHistory() {
+        txAdapter.setCurrency(selectedCode)
 
-        swipeRefreshLayout.isRefreshing = true
+        // start spinner only if view is ready
+        if (::swipeRefreshLayout.isInitialized) {
+            swipeRefreshLayout.isRefreshing = true
+        }
 
         lifecycleScope.launch {
             try {
-
-                // Run network on IO thread
-                val bal = withContext(Dispatchers.IO) {
-                    walletRepo.fetchBalance(selectedCode)
+                // 1) Fetch balances for ALL wallets
+                val balancesMap: Map<String, Double> = withContext(Dispatchers.IO) {
+                    val map = mutableMapOf<String, Double>()
+                    for (w in wallets) {
+                        try {
+                            val res = walletRepo.fetchBalance(w.code)
+                            map[w.code] = res.balance
+                        } catch (_: Exception) {
+                            // keep last known value if one currency fails
+                        }
+                    }
+                    map
                 }
 
+                // apply balances to list
+                for (i in wallets.indices) {
+                    val code = wallets[i].code
+                    balancesMap[code]?.let { wallets[i].amount = it }
+                }
+
+                // 2) Fetch history ONLY for selected wallet
                 val hist = withContext(Dispatchers.IO) {
                     walletRepo.fetchHistory(selectedCode)
                 }
 
-                // Update selected wallet amount
-                val idx = wallets.indexOfFirst { it.code == selectedCode }
-                if (idx != -1) {
-                    wallets[idx].amount = bal.balance
-                }
+                // 3) Update UI
+                applySelectedWallet(selectedCode)              // updates pill + main balance text
+                walletStripAdapter?.notifyDataSetChanged()     // updates horizontal wallet strip
 
-                applySelectedWallet(selectedCode)
-                walletStripAdapter?.notifyDataSetChanged()
-
-                // Update transactions list
-                txAdapter.submit(hist.transactions ?: emptyList())
                 val list = hist.transactions ?: emptyList()
-                txAdapter.submit(list.take(5))
+                txAdapter.submit(list.take(5))                 // show 5 recent (as you want)
 
+                if (list.isEmpty()) showStatus("No transactions yet") else hideStatus()
 
             } catch (e: Exception) {
                 Toast.makeText(
@@ -460,10 +642,13 @@ class MainActivity : AppCompatActivity() {
                     Toast.LENGTH_LONG
                 ).show()
             } finally {
-                swipeRefreshLayout.isRefreshing = false
+                if (::swipeRefreshLayout.isInitialized) {
+                    swipeRefreshLayout.isRefreshing = false
+                }
             }
         }
     }
+
 
 }
 

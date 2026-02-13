@@ -39,4 +39,15 @@
     <color name="nav_ripple">#1A0070E0</color>
 
     <color name="black">#000000</color>
+
+
+    <!-- Soft Fintech System Colors -->
+    <color name="tx_credit">#16A34A</color> <!-- modern green -->
+    <color name="tx_credit_soft">#E6F4EA</color>
+
+    <color name="tx_debit">#DC2626</color> <!-- modern red -->
+    <color name="tx_debit_soft">#FDECEC</color>
+
+    <color name="tx_neutral">#6B7280</color>
+
 </resources>

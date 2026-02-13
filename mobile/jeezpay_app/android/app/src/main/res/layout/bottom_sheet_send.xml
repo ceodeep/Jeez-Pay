@@ -4,45 +4,112 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="18dp">
 
     <TextView
-        android:layout_width="wrap_content"
+        android:id="@+id/tvSendTitle"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Send Money"
         android:textStyle="bold"
-        android:textSize="16sp" />
+        android:textSize="18sp"
+        android:textColor="@color/text_primary"
+        android:includeFontPadding="false" />
 
-    <EditText
-        android:id="@+id/etSendPhone"
+    <View
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="12dp"
-        android:hint="Receiver phone"
-        android:inputType="phone" />
+        android:layout_height="12dp" />
+
+    <!-- Phone row: country code + phone -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <Spinner
+            android:id="@+id/spCountryCode"
+            android:layout_width="110dp"
+            android:layout_height="52dp"
+            android:background="@drawable/input_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <EditText
+            android:id="@+id/etSendPhone"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/input_bg"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:hint="Phone number"
+            android:inputType="phone"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_tertiary"
+            android:includeFontPadding="false" />
+    </LinearLayout>
+
+    <!-- Helper text -->
+    <TextView
+        android:id="@+id/tvSendPhoneHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text=""
+        android:textSize="12sp"
+        android:textColor="@color/text_tertiary"
+        android:visibility="gone"
+        android:includeFontPadding="false" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="12dp" />
 
     <EditText
         android:id="@+id/etSendAmount"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="10dp"
+        android:layout_height="52dp"
+        android:background="@drawable/input_bg"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
         android:hint="Amount"
-        android:inputType="numberDecimal" />
+        android:inputType="numberDecimal"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_tertiary"
+        android:includeFontPadding="false" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="12dp" />
 
     <EditText
         android:id="@+id/etSendDesc"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="10dp"
+        android:layout_height="52dp"
+        android:background="@drawable/input_bg"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
         android:hint="Description (optional)"
-        android:inputType="text" />
+        android:inputType="text"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_tertiary"
+        android:includeFontPadding="false" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="16dp" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnSendNow"
         android:layout_width="match_parent"
         android:layout_height="52dp"
-        android:layout_marginTop="14dp"
-        android:text="Send Now"
+        android:text="Send"
         android:textAllCaps="false" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="10dp" />
 
 </LinearLayout>

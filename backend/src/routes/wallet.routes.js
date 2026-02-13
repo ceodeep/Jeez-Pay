@@ -3,7 +3,6 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const authMiddleware = require("../middlewares/auth.middleware");
 
-
 // ---- helper: check admin ----
 async function isAdmin(userId) {
   const { data, error } = await supabase
@@ -21,6 +20,26 @@ function normalizeCurrency(cur) {
   return String(cur || "").trim().toUpperCase();
 }
 
+// ✅ helper: normalize phone (same logic as auth)
+function normalizePhoneSudan(raw) {
+  const p = String(raw || "").trim();
+  const digits = p.replace(/\D/g, "");
+
+  if (digits.startsWith("0") && digits.length >= 10) {
+    return "+249" + digits.substring(1);
+  }
+  if (digits.startsWith("249")) {
+    return "+249" + digits.substring(3);
+  }
+  if (p.startsWith("+") && digits.length >= 8) {
+    return "+" + digits;
+  }
+  if (digits.length === 9) {
+    return "+249" + digits;
+  }
+  return p;
+}
+
 const DEFAULT_CURRENCIES = ["USDT", "SDG", "SSP", "EGP", "UGX"];
 
 // ---- helper: ensure a wallet exists for user+currency ----
@@ -35,7 +54,6 @@ async function ensureWallet(userId, currency) {
     .maybeSingle();
 
   if (error) return { wallet: null, error };
-
   if (wallet) return { wallet, error: null };
 
   const { data: created, error: createErr } = await supabase
@@ -45,7 +63,6 @@ async function ensureWallet(userId, currency) {
     .single();
 
   if (createErr) return { wallet: null, error: createErr };
-
   return { wallet: created, error: null };
 }
 
@@ -54,12 +71,11 @@ async function ensureWallet(userId, currency) {
  * Returns all balances for the logged-in user
  * Response: { balances: [{currency, balance}] }
  */
-router.get("/balances", async (req, res) => {
+router.get("/balances", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
 
     // Optional: auto-seed missing currencies for existing users
-    // (If you already seeded via SQL, you can remove this loop)
     for (const cur of DEFAULT_CURRENCIES) {
       const { error } = await ensureWallet(userId, cur);
       if (error) {
@@ -90,7 +106,7 @@ router.get("/balances", async (req, res) => {
  * GET /wallet/balance?currency=USDT
  * (Optional helper) Returns one currency balance
  */
-router.get("/balance", async (req, res) => {
+router.get("/balance", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     const currency = normalizeCurrency(req.query.currency || "USDT");
@@ -112,7 +128,7 @@ router.get("/balance", async (req, res) => {
  * GET /wallet/history?currency=USDT
  * Returns last 50 transactions for the selected currency wallet
  */
-router.get("/history", async (req, res) => {
+router.get("/history", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     const currency = normalizeCurrency(req.query.currency || "USDT");
@@ -149,7 +165,7 @@ router.get("/history", async (req, res) => {
  * POST /wallet/credit (ADMIN ONLY)
  * Body: { userId, currency, amount, description }
  */
-router.post("/credit", async (req, res) => {
+router.post("/credit", authMiddleware, async (req, res) => {
   try {
     const adminId = req.user.userId;
 
@@ -167,10 +183,11 @@ router.post("/credit", async (req, res) => {
 
     const numericAmount = Number(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ message: "Amount must be a positive number" });
+      return res
+        .status(400)
+        .json({ message: "Amount must be a positive number" });
     }
 
-    // Ensure wallet exists for that user+currency
     const { wallet, error } = await ensureWallet(userId, currency);
     if (error || !wallet) {
       console.error("credit ensureWallet error:", error);
@@ -179,7 +196,6 @@ router.post("/credit", async (req, res) => {
 
     const newBalance = Number(wallet.balance) + numericAmount;
 
-    // Create transaction
     const { error: txErr } = await supabase.from("transactions").insert({
       wallet_id: wallet.id,
       type: "credit",
@@ -192,7 +208,6 @@ router.post("/credit", async (req, res) => {
       return res.status(500).json({ message: "Transaction failed" });
     }
 
-    // Update balance
     const { error: updateErr } = await supabase
       .from("wallets")
       .update({ balance: newBalance })
@@ -216,113 +231,99 @@ router.post("/credit", async (req, res) => {
 });
 
 // POST /wallet/transfer
-// Body: { toPhone, currency, amount, description }
-
+// Body: { phone, currency, amount, description }
 router.post("/transfer", authMiddleware, async (req, res) => {
   try {
     const senderId = req.user.userId;
-    const { phone, amount, currency } = req.body;
 
-    if (!phone || !amount || !currency) {
-      return res.status(400).json({
-        message: "phone, amount, currency required",
-      });
+    const phoneRaw = req.body.phone;
+    const amountRaw = req.body.amount;
+    const currency = normalizeCurrency(req.body.currency);
+    const description = String(req.body.description || "").trim() || null;
+
+    if (!phoneRaw || amountRaw == null || !currency) {
+      return res.status(400).json({ message: "phone, amount, currency required" });
     }
 
-    if (amount <= 0) {
-      return res.status(400).json({
-        message: "Invalid amount",
-      });
+    const phoneRawClean = String(phoneRaw || "").trim();
+    const phoneNorm = normalizePhoneSudan(phoneRawClean);
+
+    const amount = Number(amountRaw);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: "Invalid amount" });
     }
 
-    // 1️⃣ Get sender wallet
-    const { data: senderWallet, error: senderErr } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("user_id", senderId)
-      .eq("currency", currency)
-      .single();
+    // 1) Resolve receiver user by phone (try raw then normalized)
+    let receiverUser = null;
 
-    if (senderErr || !senderWallet) {
-      return res.status(400).json({ message: "Sender wallet not found" });
-    }
-
-    if (senderWallet.balance < amount) {
-      return res.status(400).json({ message: "Insufficient balance" });
-    }
-
-    // 2️⃣ Get receiver by phone
-    const { data: receiverUser, error: userErr } = await supabase
+    const { data: u1, error: e1 } = await supabase
       .from("users")
-      .select("*")
-      .eq("phone", phone)
-      .single();
+      .select("id, phone")
+      .eq("phone", phoneRawClean)
+      .maybeSingle();
 
-    if (userErr || !receiverUser) {
+    if (e1) {
+      console.error("Receiver lookup error (raw):", e1);
+      return res.status(500).json({ message: "Receiver lookup failed" });
+    }
+    receiverUser = u1;
+
+    if (!receiverUser) {
+      const { data: u2, error: e2 } = await supabase
+        .from("users")
+        .select("id, phone")
+        .eq("phone", phoneNorm)
+        .maybeSingle();
+
+      if (e2) {
+        console.error("Receiver lookup error (normalized):", e2);
+        return res.status(500).json({ message: "Receiver lookup failed" });
+      }
+      receiverUser = u2;
+    }
+
+    if (!receiverUser) {
       return res.status(400).json({ message: "Receiver not found" });
     }
 
-    // 3️⃣ Get receiver wallet
-    const { data: receiverWallet, error: receiverErr } = await supabase
-      .from("wallets")
-      .select("*")
-      .eq("user_id", receiverUser.id)
-      .eq("currency", currency)
-      .single();
-
-    if (receiverErr || !receiverWallet) {
-      return res.status(400).json({ message: "Receiver wallet not found" });
+    if (receiverUser.id === senderId) {
+      return res.status(400).json({ code: "SELF_TRANSFER", message: "You can't send money to your own account" });
     }
 
-    // 4️⃣ Deduct sender
-    const { error: deductErr } = await supabase
-      .from("wallets")
-      .update({
-        balance: senderWallet.balance - amount,
-      })
-      .eq("id", senderWallet.id);
+    // 2) Call RPC (atomic transfer inside Postgres)
+    // This replaces: sender/receiver balance updates + tx inserts
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
+      p_sender_user_id: senderId,
+      p_receiver_phone: phoneNorm,
+      p_currency: currency,
+      p_amount: amount,
+      // keep description stable; if null, RPC can generate defaults
+      p_description: description || `Sent to ${phoneNorm}`,
+    });
 
-    if (deductErr) {
-      return res.status(500).json({ message: "Failed to deduct sender" });
+    if (rpcErr) {
+      console.error("RPC transfer error:", rpcErr);
+      return res.status(400).json({ message: rpcErr.message || "Transfer failed" });
     }
 
-    // 5️⃣ Add to receiver
-    const { error: addErr } = await supabase
-      .from("wallets")
-      .update({
-        balance: receiverWallet.balance + amount,
-      })
-      .eq("id", receiverWallet.id);
+    // Some RPCs return an object, others return an array with one row
+    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
 
-    if (addErr) {
-      return res.status(500).json({ message: "Failed to credit receiver" });
-    }
-
-    // 6️⃣ Create transactions
-    await supabase.from("transactions").insert([
-      {
-        wallet_id: senderWallet.id,
-        type: "DEBIT",
-        amount,
-        description: `Sent to ${phone}`,
-      },
-      {
-        wallet_id: receiverWallet.id,
-        type: "CREDIT",
-        amount,
-        description: `Received from ${req.user.phone}`,
-      },
-    ]);
-
-    return res.json({ message: "Transfer successful" });
+    return res.json({
+      message: "Transfer successful",
+      currency,
+      amount,
+      fromUserId: senderId,
+      toUserId: receiverUser.id,
+      phone: phoneNorm,
+      // If your RPC returns balances, expose them; otherwise null is fine
+      senderBalance: row?.sender_balance ?? row?.senderBalance ?? null,
+      receiverBalance: row?.receiver_balance ?? row?.receiverBalance ?? null,
+    });
   } catch (err) {
     console.error("Transfer error:", err);
     return res.status(500).json({ message: "Transfer failed" });
   }
 });
-
-
-
-
 
 module.exports = router;

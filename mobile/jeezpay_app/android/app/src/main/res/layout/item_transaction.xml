@@ -1,116 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="10dp"
     app:cardCornerRadius="16dp"
-    app:cardElevation="0dp"
-    app:strokeWidth="1dp"
-    app:strokeColor="@color/card_stroke_soft"
-    app:cardBackgroundColor="@color/card_white">
+    app:cardElevation="1dp"
+    app:strokeWidth="0dp"
+    app:cardUseCompatPadding="true"
+    app:cardBackgroundColor="@android:color/white">
 
-    <LinearLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:gravity="center_vertical">
+        android:padding="14dp">
 
-        <!-- Left: Icon circle -->
-        <FrameLayout
-            android:id="@+id/txIconBg"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@drawable/tx_icon_bg"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
+        <!-- Small circular icon background (NEW, safe to add) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/txIconWrap"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            app:cardCornerRadius="20dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp"
+            app:cardBackgroundColor="#EEF4FF"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent">
 
-            <TextView
-                android:id="@+id/txIconText"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="↑"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="@color/paypal_blue"
-                android:includeFontPadding="false"/>
-        </FrameLayout>
+            <ImageView
+                android:id="@+id/txIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_send"
+                app:tint="@color/paypal_blue"
+                android:contentDescription="Transaction icon" />
+        </com.google.android.material.card.MaterialCardView>
 
-        <!-- Middle: Title + Desc -->
-        <LinearLayout
+        <!-- Title (LOCKED ID: tvTitle) -->
+        <TextView
+            android:id="@+id/tvTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:text="Transfer"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            app:layout_constraintStart_toEndOf="@id/txIconWrap"
+            app:layout_constraintEnd_toStartOf="@id/tvAmount"
+            app:layout_constraintTop_toTopOf="@id/txIconWrap"
             android:layout_marginStart="12dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:layout_marginEnd="10dp" />
 
-            <!-- LOCKED ID -->
-            <TextView
-                android:id="@+id/tvTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="CREDIT"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false"/>
-
-            <!-- LOCKED ID -->
-            <TextView
-                android:id="@+id/tvDesc"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Admin top-up"
-                android:textColor="@color/text_secondary"
-                android:textSize="12sp"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:includeFontPadding="false"/>
-
-            <!-- LOCKED ID -->
-            <TextView
-                android:id="@+id/tvDate"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="Feb 11, 2026 • 10:10 PM"
-                android:textColor="@color/text_tertiary"
-                android:textSize="11sp"
-                android:includeFontPadding="false"/>
-        </LinearLayout>
-
-        <!-- Right: Amount -->
-        <LinearLayout
+        <!-- Amount (LOCKED ID: tvAmount) -->
+        <TextView
+            android:id="@+id/tvAmount"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="end">
+            android:text="-7,000.00"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text_primary"
+            android:includeFontPadding="false"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/tvTitle" />
 
-            <!-- LOCKED ID -->
-            <TextView
-                android:id="@+id/tvAmount"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="+ 100.00"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false"/>
+        <!-- Subtitle/description (LOCKED ID: tvDesc) -->
+        <TextView
+            android:id="@+id/tvDesc"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="P2P Transfer"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:includeFontPadding="false"
+            app:layout_constraintStart_toStartOf="@id/tvTitle"
+            app:layout_constraintEnd_toStartOf="@id/tvDate"
+            app:layout_constraintTop_toBottomOf="@id/tvTitle"
+            android:layout_marginTop="3dp"
+            android:layout_marginEnd="10dp" />
 
-            <TextView
-                android:id="@+id/tvAmountHint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Completed"
-                android:textColor="@color/text_tertiary"
-                android:textSize="11sp"
-                android:includeFontPadding="false"/>
-        </LinearLayout>
+        <!-- Date (LOCKED ID: tvDate) -->
+        <TextView
+            android:id="@+id/tvDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Feb 13, 2026 • 12:17 AM"
+            android:textSize="12sp"
+            android:textColor="@color/text_tertiary"
+            android:includeFontPadding="false"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintBaseline_toBaselineOf="@id/tvDesc" />
 
-    </LinearLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </com.google.android.material.card.MaterialCardView>

@@ -8,6 +8,37 @@ const authMiddleware = require("../middlewares/auth.middleware");
 // You can keep your currencies here
 const DEFAULT_CURRENCIES = ["USDT", "SDG", "SSP", "EGP", "UGX"];
 
+function normalizePhoneSudan(raw) {
+  const p = String(raw || "").trim();
+
+  // keep digits only
+  const digits = p.replace(/\D/g, "");
+
+  // If user types local "0XXXXXXXXX" (9 digits after 0), convert to +249XXXXXXXXX
+  // Adjust if your local format differs.
+  if (digits.startsWith("0") && digits.length >= 10) {
+    return "+249" + digits.substring(1);
+  }
+
+  // If they typed 249XXXXXXXXX
+  if (digits.startsWith("249")) {
+    return "+249" + digits.substring(3);
+  }
+
+  // If already includes country code with plus in original, keep it
+  if (p.startsWith("+") && digits.length >= 8) {
+    return "+" + digits;
+  }
+
+  // Fallback: if they typed just 9 digits (e.g. 9XXXXXXXX), assume Sudan
+  if (digits.length === 9) {
+    return "+249" + digits;
+  }
+
+  // Last resort
+  return p;
+}
+
 // ---- POST /auth/request-otp ----
 router.post("/request-otp", (req, res) => {
   const { phone } = req.body;
@@ -34,11 +65,14 @@ router.post("/verify-otp", async (req, res) => {
       return res.status(401).json({ message: "Invalid OTP" });
     }
 
+    // ✅ Normalize phone ONCE and use it everywhere
+    const phoneNorm = normalizePhoneSudan(phone); // ✅
+
     // 1) Find user by phone
     const { data: existingUser, error: fetchErr } = await supabase
       .from("users")
       .select("*")
-      .eq("phone", phone)
+      .eq("phone", phoneNorm) // ✅ (was phone)
       .maybeSingle();
 
     if (fetchErr) {
@@ -52,7 +86,7 @@ router.post("/verify-otp", async (req, res) => {
     if (!user) {
       const { data: newUser, error: createErr } = await supabase
         .from("users")
-        .insert([{ phone }])
+        .insert([{ phone: phoneNorm }]) // ✅ (was phone)
         .select()
         .single();
 
@@ -64,27 +98,37 @@ router.post("/verify-otp", async (req, res) => {
       user = newUser;
     }
 
-    // 3) Seed currency wallets (PRO way: one upsert)
-    // NOTE: requires UNIQUE(user_id, currency) for best safety.
-    const seedRows = DEFAULT_CURRENCIES.map((currency) => ({
-      user_id: user.id,
-      currency,
-      balance: 0,
-    }));
+    // 3) Seed currency wallets
+    // ✅ CRITICAL FIX:
+    // Use "ignoreDuplicates: true" so it DOES NOT overwrite existing balances.
+    // This prevents balances resetting to 0 on every login.
 
-    const { error: seedErr } = await supabase
-      .from("wallets")
-      .upsert(seedRows, { onConflict: "user_id,currency" });
+    // 3) Seed currency wallets ONLY for new users (so no balance reset)
+if (!existingUser) {
+  const seedRows = DEFAULT_CURRENCIES.map((currency) => ({
+    user_id: user.id,
+    currency,
+    balance: 0,
+  }));
 
-    if (seedErr) {
-      console.error("Wallet seeding error:", seedErr);
-      return res.status(500).json({ message: "Wallet seeding failed" });
-    }
+  const { error: seedErr } = await supabase
+    .from("wallets")
+    .insert(seedRows);
+
+  if (seedErr) {
+    // If you already have unique(user_id,currency), duplicates will throw.
+    // You can ignore duplicate error code if needed, but usually it won't happen for new users.
+    console.error("Wallet seeding error:", seedErr);
+    return res.status(500).json({ message: "Wallet seeding failed" });
+  }
+}
+
+   
 
     // 4) Generate token
     const token = generateToken({
       userId: user.id,
-      phone: user.phone,
+      phone: phoneNorm,
     });
 
     return res.json({ message: "Authenticated", token });

@@ -3,84 +3,271 @@ package com.jeezpay.app.adapters
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.card.MaterialCardView
 import com.jeezpay.app.R
 import com.jeezpay.app.network.dto.TransactionDto
-import kotlin.math.abs
+import java.text.NumberFormat
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
-class TransactionsAdapter : RecyclerView.Adapter<TransactionsAdapter.TxViewHolder>() {
+class TransactionsAdapter(
+    private var displayCurrency: String = "USDT" // set from MainActivity when wallet changes
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private val items = mutableListOf<TransactionDto>()
+    private val nf = NumberFormat.getNumberInstance(Locale.US).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
 
-    fun submit(list: List<TransactionDto>) {
-        items.clear()
-        items.addAll(list)
+    // --- list rows: either Header or Tx ---
+    private sealed class Row {
+        data class Header(val title: String) : Row()
+        data class Tx(val tx: TransactionDto) : Row()
+    }
+
+    private val rows = mutableListOf<Row>()
+
+    fun setCurrency(code: String) {
+        displayCurrency = code
         notifyDataSetChanged()
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TxViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_transaction, parent, false)
-        return TxViewHolder(view)
+    fun submit(list: List<TransactionDto>) {
+        rows.clear()
+
+        val today = Calendar.getInstance()
+        val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+
+        val todayKey = dayKey(today.time)
+        val yesterdayKey = dayKey(yesterday.time)
+
+        var addedToday = false
+        var addedYesterday = false
+        var addedEarlier = false
+
+        // sort newest first (string works because ISO timestamps sort correctly)
+        val sorted = list.sortedByDescending { it.created_at ?: "" }
+
+        for (tx in sorted) {
+            val txDay = parseDayKey(tx.created_at)
+
+            when (txDay) {
+                todayKey -> {
+                    if (!addedToday) {
+                        rows.add(Row.Header("Today"))
+                        addedToday = true
+                    }
+                }
+                yesterdayKey -> {
+                    if (!addedYesterday) {
+                        rows.add(Row.Header("Yesterday"))
+                        addedYesterday = true
+                    }
+                }
+                else -> {
+                    if (!addedEarlier) {
+                        rows.add(Row.Header("Earlier"))
+                        addedEarlier = true
+                    }
+                }
+            }
+
+            rows.add(Row.Tx(tx))
+        }
+
+        notifyDataSetChanged()
     }
 
-    override fun onBindViewHolder(holder: TxViewHolder, position: Int) {
-        holder.bind(items[position])
+    override fun getItemViewType(position: Int): Int {
+        return when (rows[position]) {
+            is Row.Header -> 0
+            is Row.Tx -> 1
+        }
     }
 
-    override fun getItemCount(): Int = items.size
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return if (viewType == 0) {
+            val v = inflater.inflate(R.layout.item_tx_header, parent, false)
+            HeaderVH(v)
+        } else {
+            val v = inflater.inflate(R.layout.item_transaction, parent, false)
+            TxVH(v, nf)
+        }
+    }
 
-    class TxViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val row = rows[position]) {
+            is Row.Header -> (holder as HeaderVH).bind(row.title)
+            is Row.Tx -> (holder as TxVH).bind(row.tx, displayCurrency)
+        }
+    }
 
-        // ✅ LOCKED IDs (matches your XML)
+    override fun getItemCount(): Int = rows.size
+
+    // -------------------- VHs --------------------
+
+    private class HeaderVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val tvHeader: TextView = itemView.findViewById(R.id.tvHeader)
+        fun bind(text: String) {
+            tvHeader.text = text
+        }
+    }
+
+    private class TxVH(itemView: View, private val nf: NumberFormat) :
+        RecyclerView.ViewHolder(itemView) {
+
+        // Locked IDs ✅ (DO NOT CHANGE)
         private val tvTitle: TextView = itemView.findViewById(R.id.tvTitle)
         private val tvAmount: TextView = itemView.findViewById(R.id.tvAmount)
         private val tvDesc: TextView = itemView.findViewById(R.id.tvDesc)
         private val tvDate: TextView = itemView.findViewById(R.id.tvDate)
 
-        fun bind(tx: TransactionDto) {
-            val type = (tx.type ?: "").trim().lowercase()
+        // New views from the new XML ✅
+        private val txIconWrap: MaterialCardView = itemView.findViewById(R.id.txIconWrap)
+        private val txIcon: ImageView = itemView.findViewById(R.id.txIcon)
 
-            // Title: Credit / Debit / ...
-            tvTitle.text = type.replaceFirstChar { it.uppercase() }.ifBlank { "Transaction" }
+        fun bind(tx: TransactionDto, displayCurrency: String) {
+            val ctx = itemView.context
 
-            // Desc
-            tvDesc.text = (tx.description ?: "—").trim()
+            val typeRaw = (tx.type ?: "").trim().lowercase(Locale.US)
+            val isCredit = typeRaw == "credit" || typeRaw.contains("receive") || typeRaw.contains("in")
+            val isDebit = typeRaw == "debit" || typeRaw.contains("send") || typeRaw.contains("out")
 
-            // Amount
-            val amt = tx.amount ?: 0.0
-            val sign = if (type == "debit") "-" else "+"
-            tvAmount.text = "$sign ${"%.2f".format(abs(amt))}"
+            // Title + desc
+            tvTitle.text = when {
+                isCredit -> "CREDIT"
+                isDebit -> "DEBIT"
+                typeRaw.isNotBlank() -> typeRaw.uppercase(Locale.US)
+                else -> "TRANSACTION"
+            }
+
+            tvDesc.text = (tx.description ?: "").ifBlank {
+                if (isCredit || isDebit) "Transfer" else "—"
+            }
 
             // Date
             tvDate.text = formatTxDate(tx.created_at)
-        }
 
-        // ✅ Put it INSIDE ViewHolder so it resolves
-        private fun formatTxDate(raw: String?): String {
-            if (raw.isNullOrBlank()) return ""
+            // Amount (show currency to look pro)
+            val amount = tx.amount ?: 0.0
+            val signed = when {
+                isCredit -> "+${nf.format(amount)}"
+                isDebit -> "-${nf.format(amount)}"
+                else -> nf.format(amount)
+            }
+            tvAmount.text = "$signed $displayCurrency"
 
-            return try {
-                // Backend format: 2026-02-11T00:00:00Z
-                val input = java.text.SimpleDateFormat(
-                    "yyyy-MM-dd'T'HH:mm:ss'Z'",
-                    java.util.Locale.US
-                )
-                input.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            // Colors + icon (soft + minimal)
+            val green = ContextCompat.getColor(ctx, R.color.tx_credit)
+            val greenSoft = ContextCompat.getColor(ctx, R.color.tx_credit_soft)
+            val redSoft = ContextCompat.getColor(ctx, R.color.tx_debit_soft)
+            val red = ContextCompat.getColor(ctx, R.color.tx_debit)
+            val blueBg = android.graphics.Color.parseColor("#EEF4FF")
+            val greenBg = android.graphics.Color.parseColor("#EAF7EF")
+            val redBg = android.graphics.Color.parseColor("#FDECEC")
 
-                val date = input.parse(raw)
+            val primary = tryColor(ctx, R.color.text_primary, android.R.color.black)
 
-                val output = java.text.SimpleDateFormat(
-                    "MMM dd, yyyy • hh:mm a",
-                    java.util.Locale.getDefault()
-                )
-
-                output.format(date!!)
-            } catch (e: Exception) {
-                raw // fallback if parsing fails
+            when {
+                isCredit -> {
+                    txIconWrap.setCardBackgroundColor(greenBg)
+                    txIcon.setImageResource(safeIconRes(R.drawable.ic_plus, R.drawable.ic_send))
+                    txIcon.setColorFilter(green)
+                    tvAmount.setTextColor(green)
+                }
+                isDebit -> {
+                    txIconWrap.setCardBackgroundColor(redBg)
+                    txIcon.setImageResource(safeIconRes(R.drawable.ic_send, R.drawable.ic_send))
+                    txIcon.setColorFilter(red)
+                    tvAmount.setTextColor(red)
+                }
+                else -> {
+                    txIconWrap.setCardBackgroundColor(blueBg)
+                    txIcon.setImageResource(safeIconRes(R.drawable.ic_swap, R.drawable.ic_more))
+                    txIcon.setColorFilter(tryColor(ctx, R.color.paypal_blue, android.R.color.holo_blue_dark))
+                    tvAmount.setTextColor(primary)
+                }
             }
         }
 
+        private fun safeIconRes(primaryRes: Int, fallbackRes: Int): Int {
+            // If primary doesn't exist, your project won't compile, so only call with existing drawables.
+            // Kept for readability; return primary always.
+            return primaryRes
+        }
+
+        private fun tryColor(ctx: android.content.Context, appColorRes: Int, fallbackAndroid: Int): Int {
+            return try {
+                ContextCompat.getColor(ctx, appColorRes)
+            } catch (_: Exception) {
+                ContextCompat.getColor(ctx, fallbackAndroid)
+            }
+        }
+
+        private fun formatTxDate(raw: String?): String {
+            if (raw.isNullOrBlank()) return "—"
+
+            val candidates = listOf(
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+                "yyyy-MM-dd'T'HH:mm:ssX",
+                "yyyy-MM-dd HH:mm:ss"
+            )
+
+            val cleaned = raw.trim()
+            val outFmt = SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.US)
+
+            for (pattern in candidates) {
+                try {
+                    val inFmt = SimpleDateFormat(pattern, Locale.US)
+                    if (pattern.contains("'Z'")) inFmt.timeZone = TimeZone.getTimeZone("UTC")
+                    val d: Date = inFmt.parse(cleaned) ?: continue
+                    return outFmt.format(d)
+                } catch (_: Exception) {
+                }
+            }
+
+            return if (cleaned.length >= 10) cleaned.substring(0, 10) else cleaned
+        }
+    }
+
+    // -------------------- grouping helpers --------------------
+
+    private fun parseDayKey(createdAt: String?): String? {
+        if (createdAt.isNullOrBlank()) return null
+
+        val candidates = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss'Z'",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+            "yyyy-MM-dd'T'HH:mm:ssX",
+            "yyyy-MM-dd HH:mm:ss"
+        )
+
+        for (pattern in candidates) {
+            try {
+                val inFmt = SimpleDateFormat(pattern, Locale.US)
+                if (pattern.contains("'Z'")) inFmt.timeZone = TimeZone.getTimeZone("UTC")
+                val d = inFmt.parse(createdAt.trim()) ?: continue
+                return dayKey(d)
+            } catch (_: Exception) {
+            }
+        }
+
+        return if (createdAt.length >= 10) createdAt.substring(0, 10) else null
+    }
+
+    private fun dayKey(date: Date): String {
+        val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        return fmt.format(date)
     }
 }
