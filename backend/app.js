@@ -21,6 +21,13 @@ app.get("/health", (req, res) => {
 });
 
 
+app.get("/", (req, res) => {
+  res.status(200).json({ ok: true, service: "JeezPay API" });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({ ok: true });
+});
 
 app.get("/me", authMiddleware, (req, res) => {
     res.json({user: req.user});

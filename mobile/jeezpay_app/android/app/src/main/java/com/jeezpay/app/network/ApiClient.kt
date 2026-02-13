@@ -10,7 +10,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 object ApiClient {
 
     // Emulator -> PC localhost
-    private const val BASE_URL = "http://10.0.2.2:3000/"
+    private const val BASE_URL = "https://jeez-pay.onrender.com"
 
     private lateinit var sessionManager: SessionManager
     private lateinit var retrofit: Retrofit
