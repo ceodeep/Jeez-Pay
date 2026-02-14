@@ -29,6 +29,8 @@
     <color name="ripple_soft">#220070F3</color>
 
 
+    <color name="bg_app">#F6F7FB</color>
+    <color name="card_bg">#FFFFFF</color>
 
     <color name="btn_bg">#F0F4FF</color>
     <color name="divider">#E9EEF6</color>

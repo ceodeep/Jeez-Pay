@@ -33,6 +33,8 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 
 class MainActivity : AppCompatActivity() {
+    private lateinit var profileCard: View
+
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
     private val walletRepo = WalletRepository()
@@ -205,6 +207,17 @@ class MainActivity : AppCompatActivity() {
             fetchBalanceAndHistory()
         }
 
+        val profileCard = findViewById<View>(R.id.profileCard)
+        profileCard.setOnClickListener {
+            startActivity(Intent(this, KycActivity::class.java))
+        }
+
+
+        profileCard.setOnClickListener {
+            startActivity(Intent(this, KycActivity::class.java))
+        }
+
+
 
         // Transactions recycler
         rvTransactions.layoutManager = LinearLayoutManager(this)
@@ -233,6 +246,10 @@ class MainActivity : AppCompatActivity() {
         tvCurrency = findViewById(R.id.tvCurrency)
 
         actionText = findViewById(R.id.actionText)
+
+
+
+        profileCard = findViewById(R.id.profileCard)
 
         navHome = findViewById(R.id.navHome)
         navCard = findViewById(R.id.navCard)

@@ -12,6 +12,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/JeezPayTheme">
+        <activity android:name=".KycActivity" />
+
 
         <!-- AUTH is the ONLY launcher -->
         <activity

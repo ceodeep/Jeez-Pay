@@ -5,13 +5,14 @@ const morgan = require("morgan");
 const authRoutes = require("./src/routes/auth.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
-
+const kycRoutes = require("./src/routes/kyc.routes");
 
 const app = express();
 
 app.use(morgan("dev"));
 app.use(cors());
 app.use(express.json());
+app.use("/kyc", kycRoutes);
 
 app.use("/auth", authRoutes);
 app.use("/wallet", authMiddleware, walletRoutes);
