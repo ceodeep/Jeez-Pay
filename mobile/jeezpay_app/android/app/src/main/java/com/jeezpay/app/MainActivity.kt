@@ -1,8 +1,5 @@
 package com.jeezpay.app
 
-import retrofit2.HttpException
-import org.json.JSONObject
-
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
@@ -11,8 +8,10 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.jeezpay.app.adapters.TransactionsAdapter
 import com.jeezpay.app.adapters.WalletPickerAdapter
@@ -25,15 +24,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Locale
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import com.jeezpay.app.ProfileActivity
 
 
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var profileCard: View
+    private lateinit var imgProfile: View
+
 
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
@@ -200,6 +197,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val imgProfile = findViewById<View>(R.id.imgProfile)
+
+        imgProfile.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
+
+
 
         bindViews()
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
@@ -209,12 +213,10 @@ class MainActivity : AppCompatActivity() {
 
         val profileCard = findViewById<View>(R.id.profileCard)
         profileCard.setOnClickListener {
-            startActivity(Intent(this, KycActivity::class.java))
+            startActivity(Intent(this, ProfileActivity::class.java))
         }
-
-
-        profileCard.setOnClickListener {
-            startActivity(Intent(this, KycActivity::class.java))
+        imgProfile.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
         }
 
 
@@ -225,8 +227,8 @@ class MainActivity : AppCompatActivity() {
         rvTransactions.adapter = txAdapter
 
         // logout
-        val tvLogout = findViewById<TextView>(R.id.tvLogout)
-        tvLogout.setOnClickListener { doLogout() }
+//        val tvLogout = findViewById<TextView>(R.id.tvLogout)
+//        tvLogout.setOnClickListener { doLogout() }
 
         setupWallets()
         setupCurrencyPill()
@@ -249,7 +251,7 @@ class MainActivity : AppCompatActivity() {
 
 
 
-        profileCard = findViewById(R.id.profileCard)
+        imgProfile = findViewById(R.id.imgProfile)
 
         navHome = findViewById(R.id.navHome)
         navCard = findViewById(R.id.navCard)

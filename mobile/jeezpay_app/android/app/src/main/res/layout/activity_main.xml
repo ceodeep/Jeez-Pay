@@ -58,20 +58,20 @@
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
                         app:layout_constraintBottom_toBottomOf="parent" />
-                    <TextView
-                        android:id="@+id/tvLogout"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Logout"
-                        android:textColor="@color/paypal_blue"
-                        android:textSize="13sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:includeFontPadding="false"
-                        android:padding="8dp"
-                        app:layout_constraintEnd_toStartOf="@id/profileCard"
-                        app:layout_constraintTop_toTopOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        android:layout_marginEnd="6dp"/>
+<!--                    <TextView-->
+<!--                        android:id="@+id/tvLogout"-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:text="Logout"-->
+<!--                        android:textColor="@color/paypal_blue"-->
+<!--                        android:textSize="13sp"-->
+<!--                        android:fontFamily="sans-serif-medium"-->
+<!--                        android:includeFontPadding="false"-->
+<!--                        android:padding="8dp"-->
+<!--                        app:layout_constraintEnd_toStartOf="@id/profileCard"-->
+<!--                        app:layout_constraintTop_toTopOf="parent"-->
+<!--                        app:layout_constraintBottom_toBottomOf="parent"-->
+<!--                        android:layout_marginEnd="6dp"/>-->
 
 
                     <com.google.android.material.card.MaterialCardView

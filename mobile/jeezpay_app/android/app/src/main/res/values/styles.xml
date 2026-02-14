@@ -2,7 +2,7 @@
 <resources>
 
 
-    <style name="JeezPayTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="JeezPayTheme" parent="Theme.Material3.DayNight.NoActionBar">
 
         <!-- Real primary (used by Material internally) -->
         <item name="colorPrimary">@color/paypal_blue</item>

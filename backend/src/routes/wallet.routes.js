@@ -106,23 +106,20 @@ router.get("/balances", authMiddleware, async (req, res) => {
  * GET /wallet/balance?currency=USDT
  * (Optional helper) Returns one currency balance
  */
-router.get("/balance", authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const currency = normalizeCurrency(req.query.currency || "USDT");
+router.get("/balances", authMiddleware, async (req, res) => {
+  const userId = req.user.userId;
 
-    const { wallet, error } = await ensureWallet(userId, currency);
-    if (error) {
-      console.error("balance ensureWallet error:", error);
-      return res.status(500).json({ message: "Failed to fetch wallet" });
-    }
+  const { data, error } = await supabase
+    .from("wallets")
+    .select("currency, balance")
+    .eq("user_id", userId)
+    .order("currency", { ascending: true });
 
-    return res.json({ currency: wallet.currency, balance: wallet.balance });
-  } catch (err) {
-    console.error("balance crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
-  }
+  if (error) return res.status(500).json({ message: "Failed to fetch balances" });
+
+  return res.json({ balances: data || [] });
 });
+
 
 /**
  * GET /wallet/history?currency=USDT

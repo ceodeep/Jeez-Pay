@@ -12,7 +12,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/JeezPayTheme">
-        <activity android:name=".KycActivity" />
+        <activity android:name=".KycActivity"  android:exported="false"/>
 
 
         <!-- AUTH is the ONLY launcher -->
@@ -29,6 +29,11 @@
         <activity
             android:name=".MainActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="false" />
+
 
     </application>
 
