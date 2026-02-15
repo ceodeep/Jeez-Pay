@@ -3,34 +3,24 @@ package com.jeezpay.app
 import android.app.DatePickerDialog
 import android.net.Uri
 import android.os.Bundle
-import android.widget.ImageView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.appbar.MaterialToolbar
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.card.MaterialCardView
-import com.google.android.material.textfield.TextInputEditText
+import androidx.lifecycle.lifecycleScope
+import com.jeezpay.app.databinding.ActivityKycBinding
+import com.jeezpay.app.network.SignedUploader
+import com.jeezpay.app.network.dto.KycSubmitRequest
+import com.jeezpay.app.repository.KycRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
 
 class KycActivity : AppCompatActivity() {
 
-    private lateinit var toolbar: MaterialToolbar
-
-    private lateinit var etFullName: TextInputEditText
-    private lateinit var etDob: TextInputEditText
-    private lateinit var etAddress: TextInputEditText
-
-    private lateinit var cardIdUpload: MaterialCardView
-    private lateinit var cardSelfieUpload: MaterialCardView
-
-    private lateinit var imgIdPreview: ImageView
-    private lateinit var imgSelfiePreview: ImageView
-
-    private lateinit var btnPickId: MaterialButton
-    private lateinit var btnPickSelfie: MaterialButton
-    private lateinit var btnSubmit: MaterialButton
+    private lateinit var binding: ActivityKycBinding
+    private val repo = KycRepository()
 
     private var idUri: Uri? = null
     private var selfieUri: Uri? = null
@@ -38,111 +28,167 @@ class KycActivity : AppCompatActivity() {
     private val pickId = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             idUri = uri
-            imgIdPreview.setImageURI(uri)
+            binding.imgIdPreview.setImageURI(uri)
+            binding.btnPickId.text = "ID selected"
         }
-        updateSubmitState()
     }
 
     private val pickSelfie = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             selfieUri = uri
-            imgSelfiePreview.setImageURI(uri)
+            binding.imgSelfiePreview.setImageURI(uri)
+            binding.btnPickSelfie.text = "Selfie selected"
         }
-        updateSubmitState()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_kyc)
+        binding = ActivityKycBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        bindViews()
-        setupUi()
-        updateSubmitState()
-    }
-
-    private fun bindViews() {
-        toolbar = findViewById(R.id.toolbarKyc)
-
-        etFullName = findViewById(R.id.etFullName)
-        etDob = findViewById(R.id.etDob)
-        etAddress = findViewById(R.id.etAddress)
-
-        cardIdUpload = findViewById(R.id.cardIdUpload)
-        cardSelfieUpload = findViewById(R.id.cardSelfieUpload)
-
-        imgIdPreview = findViewById(R.id.imgIdPreview)
-        imgSelfiePreview = findViewById(R.id.imgSelfiePreview)
-
-        btnPickId = findViewById(R.id.btnPickId)
-        btnPickSelfie = findViewById(R.id.btnPickSelfie)
-        btnSubmit = findViewById(R.id.btnSubmitKyc)
-    }
-
-    private fun setupUi() {
-        // Back arrow
-        toolbar.setNavigationOnClickListener { finish() }
+        // Toolbar back
+        binding.toolbarKyc.setNavigationOnClickListener { finish() }
 
         // DOB picker
-        etDob.setOnClickListener { showDobPicker() }
+        binding.etDob.setOnClickListener { openDobPicker() }
+        // also allow clicking the end icon area
+        binding.etDob.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) openDobPicker()
+        }
 
-        // Pickers (card + button both work)
-        cardIdUpload.setOnClickListener { pickId.launch("image/*") }
-        btnPickId.setOnClickListener { pickId.launch("image/*") }
+        // Pickers
+        binding.btnPickId.setOnClickListener { pickId.launch("image/*") }
+        binding.btnPickSelfie.setOnClickListener { pickSelfie.launch("image/*") }
 
-        cardSelfieUpload.setOnClickListener { pickSelfie.launch("image/*") }
-        btnPickSelfie.setOnClickListener { pickSelfie.launch("image/*") }
+        // Submit
+        binding.btnSubmitKyc.setOnClickListener { submitKyc() }
 
-        btnSubmit.setOnClickListener {
-            val fullName = etFullName.text?.toString()?.trim().orEmpty()
-            val dob = etDob.text?.toString()?.trim().orEmpty()
-            val address = etAddress.text?.toString()?.trim().orEmpty()
+        // Prefill from API if exists
+        prefillFromServer()
+    }
 
-            if (fullName.length < 3) {
-                toast("Enter your full name")
-                return@setOnClickListener
+    private fun prefillFromServer() {
+        lifecycleScope.launch {
+            try {
+                val kyc = repo.me().kyc ?: return@launch
+
+                binding.etFullName.setText(kyc.full_name ?: "")
+                binding.etDob.setText(kyc.dob ?: "")
+                binding.etAddress.setText(kyc.address ?: "")
+
+                // Since your bucket is private, we can't reliably preview existing uploads here
+                // without another endpoint to generate signed READ url.
+                // We still show a helpful hint via button text.
+                if (!kyc.id_path.isNullOrBlank()) binding.btnPickId.text = "ID uploaded (replace)"
+                if (!kyc.selfie_path.isNullOrBlank()) binding.btnPickSelfie.text = "Selfie uploaded (replace)"
+
+                // Optional: if pending/approved, you can change submit button text
+                val status = kyc.status?.lowercase(Locale.ROOT)
+                if (status == "approved") {
+                    binding.btnSubmitKyc.text = "KYC Approved"
+                    binding.btnSubmitKyc.isEnabled = false
+                } else if (status == "pending") {
+                    binding.btnSubmitKyc.text = "Update & Resubmit"
+                }
+            } catch (_: Exception) {
+                // ignore; user can still submit
             }
-            if (dob.isBlank()) {
-                toast("Pick your date of birth")
-                return@setOnClickListener
-            }
-            if (address.length < 5) {
-                toast("Enter your address")
-                return@setOnClickListener
-            }
-            if (idUri == null || selfieUri == null) {
-                toast("Upload ID and selfie")
-                return@setOnClickListener
-            }
-
-            // Next step: call your backend /kyc/upload-url then /kyc/submit
-            toast("KYC UI OK ✅ Next: upload to Supabase + submit")
-            finish()
         }
     }
 
-    private fun updateSubmitState() {
-        val fullNameOk = !etFullName.text.isNullOrBlank()
-        val dobOk = !etDob.text.isNullOrBlank()
-        val addressOk = !etAddress.text.isNullOrBlank()
-        val docsOk = (idUri != null && selfieUri != null)
-
-        btnSubmit.isEnabled = fullNameOk && dobOk && addressOk && docsOk
-        btnSubmit.alpha = if (btnSubmit.isEnabled) 1f else 0.6f
+    private fun openDobPicker() {
+        val cal = Calendar.getInstance()
+        val dlg = DatePickerDialog(
+            this,
+            { _, year, month, dayOfMonth ->
+                // month is 0-based
+                val mm = (month + 1).toString().padStart(2, '0')
+                val dd = dayOfMonth.toString().padStart(2, '0')
+                binding.etDob.setText("$year-$mm-$dd")
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        )
+        dlg.show()
     }
 
-    private fun showDobPicker() {
-        val cal = Calendar.getInstance()
-        val y = cal.get(Calendar.YEAR)
-        val m = cal.get(Calendar.MONTH)
-        val d = cal.get(Calendar.DAY_OF_MONTH)
+    private fun submitKyc() {
+        val fullName = binding.etFullName.text?.toString()?.trim().orEmpty()
+        val dob = binding.etDob.text?.toString()?.trim().orEmpty()
+        val address = binding.etAddress.text?.toString()?.trim().orEmpty()
 
-        DatePickerDialog(this, { _, year, month, day ->
-            // YYYY-MM-DD
-            val mm = String.format(Locale.US, "%02d", month + 1)
-            val dd = String.format(Locale.US, "%02d", day)
-            etDob.setText("$year-$mm-$dd")
-            updateSubmitState()
-        }, y, m, d).show()
+        val localIdUri = idUri
+        val localSelfieUri = selfieUri
+
+        if (fullName.isBlank() || dob.isBlank() || address.isBlank()) {
+            toast("Please fill full name, DOB, and address")
+            return
+        }
+
+        // Require fresh selections for now (keeps flow simple + matches milestone)
+        if (localIdUri == null || localSelfieUri == null) {
+            toast("Please choose both ID photo and selfie")
+            return
+        }
+
+        setLoading(true)
+
+        lifecycleScope.launch {
+            try {
+                // 1) Get signed upload for ID
+                val idContentType = contentResolver.getType(localIdUri) ?: "image/jpeg"
+                val idUpload = repo.uploadUrl("id", idContentType)
+                val idBytes = readAllBytes(localIdUri)
+
+                withContext(Dispatchers.IO) {
+                    SignedUploader.putBytes(idUpload.signedUrl, idBytes, idContentType)
+                }
+
+                // 2) Get signed upload for Selfie
+                val selfieContentType = contentResolver.getType(localSelfieUri) ?: "image/jpeg"
+                val selfieUpload = repo.uploadUrl("selfie", selfieContentType)
+                val selfieBytes = readAllBytes(localSelfieUri)
+
+                withContext(Dispatchers.IO) {
+                    SignedUploader.putBytes(selfieUpload.signedUrl, selfieBytes, selfieContentType)
+                }
+
+                // 3) Submit KYC with storage paths
+                repo.submit(
+                    KycSubmitRequest(
+                        fullName = fullName,
+                        dob = dob,
+                        address = address,
+                        idPath = idUpload.path,
+                        selfiePath = selfieUpload.path
+                    )
+                )
+
+                toast("KYC submitted (pending)")
+                finish()
+
+            } catch (e: Exception) {
+                toast(e.message ?: "KYC submission failed")
+            } finally {
+                setLoading(false)
+            }
+        }
+    }
+
+    private fun readAllBytes(uri: Uri): ByteArray {
+        contentResolver.openInputStream(uri).use { input ->
+            if (input == null) throw IllegalStateException("Can't open selected file")
+            return input.readBytes()
+        }
+    }
+
+    private fun setLoading(loading: Boolean) {
+        binding.btnSubmitKyc.isEnabled = !loading
+        binding.btnPickId.isEnabled = !loading
+        binding.btnPickSelfie.isEnabled = !loading
+
+        binding.btnSubmitKyc.text = if (loading) "Submitting..." else "Submit KYC"
     }
 
     private fun toast(msg: String) {

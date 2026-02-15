@@ -33,6 +33,10 @@
         <activity
             android:name=".ProfileActivity"
             android:exported="false" />
+        <activity android:name=".ProfileDetailsActivity" android:exported="false"/>
+        <activity android:name=".SecurityActivity" android:exported="false"/>
+        <activity android:name=".PaymentSettingsActivity" android:exported="false"/>
+        <activity android:name=".AboutActivity" android:exported="false"/>
 
 
     </application>

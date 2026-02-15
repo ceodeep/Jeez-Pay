@@ -19,7 +19,7 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:src="@drawable/ic_hub"
-            android:tint="@color/text_primary" />
+            app:tint="@color/text_primary" />
 
         <TextView
             android:layout_width="0dp"
@@ -32,6 +32,7 @@
             android:textColor="@color/text_primary" />
     </LinearLayout>
 
+    <!-- KYC card (only if not verified) -->
     <!-- KYC card (only if not verified) -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/kycCard"
@@ -49,15 +50,33 @@
             android:padding="16dp"
             android:orientation="vertical">
 
+            <!-- Status chip -->
             <TextView
+                android:id="@+id/tvKycStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="KYC"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/paypal_blue"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:background="@drawable/currency_pill_bg" />
+
+            <TextView
+                android:id="@+id/tvKycTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
                 android:text="Complete your KYC"
                 android:textStyle="bold"
                 android:textSize="16sp"
                 android:textColor="@color/text_primary"/>
 
             <TextView
+                android:id="@+id/tvKycDesc"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
@@ -74,6 +93,7 @@
 
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+
 
     <!-- Menu rows -->
     <com.google.android.material.card.MaterialCardView
@@ -102,7 +122,7 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:src="@drawable/ic_wallet"
-                    android:tint="@color/text_primary" />
+                    app:tint="@color/text_primary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -117,7 +137,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_hub"
-                    android:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
 
             <View
@@ -139,7 +159,7 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:src="@drawable/ic_settings"
-                    android:tint="@color/text_primary" />
+                    app:tint="@color/text_primary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -154,7 +174,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_hub"
-                    android:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
 
             <View
@@ -175,7 +195,7 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:src="@drawable/ic_card"
-                    android:tint="@color/text_primary" />
+                    app:tint="@color/text_primary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -190,7 +210,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_hub"
-                    android:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
 
             <View
@@ -211,7 +231,7 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:src="@drawable/ic_history"
-                    android:tint="@color/text_primary" />
+                    app:tint="@color/text_primary" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -226,7 +246,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_hub"
-                    android:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
 
             <View
@@ -247,7 +267,7 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:src="@drawable/ic_send"
-                    android:tint="@android:color/holo_red_dark" />
+                    app:tint="@android:color/holo_red_dark" />
 
                 <TextView
                     android:layout_width="wrap_content"
