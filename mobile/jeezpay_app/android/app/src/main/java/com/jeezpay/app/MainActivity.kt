@@ -25,6 +25,9 @@ import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Locale
 import com.jeezpay.app.ProfileActivity
+import com.jeezpay.app.repository.KycRepository
+import androidx.appcompat.app.AlertDialog
+
 
 
 
@@ -487,25 +490,49 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
+            // ✅ KYC GATE HERE (before transfer)
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    val res = walletRepo.transfer(phone, selectedCode, amount, desc)
+                    val kyc = KycRepository().me().kyc
+                    val status = kyc?.status?.lowercase()
+
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, res.message, Toast.LENGTH_SHORT).show()
-                        dialog.dismiss()
-                        fetchBalanceAndHistory()
+                        if (status != "approved") {
+                            dialog.dismiss() // close sheet so user sees dialog clearly
+                            if (status == "pending") showKycPendingDialog()
+                            else showKycRequiredDialog()
+                            return@withContext
+                        }
+
+                        // ✅ Only approved reaches here -> do transfer
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val res = walletRepo.transfer(phone, selectedCode, amount, desc)
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(this@MainActivity, res.message, Toast.LENGTH_SHORT).show()
+                                    dialog.dismiss()
+                                    fetchBalanceAndHistory()
+                                }
+                            } catch (e: Exception) {
+                                withContext(Dispatchers.Main) {
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        "Transfer failed: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
                     }
+
                 } catch (e: Exception) {
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Transfer failed: ${e.message}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        Toast.makeText(this@MainActivity, "KYC check failed", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
         }
+
 
         dialog.setContentView(view)
         dialog.show()
@@ -667,6 +694,30 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+
+    private fun showKycRequiredDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("KYC Required")
+            .setMessage("You must complete KYC to unlock transfers & higher limits.")
+            .setPositiveButton("Start KYC") { _, _ ->
+                startActivity(Intent(this, KycActivity::class.java))
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showKycPendingDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("KYC Pending")
+            .setMessage("Your KYC is under review. Transfers are disabled until approval.")
+            .setPositiveButton("View KYC") { _, _ ->
+                startActivity(Intent(this, KycActivity::class.java))
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
 
 
 }

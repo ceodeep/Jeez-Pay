@@ -233,6 +233,25 @@ router.post("/transfer", authMiddleware, async (req, res) => {
   try {
     const senderId = req.user.userId;
 
+    // ---- KYC CHECK ----
+const { data: kyc, error: kycErr } = await supabase
+  .from("kyc_profiles")
+  .select("status")
+  .eq("user_id", senderId)
+  .maybeSingle();
+
+if (kycErr) {
+  return res.status(500).json({ message: "KYC check failed" });
+}
+
+if (!kyc || kyc.status !== "approved") {
+  return res.status(403).json({
+    code: "KYC_REQUIRED",
+    message: "KYC must be approved before transfers"
+  });
+}
+
+
     const phoneRaw = req.body.phone;
     const amountRaw = req.body.amount;
     const currency = normalizeCurrency(req.body.currency);
