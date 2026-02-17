@@ -71,6 +71,11 @@ async function ensureWallet(userId, currency) {
  * Returns all balance for the logged-in user
  * Response: { balance: [{currency, balance}] }
  */
+/**
+ * GET /wallet/balance
+ * Returns all balances for the logged-in user
+ * Response: { balances: [{currency, balance}] }
+ */
 router.get("/balance", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -92,16 +97,17 @@ router.get("/balance", authMiddleware, async (req, res) => {
 
     if (error) {
       console.error("balance fetch error:", error);
-
       return res.status(500).json({ message: "Failed to fetch balances" });
     }
 
-    return res.json({ balance: data || [] });
+    // ✅ IMPORTANT: "balances" key (matches app DTO)
+    return res.json({ balances: data || [] });
   } catch (err) {
     console.error("balance crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 
 
