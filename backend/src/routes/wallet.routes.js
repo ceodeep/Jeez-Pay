@@ -71,7 +71,7 @@ async function ensureWallet(userId, currency) {
  * Returns all balances for the logged-in user
  * Response: { balances: [{currency, balance}] }
  */
-router.get("/balances", authMiddleware, async (req, res) => {
+router.get("/balance", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
 
@@ -106,7 +106,7 @@ router.get("/balances", authMiddleware, async (req, res) => {
  * GET /wallet/balance?currency=USDT
  * (Optional helper) Returns one currency balance
  */
-router.get("/balances", authMiddleware, async (req, res) => {
+router.get("/balance", authMiddleware, async (req, res) => {
   const userId = req.user.userId;
 
   const { data, error } = await supabase
