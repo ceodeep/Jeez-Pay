@@ -15,6 +15,29 @@ async function isAdmin(userId) {
   return data.role === "admin";
 }
 
+async function getUserRole(userId) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.role || null;
+}
+
+async function getUserByPhone(phone) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, phone, role")
+    .eq("phone", phone)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+
 // ---- helper: normalize currency ----
 function normalizeCurrency(cur) {
   return String(cur || "").trim().toUpperCase();
