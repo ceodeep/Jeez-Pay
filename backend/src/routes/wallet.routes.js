@@ -67,9 +67,9 @@ async function ensureWallet(userId, currency) {
 }
 
 /**
- * GET /wallet/balances
- * Returns all balances for the logged-in user
- * Response: { balances: [{currency, balance}] }
+ * GET /wallet/balance
+ * Returns all balance for the logged-in user
+ * Response: { balance: [{currency, balance}] }
  */
 router.get("/balance", authMiddleware, async (req, res) => {
   try {
@@ -91,13 +91,13 @@ router.get("/balance", authMiddleware, async (req, res) => {
       .order("currency", { ascending: true });
 
     if (error) {
-      console.error("balances fetch error:", error);
-      return res.status(500).json({ message: "Failed to fetch balances" });
+      console.error("balance fetch error:", error);
+      return res.status(500).json({ message: "Failed to fetch balance" });
     }
 
-    return res.json({ balances: data || [] });
+    return res.json({ balance: data || [] });
   } catch (err) {
-    console.error("balances crash:", err);
+    console.error("balance crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
