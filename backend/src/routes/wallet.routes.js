@@ -67,9 +67,9 @@ async function ensureWallet(userId, currency) {
 }
 
 /**
- * GET /wallet/balances
- * Returns all balances for the logged-in user
- * Response: { balances: [{currency, balance}] }
+ * GET /wallet/balance
+ * Returns all balance for the logged-in user
+ * Response: { balance: [{currency, balance}] }
  */
 router.get("/balance", authMiddleware, async (req, res) => {
   try {
@@ -92,33 +92,19 @@ router.get("/balance", authMiddleware, async (req, res) => {
 
     if (error) {
       console.error("balance fetch error:", error);
+
       return res.status(500).json({ message: "Failed to fetch balances" });
     }
 
-    return res.json({ balances: data || [] });
+    return res.json({ balance: data || [] });
   } catch (err) {
-    console.error("balances crash:", err);
+    console.error("balance crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-/**
- * GET /wallet/balance?currency=USDT
- * (Optional helper) Returns one currency balance
- */
-router.get("/balance", authMiddleware, async (req, res) => {
-  const userId = req.user.userId;
 
-  const { data, error } = await supabase
-    .from("wallets")
-    .select("currency, balance")
-    .eq("user_id", userId)
-    .order("currency", { ascending: true });
 
-  if (error) return res.status(500).json({ message: "Failed to fetch balances" });
-
-  return res.json({ balances: data || [] });
-});
 
 
 /**
