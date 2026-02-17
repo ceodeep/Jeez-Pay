@@ -37,7 +37,6 @@ async function getUserByPhone(phone) {
   return data || null;
 }
 
-
 // ---- helper: normalize currency ----
 function normalizeCurrency(cur) {
   return String(cur || "").trim().toUpperCase();
@@ -89,11 +88,18 @@ async function ensureWallet(userId, currency) {
   return { wallet: created, error: null };
 }
 
-/**
- * GET /wallet/balance
- * Returns all balance for the logged-in user
- * Response: { balance: [{currency, balance}] }
- */
+// ---- helper: KYC gate ----
+async function requireKycApproved(userId) {
+  const { data: kyc, error: kycErr } = await supabase
+    .from("kyc_profiles")
+    .select("status")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (kycErr) throw kycErr;
+  return !!kyc && kyc.status === "approved";
+}
+
 /**
  * GET /wallet/balance
  * Returns all balances for the logged-in user
@@ -123,18 +129,12 @@ router.get("/balance", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to fetch balances" });
     }
 
-    // ✅ IMPORTANT: "balances" key (matches app DTO)
     return res.json({ balances: data || [] });
   } catch (err) {
     console.error("balance crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
-
-
-
-
-
 
 /**
  * GET /wallet/history?currency=USDT
@@ -195,9 +195,7 @@ router.post("/credit", authMiddleware, async (req, res) => {
 
     const numericAmount = Number(amount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res
-        .status(400)
-        .json({ message: "Amount must be a positive number" });
+      return res.status(400).json({ message: "Amount must be a positive number" });
     }
 
     const { wallet, error } = await ensureWallet(userId, currency);
@@ -242,32 +240,24 @@ router.post("/credit", authMiddleware, async (req, res) => {
   }
 });
 
-// POST /wallet/transfer
-// Body: { phone, currency, amount, description }
+/**
+ * POST /wallet/transfer
+ * Body: { phone, currency, amount, description }
+ * USER -> USER transfer (KYC gated)
+ */
 router.post("/transfer", authMiddleware, async (req, res) => {
   try {
     const senderId = req.user.userId;
 
-    // ---- KYC CHECK ----
-const { data: kyc, error: kycErr } = await supabase
-  .from("kyc_profiles")
-  .select("status")
-  .eq("user_id", senderId)
-  .maybeSingle();
+    const okKyc = await requireKycApproved(senderId);
+    if (!okKyc) {
+      return res.status(403).json({
+        code: "KYC_REQUIRED",
+        message: "KYC must be approved before transfers",
+      });
+    }
 
-if (kycErr) {
-  return res.status(500).json({ message: "KYC check failed" });
-}
-
-if (!kyc || kyc.status !== "approved") {
-  return res.status(403).json({
-    code: "KYC_REQUIRED",
-    message: "KYC must be approved before transfers"
-  });
-}
-
-
-    const phoneRaw = req.body.phone;
+    const phoneRaw = String(req.body.phone || "").trim();
     const amountRaw = req.body.amount;
     const currency = normalizeCurrency(req.body.currency);
     const description = String(req.body.description || "").trim() || null;
@@ -276,59 +266,27 @@ if (!kyc || kyc.status !== "approved") {
       return res.status(400).json({ message: "phone, amount, currency required" });
     }
 
-    const phoneRawClean = String(phoneRaw || "").trim();
-    const phoneNorm = normalizePhoneSudan(phoneRawClean);
+    const phoneNorm = normalizePhoneSudan(phoneRaw);
 
     const amount = Number(amountRaw);
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
 
-    // 1) Resolve receiver user by phone (try raw then normalized)
-    let receiverUser = null;
+    // receiver lookup (try raw then normalized)
+    let receiverUser = await getUserByPhone(phoneRaw);
+    if (!receiverUser) receiverUser = await getUserByPhone(phoneNorm);
 
-    const { data: u1, error: e1 } = await supabase
-      .from("users")
-      .select("id, phone")
-      .eq("phone", phoneRawClean)
-      .maybeSingle();
-
-    if (e1) {
-      console.error("Receiver lookup error (raw):", e1);
-      return res.status(500).json({ message: "Receiver lookup failed" });
-    }
-    receiverUser = u1;
-
-    if (!receiverUser) {
-      const { data: u2, error: e2 } = await supabase
-        .from("users")
-        .select("id, phone")
-        .eq("phone", phoneNorm)
-        .maybeSingle();
-
-      if (e2) {
-        console.error("Receiver lookup error (normalized):", e2);
-        return res.status(500).json({ message: "Receiver lookup failed" });
-      }
-      receiverUser = u2;
-    }
-
-    if (!receiverUser) {
-      return res.status(400).json({ message: "Receiver not found" });
-    }
-
+    if (!receiverUser) return res.status(400).json({ message: "Receiver not found" });
     if (receiverUser.id === senderId) {
       return res.status(400).json({ code: "SELF_TRANSFER", message: "You can't send money to your own account" });
     }
 
-    // 2) Call RPC (atomic transfer inside Postgres)
-    // This replaces: sender/receiver balance updates + tx inserts
     const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
       p_sender_user_id: senderId,
       p_receiver_phone: phoneNorm,
       p_currency: currency,
       p_amount: amount,
-      // keep description stable; if null, RPC can generate defaults
       p_description: description || `Sent to ${phoneNorm}`,
     });
 
@@ -337,7 +295,6 @@ if (!kyc || kyc.status !== "approved") {
       return res.status(400).json({ message: rpcErr.message || "Transfer failed" });
     }
 
-    // Some RPCs return an object, others return an array with one row
     const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
 
     return res.json({
@@ -347,13 +304,219 @@ if (!kyc || kyc.status !== "approved") {
       fromUserId: senderId,
       toUserId: receiverUser.id,
       phone: phoneNorm,
-      // If your RPC returns balances, expose them; otherwise null is fine
       senderBalance: row?.sender_balance ?? row?.senderBalance ?? null,
       receiverBalance: row?.receiver_balance ?? row?.receiverBalance ?? null,
     });
   } catch (err) {
     console.error("Transfer error:", err);
     return res.status(500).json({ message: "Transfer failed" });
+  }
+});
+
+/**
+ * POST /wallet/agent-cash-in  (AGENT -> USER)
+ * Body: { phone, currency, amount, description, fee }
+ */
+router.post("/agent-cash-in", authMiddleware, async (req, res) => {
+  try {
+    const agentId = req.user.userId;
+
+    const agentRole = await getUserRole(agentId);
+    if (agentRole !== "agent") {
+      return res.status(403).json({ message: "Only agents can cash-in users" });
+    }
+
+    const phoneRaw = String(req.body.phone || "").trim();
+    const phoneNorm = normalizePhoneSudan(phoneRaw);
+    const currency = normalizeCurrency(req.body.currency);
+    const amount = Number(req.body.amount);
+    const fee = Number(req.body.fee ?? 0);
+    const description = String(req.body.description || "").trim() || null;
+
+    if (!phoneRaw || !currency || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: "phone, currency, amount required" });
+    }
+    if (!Number.isFinite(fee) || fee < 0) {
+      return res.status(400).json({ message: "Invalid fee" });
+    }
+
+    let customer = await getUserByPhone(phoneRaw);
+    if (!customer) customer = await getUserByPhone(phoneNorm);
+
+    if (!customer) return res.status(400).json({ message: "Customer not found" });
+    if (customer.id === agentId) return res.status(400).json({ message: "You can't cash-in yourself" });
+    if (customer.role !== "user") return res.status(400).json({ message: "Customer must be a user" });
+
+    // Transfer money AGENT -> USER (agent must have balance/float)
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
+      p_sender_user_id: agentId,
+      p_receiver_phone: phoneNorm,
+      p_currency: currency,
+      p_amount: amount,
+      p_description: description || `Agent cash-in to ${phoneNorm}`,
+    });
+
+    if (rpcErr) {
+      console.error("agent-cash-in RPC error:", rpcErr);
+      return res.status(400).json({ message: rpcErr.message || "Cash-in failed" });
+    }
+
+    // ledger record (non-blocking is okay, but we'll handle error)
+    const { error: opErr } = await supabase.from("agent_operations").insert({
+      type: "cash_in",
+      agent_user_id: agentId,
+      customer_user_id: customer.id,
+      currency,
+      amount,
+      fee,
+      description: description || `Cash-in`,
+      status: "completed",
+    });
+
+    if (opErr) {
+      console.error("agent_operations insert error:", opErr);
+      // Transfer succeeded; we still return success but warn in logs
+    }
+
+    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+
+    return res.json({
+      message: "Cash-in successful",
+      currency,
+      amount,
+      fee,
+      agentUserId: agentId,
+      customerUserId: customer.id,
+      phone: phoneNorm,
+      senderBalance: row?.sender_balance ?? row?.senderBalance ?? null,
+      receiverBalance: row?.receiver_balance ?? row?.receiverBalance ?? null,
+    });
+  } catch (err) {
+    console.error("agent-cash-in error:", err);
+    return res.status(500).json({ message: "Cash-in failed" });
+  }
+});
+
+/**
+ * POST /wallet/agent-cash-out  (USER -> AGENT)
+ * Body: { phone, currency, amount, description, fee }
+ * KYC REQUIRED for the USER
+ */
+router.post("/agent-cash-out", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const userRole = await getUserRole(userId);
+    if (userRole !== "user") {
+      return res.status(403).json({ message: "Only users can cash-out" });
+    }
+
+    const okKyc = await requireKycApproved(userId);
+    if (!okKyc) {
+      return res.status(403).json({
+        code: "KYC_REQUIRED",
+        message: "KYC must be approved before cash-out",
+      });
+    }
+
+    const phoneRaw = String(req.body.phone || "").trim();
+    const phoneNorm = normalizePhoneSudan(phoneRaw);
+    const currency = normalizeCurrency(req.body.currency);
+    const amount = Number(req.body.amount);
+    const fee = Number(req.body.fee ?? 0);
+    const description = String(req.body.description || "").trim() || null;
+
+    if (!phoneRaw || !currency || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: "phone, currency, amount required" });
+    }
+    if (!Number.isFinite(fee) || fee < 0) {
+      return res.status(400).json({ message: "Invalid fee" });
+    }
+
+    let agent = await getUserByPhone(phoneRaw);
+    if (!agent) agent = await getUserByPhone(phoneNorm);
+
+    if (!agent) return res.status(400).json({ message: "Agent not found" });
+    if (agent.id === userId) return res.status(400).json({ message: "You can't cash-out to yourself" });
+    if (agent.role !== "agent") return res.status(400).json({ message: "Receiver must be an agent" });
+
+    // Transfer money USER -> AGENT
+    const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
+      p_sender_user_id: userId,
+      p_receiver_phone: phoneNorm,
+      p_currency: currency,
+      p_amount: amount,
+      p_description: description || `Agent cash-out to ${phoneNorm}`,
+    });
+
+    if (rpcErr) {
+      console.error("agent-cash-out RPC error:", rpcErr);
+      return res.status(400).json({ message: rpcErr.message || "Cash-out failed" });
+    }
+
+    const { error: opErr } = await supabase.from("agent_operations").insert({
+      type: "cash_out",
+      agent_user_id: agent.id,
+      customer_user_id: userId,
+      currency,
+      amount,
+      fee,
+      description: description || `Cash-out`,
+      status: "completed",
+    });
+
+    if (opErr) {
+      console.error("agent_operations insert error:", opErr);
+    }
+
+    const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+
+    return res.json({
+      message: "Cash-out successful",
+      currency,
+      amount,
+      fee,
+      agentUserId: agent.id,
+      customerUserId: userId,
+      phone: phoneNorm,
+      senderBalance: row?.sender_balance ?? row?.senderBalance ?? null,
+      receiverBalance: row?.receiver_balance ?? row?.receiverBalance ?? null,
+    });
+  } catch (err) {
+    console.error("agent-cash-out error:", err);
+    return res.status(500).json({ message: "Cash-out failed" });
+  }
+});
+
+/**
+ * GET /wallet/agent/operations
+ * Agent can view their ledger
+ */
+router.get("/agent/operations", authMiddleware, async (req, res) => {
+  try {
+    const agentId = req.user.userId;
+
+    const role = await getUserRole(agentId);
+    if (role !== "agent") {
+      return res.status(403).json({ message: "Only agents can view operations" });
+    }
+
+    const { data, error } = await supabase
+      .from("agent_operations")
+      .select("id, type, currency, amount, fee, description, status, created_at, customer_user_id")
+      .eq("agent_user_id", agentId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error("agent ops fetch error:", error);
+      return res.status(500).json({ message: "Failed to fetch agent operations" });
+    }
+
+    return res.json({ operations: data || [] });
+  } catch (err) {
+    console.error("agent ops crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
