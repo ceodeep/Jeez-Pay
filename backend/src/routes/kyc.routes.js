@@ -5,6 +5,19 @@ const supabase = require("../config/supabase");
 const supabaseAdmin = require("../config/supabaseAdmin");
 const authMiddleware = require("../middlewares/auth.middleware");
 
+// ---- helper: check admin ----
+async function isAdmin(userId) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) return false;
+  return data.role === "admin";
+}
+
+
 // Keep bucket private in Supabase dashboard
 const KYC_BUCKET = "kyc-documents";
 
@@ -139,5 +152,67 @@ router.get("/me", authMiddleware, async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+/**
+ * POST /kyc/approve  (ADMIN ONLY)
+ * Body: { userId }
+ * Sets kyc_profiles.status = 'approved'
+ */
+router.post("/approve", authMiddleware, async (req, res) => {
+  try {
+    const adminId = req.user.userId;
+    const ok = await isAdmin(adminId);
+
+    if (!ok) {
+      return res.status(403).json({ message: "Only admin can approve KYC" });
+    }
+
+    const targetUserId = String(req.body.userId || "").trim();
+    if (!targetUserId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+
+    // Make sure the user has a KYC row
+    const { data: existing, error: findErr } = await supabase
+      .from("kyc_profiles")
+      .select("id, status")
+      .eq("user_id", targetUserId)
+      .maybeSingle();
+
+    if (findErr) {
+      console.error("KYC find error:", findErr);
+      return res.status(500).json({ message: "Failed to find KYC profile" });
+    }
+
+    if (!existing) {
+      return res.status(404).json({ message: "KYC profile not found for this user" });
+    }
+
+    const { data: updated, error: upErr } = await supabase
+      .from("kyc_profiles")
+      .update({
+        status: "approved",
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: adminId,
+      })
+      .eq("user_id", targetUserId)
+      .select("user_id, status, reviewed_at, reviewed_by")
+      .single();
+
+    if (upErr) {
+      console.error("KYC approve error:", upErr);
+      return res.status(500).json({ message: "Failed to approve KYC" });
+    }
+
+    return res.json({
+      message: "KYC approved",
+      kyc: updated,
+    });
+  } catch (err) {
+    console.error("KYC approve crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 
 module.exports = router;

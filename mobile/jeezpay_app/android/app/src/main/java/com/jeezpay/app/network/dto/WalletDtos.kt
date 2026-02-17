@@ -1,26 +1,32 @@
 package com.jeezpay.app.network.dto
 
-data class BalanceResponse(
+import com.google.gson.annotations.SerializedName
+
+// ---------- BALANCE ----------
+data class BalanceItem(
+    val currency: String,
     val balance: Double
 )
 
-
-
-data class TxItem(
-    val type: String,
-    val amount: Double,
-    val description: String?,
-    val created_at: String
+data class BalanceResponse(
+    @SerializedName(value = "balances", alternate = ["balance"])
+    val balances: List<BalanceItem> = emptyList()
 )
 
+// ---------- HISTORY ----------
+
 data class HistoryResponse(
+    val currency: String? = null,
     val transactions: List<TransactionDto> = emptyList()
 )
 
+// Keep these only if you REALLY use them somewhere else.
+// Otherwise delete them to avoid confusion.
 data class WalletBalanceResponse(
-    val balance: Double
+    val balances: List<BalanceItem> = emptyList()
 )
 
 data class WalletHistoryResponse(
-    val transactions: List<TransactionDto>
+    val currency: String? = null,
+    val transactions: List<TransactionDto> = emptyList()
 )

@@ -115,14 +115,13 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 val res = walletRepo.fetchBalance(currency)
+                val bal = res.balances.firstOrNull { it.currency == currency }?.balance ?: 0.0
 
                 withContext(Dispatchers.Main) {
                     val w = wallets.firstOrNull { it.code == currency }
                     if (w != null) {
-                        w.amount = res.balance
+                        w.amount = bal
                     }
-
-                    // show balance for the selected wallet
                     applyBalanceVisibility()
                 }
             } catch (e: Exception) {
@@ -132,6 +131,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+
 
     private fun fetchHistory(currency: String) {
         showStatus("Loading transactions...")
@@ -653,7 +654,8 @@ class MainActivity : AppCompatActivity() {
                     for (w in wallets) {
                         try {
                             val res = walletRepo.fetchBalance(w.code)
-                            map[w.code] = res.balance
+                            map[w.code] = res.balances.firstOrNull { it.currency == w.code }?.balance ?: 0.0
+
                         } catch (_: Exception) {
                             // keep last known value if one currency fails
                         }
