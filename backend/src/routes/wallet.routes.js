@@ -296,17 +296,16 @@ router.post("/transfer", authMiddleware, async (req, res) => {
     }
 
     const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+const payload = row?.wallet_transfer ?? row ?? {};
 
-    return res.json({
-      message: "Transfer successful",
-      currency,
-      amount,
-      fromUserId: senderId,
-      toUserId: receiverUser.id,
-      phone: phoneNorm,
-      senderBalance: row?.sender_balance ?? row?.senderBalance ?? null,
-      receiverBalance: row?.receiver_balance ?? row?.receiverBalance ?? null,
-    });
+return res.json({
+  message: payload.message || "Transfer successful",
+  currency: payload.currency || currency,
+  amount: Number(payload.amount ?? amount),
+  phone: payload.phone || phoneNorm,
+  reference: payload.reference || null,
+});
+
   } catch (err) {
     console.error("Transfer error:", err);
     return res.status(500).json({ message: "Transfer failed" });

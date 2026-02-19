@@ -338,206 +338,208 @@ class MainActivity : AppCompatActivity() {
     private fun setupActionButtons() {
         val btnSend = findViewById<View>(R.id.btnSend)
         btnSend.setOnClickListener {
-            showSendSheet()
+            startActivity(Intent(this, com.jeezpay.app.ui.send.SendMoneyActivity::class.java))
         }
     }
 
-    private fun showSendSheet() {
-        val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.bottom_sheet_send, null)
-
-        val etPhone = view.findViewById<android.widget.EditText>(R.id.etSendPhone)
-        val etAmount = view.findViewById<android.widget.EditText>(R.id.etSendAmount)
-        val etDesc = view.findViewById<android.widget.EditText>(R.id.etSendDesc)
-        val btn = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSendNow)
-
-        val spCountry = view.findViewById<android.widget.Spinner>(R.id.spCountryCode)
-        val tvHint = view.findViewById<TextView>(R.id.tvSendPhoneHint)
-
-        // ---- Country codes (you can add more later) ----
-        val countryItems = listOf(
-            "Sudan (+249)",
-            "South Sudan (+211)",
-            "Egypt (+20)",
-            "Uganda (+256)"
-        )
-        val countryCodes = mapOf(
-            "Sudan (+249)" to "+249",
-            "South Sudan (+211)" to "+211",
-            "Egypt (+20)" to "+20",
-            "Uganda (+256)" to "+256"
-        )
-
-        spCountry.adapter = android.widget.ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_dropdown_item,
-            countryItems
-        )
-
-        // Default to Sudan (+249)
-        spCountry.setSelection(0)
-
-        val myPhone = getMyPhoneFromJwt() // uses SessionManager token
-
-        fun showHint(text: String, isError: Boolean = false) {
-            tvHint.visibility = View.VISIBLE
-            tvHint.text = text
-            tvHint.setTextColor(
-                if (isError) getColor(android.R.color.holo_red_dark)
-                else getColor(R.color.text_tertiary)
-            )
-        }
-
-        fun hideHint() {
-            tvHint.text = ""
-            tvHint.visibility = View.GONE
-        }
-
-        fun normalizeWithSelectedCountry(raw: String): String {
-            val p = raw.trim()
-            val digits = p.replace("\\D".toRegex(), "")
-
-            val selectedLabel = spCountry.selectedItem?.toString() ?: "Sudan (+249)"
-            val cc = countryCodes[selectedLabel] ?: "+249"
-
-            // If already starts with +
-            if (p.startsWith("+") && digits.isNotBlank()) return "+$digits"
-
-            // If starts with 00 (international)
-            if (digits.startsWith("00") && digits.length > 2) return "+" + digits.substring(2)
-
-            // If user typed country code without plus (e.g. 249xxxxxxxxx)
-            if (digits.startsWith(cc.replace("+", ""))) return cc + digits.removePrefix(cc.replace("+", ""))
-
-            // If user typed local starting 0 (0xxxxxxxxx) -> drop 0 then prefix cc
-            if (digits.startsWith("0") && digits.length >= 10) return cc + digits.substring(1)
-
-            // If they typed just digits (no 0) -> prefix cc
-            if (digits.length in 7..12) return cc + digits
-
-            // fallback
-            return p
-        }
-
-        fun isSendingToSelf(normalizedTarget: String): Boolean {
-            if (myPhone.isNullOrBlank()) return false
-            val mine = normalizeWithSelectedCountry(myPhone) // normalize mine too
-            return mine == normalizedTarget
-        }
-
-        fun validateLive() {
-            val raw = etPhone.text.toString()
-            if (raw.isBlank()) {
-                hideHint()
-                btn.isEnabled = true
-                return
-            }
-
-            val normalized = normalizeWithSelectedCountry(raw)
-
-            // Show a friendly preview
-            showHint("Will send to: $normalized")
-
-            // Disable if sending to self
-            if (isSendingToSelf(normalized)) {
-                btn.isEnabled = false
-                showHint("You can’t send money to your own number.", isError = true)
-            } else {
-                btn.isEnabled = true
-            }
-        }
-
-        // Re-check when typing or changing country
-        etPhone.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                validateLive()
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
-
-        spCountry.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: android.widget.AdapterView<*>?,
-                view: View?,
-                position: Int,
-                id: Long
-            ) {
-                validateLive()
-            }
-
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-        }
-
-        // Initial state
-        validateLive()
-
-        btn.setOnClickListener {
-            val phoneRaw = etPhone.text.toString().trim()
-            val phone = normalizeWithSelectedCountry(phoneRaw)
-
-            val amount = etAmount.text.toString().trim().toDoubleOrNull()
-            val desc = etDesc.text.toString().trim().ifEmpty { null }
-
-            if (phoneRaw.isBlank() || amount == null || amount <= 0) {
-                Toast.makeText(this, "Enter valid phone + amount", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            // Final safety block
-            if (isSendingToSelf(phone)) {
-                btn.isEnabled = false
-                showHint("You can’t send money to your own number.", isError = true)
-                return@setOnClickListener
-            }
-
-            // ✅ KYC GATE HERE (before transfer)
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val kyc = KycRepository().me().kyc
-                    val status = kyc?.status?.lowercase()
-
-                    withContext(Dispatchers.Main) {
-                        if (status != "approved") {
-                            dialog.dismiss() // close sheet so user sees dialog clearly
-                            if (status == "pending") showKycPendingDialog()
-                            else showKycRequiredDialog()
-                            return@withContext
-                        }
-
-                        // ✅ Only approved reaches here -> do transfer
-                        CoroutineScope(Dispatchers.IO).launch {
-                            try {
-                                val res = walletRepo.transfer(phone, selectedCode, amount, desc)
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(this@MainActivity, res.message, Toast.LENGTH_SHORT).show()
-                                    dialog.dismiss()
-                                    fetchBalanceAndHistory()
-                                }
-                            } catch (e: Exception) {
-                                withContext(Dispatchers.Main) {
-                                    Toast.makeText(
-                                        this@MainActivity,
-                                        "Transfer failed: ${e.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            }
-                        }
-                    }
-
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@MainActivity, "KYC check failed", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        }
 
 
-        dialog.setContentView(view)
-        dialog.show()
-    }
+//    private fun showSendSheet() {
+//        val dialog = BottomSheetDialog(this)
+//        val view = layoutInflater.inflate(R.layout.bottom_sheet_send, null)
+//
+//        val etPhone = view.findViewById<android.widget.EditText>(R.id.etSendPhone)
+//        val etAmount = view.findViewById<android.widget.EditText>(R.id.etSendAmount)
+//        val etDesc = view.findViewById<android.widget.EditText>(R.id.etSendDesc)
+//        val btn = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSendNow)
+//
+//        val spCountry = view.findViewById<android.widget.Spinner>(R.id.spCountryCode)
+//        val tvHint = view.findViewById<TextView>(R.id.tvSendPhoneHint)
+//
+//        // ---- Country codes (you can add more later) ----
+//        val countryItems = listOf(
+//            "Sudan (+249)",
+//            "South Sudan (+211)",
+//            "Egypt (+20)",
+//            "Uganda (+256)"
+//        )
+//        val countryCodes = mapOf(
+//            "Sudan (+249)" to "+249",
+//            "South Sudan (+211)" to "+211",
+//            "Egypt (+20)" to "+20",
+//            "Uganda (+256)" to "+256"
+//        )
+//
+//        spCountry.adapter = android.widget.ArrayAdapter(
+//            this,
+//            android.R.layout.simple_spinner_dropdown_item,
+//            countryItems
+//        )
+//
+//        // Default to Sudan (+249)
+//        spCountry.setSelection(0)
+//
+//        val myPhone = getMyPhoneFromJwt() // uses SessionManager token
+//
+//        fun showHint(text: String, isError: Boolean = false) {
+//            tvHint.visibility = View.VISIBLE
+//            tvHint.text = text
+//            tvHint.setTextColor(
+//                if (isError) getColor(android.R.color.holo_red_dark)
+//                else getColor(R.color.text_tertiary)
+//            )
+//        }
+//
+//        fun hideHint() {
+//            tvHint.text = ""
+//            tvHint.visibility = View.GONE
+//        }
+//
+//        fun normalizeWithSelectedCountry(raw: String): String {
+//            val p = raw.trim()
+//            val digits = p.replace("\\D".toRegex(), "")
+//
+//            val selectedLabel = spCountry.selectedItem?.toString() ?: "Sudan (+249)"
+//            val cc = countryCodes[selectedLabel] ?: "+249"
+//
+//            // If already starts with +
+//            if (p.startsWith("+") && digits.isNotBlank()) return "+$digits"
+//
+//            // If starts with 00 (international)
+//            if (digits.startsWith("00") && digits.length > 2) return "+" + digits.substring(2)
+//
+//            // If user typed country code without plus (e.g. 249xxxxxxxxx)
+//            if (digits.startsWith(cc.replace("+", ""))) return cc + digits.removePrefix(cc.replace("+", ""))
+//
+//            // If user typed local starting 0 (0xxxxxxxxx) -> drop 0 then prefix cc
+//            if (digits.startsWith("0") && digits.length >= 10) return cc + digits.substring(1)
+//
+//            // If they typed just digits (no 0) -> prefix cc
+//            if (digits.length in 7..12) return cc + digits
+//
+//            // fallback
+//            return p
+//        }
+//
+//        fun isSendingToSelf(normalizedTarget: String): Boolean {
+//            if (myPhone.isNullOrBlank()) return false
+//            val mine = normalizeWithSelectedCountry(myPhone) // normalize mine too
+//            return mine == normalizedTarget
+//        }
+//
+//        fun validateLive() {
+//            val raw = etPhone.text.toString()
+//            if (raw.isBlank()) {
+//                hideHint()
+//                btn.isEnabled = true
+//                return
+//            }
+//
+//            val normalized = normalizeWithSelectedCountry(raw)
+//
+//            // Show a friendly preview
+//            showHint("Will send to: $normalized")
+//
+//            // Disable if sending to self
+//            if (isSendingToSelf(normalized)) {
+//                btn.isEnabled = false
+//                showHint("You can’t send money to your own number.", isError = true)
+//            } else {
+//                btn.isEnabled = true
+//            }
+//        }
+//
+//        // Re-check when typing or changing country
+//        etPhone.addTextChangedListener(object : android.text.TextWatcher {
+//            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+//            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+//                validateLive()
+//            }
+//            override fun afterTextChanged(s: android.text.Editable?) {}
+//        })
+//
+//        spCountry.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+//            override fun onItemSelected(
+//                parent: android.widget.AdapterView<*>?,
+//                view: View?,
+//                position: Int,
+//                id: Long
+//            ) {
+//                validateLive()
+//            }
+//
+//            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+//        }
+//
+//        // Initial state
+//        validateLive()
+//
+//        btn.setOnClickListener {
+//            val phoneRaw = etPhone.text.toString().trim()
+//            val phone = normalizeWithSelectedCountry(phoneRaw)
+//
+//            val amount = etAmount.text.toString().trim().toDoubleOrNull()
+//            val desc = etDesc.text.toString().trim().ifEmpty { null }
+//
+//            if (phoneRaw.isBlank() || amount == null || amount <= 0) {
+//                Toast.makeText(this, "Enter valid phone + amount", Toast.LENGTH_SHORT).show()
+//                return@setOnClickListener
+//            }
+//
+//            // Final safety block
+//            if (isSendingToSelf(phone)) {
+//                btn.isEnabled = false
+//                showHint("You can’t send money to your own number.", isError = true)
+//                return@setOnClickListener
+//            }
+//
+//            // ✅ KYC GATE HERE (before transfer)
+//            CoroutineScope(Dispatchers.IO).launch {
+//                try {
+//                    val kyc = KycRepository().me().kyc
+//                    val status = kyc?.status?.lowercase()
+//
+//                    withContext(Dispatchers.Main) {
+//                        if (status != "approved") {
+//                            dialog.dismiss() // close sheet so user sees dialog clearly
+//                            if (status == "pending") showKycPendingDialog()
+//                            else showKycRequiredDialog()
+//                            return@withContext
+//                        }
+//
+//                        // ✅ Only approved reaches here -> do transfer
+//                        CoroutineScope(Dispatchers.IO).launch {
+//                            try {
+//                                val res = walletRepo.transfer(phone, selectedCode, amount, desc)
+//                                withContext(Dispatchers.Main) {
+//                                    Toast.makeText(this@MainActivity, res.message, Toast.LENGTH_SHORT).show()
+//                                    dialog.dismiss()
+//                                    fetchBalanceAndHistory()
+//                                }
+//                            } catch (e: Exception) {
+//                                withContext(Dispatchers.Main) {
+//                                    Toast.makeText(
+//                                        this@MainActivity,
+//                                        "Transfer failed: ${e.message}",
+//                                        Toast.LENGTH_LONG
+//                                    ).show()
+//                                }
+//                            }
+//                        }
+//                    }
+//
+//                } catch (e: Exception) {
+//                    withContext(Dispatchers.Main) {
+//                        Toast.makeText(this@MainActivity, "KYC check failed", Toast.LENGTH_SHORT).show()
+//                    }
+//                }
+//            }
+//        }
+//
+//
+//        dialog.setContentView(view)
+//        dialog.show()
+//    }
 
 
 

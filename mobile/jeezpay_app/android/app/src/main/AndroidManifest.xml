@@ -38,6 +38,14 @@
         <activity android:name=".PaymentSettingsActivity" android:exported="false"/>
         <activity android:name=".AboutActivity" android:exported="false"/>
 
+        <activity
+            android:name=".ui.send.SendMoneyActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.receipt.ReceiptActivity"
+            android:exported="false" />
+
 
     </application>
 
