@@ -25,7 +25,10 @@ data class HistoryResponse(
 data class WalletBalanceResponse(
     val balances: List<BalanceItem> = emptyList()
 )
-
+data class WalletBalanceItem(
+    val currency: String = "",
+    val balance: Double = 0.0
+)
 data class WalletHistoryResponse(
     val currency: String? = null,
     val transactions: List<TransactionDto> = emptyList()

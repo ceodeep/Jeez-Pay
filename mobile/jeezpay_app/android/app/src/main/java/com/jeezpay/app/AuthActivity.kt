@@ -83,9 +83,17 @@ class AuthActivity : AppCompatActivity() {
     private fun routeUser() {
         val token = session.getToken()
         val pin = session.getPin()
+        val savedPhone = session.getPhone()
 
         // 1) no token -> phone login screen
         if (token.isNullOrBlank()) {
+            flipper.displayedChild = 0
+            return
+        }
+
+        // ✅ FIX: token exists but phone missing (user logged in before you added savePhone)
+        if (savedPhone.isNullOrBlank()) {
+            // force phone login once to capture phone into session
             flipper.displayedChild = 0
             return
         }
@@ -132,7 +140,10 @@ class AuthActivity : AppCompatActivity() {
 
             verifyOtp(phone, otp) { token ->
                 session.saveToken(token)
+                session.savePhone(phone)
+                android.util.Log.d("AUTH", "Saved phone = ${session.getPhone()}")
                 flipper.displayedChild = 2
+
             }
         }
     }

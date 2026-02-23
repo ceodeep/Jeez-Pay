@@ -37,6 +37,51 @@ async function getUserByPhone(phone) {
   return data || null;
 }
 
+async function getUserByIdentifier(identifierRaw) {
+  const raw = String(identifierRaw || "").trim();
+  const digitsOnly = /^\d+$/.test(raw);
+
+  // 1️⃣ Try phone exact
+  let { data, error } = await supabase
+    .from("users")
+    .select("id, phone, role, wallet_account_number")
+    .eq("phone", raw)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (data) return data;
+
+  // 2️⃣ Try normalized phone
+  const phoneNorm = normalizePhoneSudan(raw);
+  if (phoneNorm !== raw) {
+    const r2 = await supabase
+      .from("users")
+      .select("id, phone, role, wallet_account_number")
+      .eq("phone", phoneNorm)
+      .maybeSingle();
+
+    if (r2.error) throw r2.error;
+    if (r2.data) return r2.data;
+  }
+
+  // 3️⃣ If numeric only, try wallet_account_number
+  if (digitsOnly) {
+    const acc = Number(raw);
+    if (Number.isSafeInteger(acc)) {
+      const r3 = await supabase
+        .from("users")
+        .select("id, phone, role, wallet_account_number")
+        .eq("wallet_account_number", acc)
+        .maybeSingle();
+
+      if (r3.error) throw r3.error;
+      if (r3.data) return r3.data;
+    }
+  }
+
+  return null;
+}
+
 // ---- helper: normalize currency ----
 function normalizeCurrency(cur) {
   return String(cur || "").trim().toUpperCase();
@@ -274,17 +319,15 @@ router.post("/transfer", authMiddleware, async (req, res) => {
     }
 
     // receiver lookup (try raw then normalized)
-    let receiverUser = await getUserByPhone(phoneRaw);
-    if (!receiverUser) receiverUser = await getUserByPhone(phoneNorm);
+   const receiverUser = await getUserByIdentifier(phoneRaw);
 
-    if (!receiverUser) return res.status(400).json({ message: "Receiver not found" });
-    if (receiverUser.id === senderId) {
-      return res.status(400).json({ code: "SELF_TRANSFER", message: "You can't send money to your own account" });
-    }
+if (!receiverUser) {
+  return res.status(400).json({ message: "Receiver not found" });
+}
 
     const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
       p_sender_user_id: senderId,
-      p_receiver_phone: phoneNorm,
+      p_receiver_phone: phoneRaw,
       p_currency: currency,
       p_amount: amount,
       p_description: description || `Sent to ${phoneNorm}`,
@@ -349,7 +392,7 @@ router.post("/agent-cash-in", authMiddleware, async (req, res) => {
     // Transfer money AGENT -> USER (agent must have balance/float)
     const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
       p_sender_user_id: agentId,
-      p_receiver_phone: phoneNorm,
+      p_receiver_phone: phoneRaw,
       p_currency: currency,
       p_amount: amount,
       p_description: description || `Agent cash-in to ${phoneNorm}`,
@@ -442,7 +485,7 @@ router.post("/agent-cash-out", authMiddleware, async (req, res) => {
     // Transfer money USER -> AGENT
     const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
       p_sender_user_id: userId,
-      p_receiver_phone: phoneNorm,
+      p_receiver_phone: phoneRaw,
       p_currency: currency,
       p_amount: amount,
       p_description: description || `Agent cash-out to ${phoneNorm}`,

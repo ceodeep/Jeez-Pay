@@ -18,7 +18,6 @@ class SessionManager(context: Context) {
 
     fun getPin(): String? = prefs.getString(KEY_PIN, null)
 
-    // ✅ NEW: phone
     fun savePhone(phone: String) {
         prefs.edit().putString(KEY_PHONE, phone).apply()
     }
@@ -32,6 +31,6 @@ class SessionManager(context: Context) {
     companion object {
         private const val KEY_TOKEN = "token"
         private const val KEY_PIN = "pin"
-        private const val KEY_PHONE = "phone" // ✅ NEW
+        private const val KEY_PHONE = "phone"
     }
 }
