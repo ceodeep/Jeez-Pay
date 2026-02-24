@@ -1,4 +1,4 @@
-package com.jeezpay.app.ui.send
+package com.jeezpay.app
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -8,7 +8,6 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
-import com.jeezpay.app.R
 import java.text.DecimalFormat
 
 class SendReviewBottomSheet(

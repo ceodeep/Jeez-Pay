@@ -4,7 +4,8 @@ data class TransferRequest(
     val phone: String,
     val currency: String,
     val amount: Double,
-    val description: String? = null
+    val description: String? = null,
+    val pin: String? = null
 )
 
 data class TransferResponse(

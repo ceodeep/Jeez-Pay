@@ -25,14 +25,16 @@ class WalletRepository {
         toPhone: String,
         currency: String,
         amount: Double,
-        description: String?
+        description: String?,
+        pin: String?
     ): TransferResponse {
         return api.transfer(
             TransferRequest(
                 phone = toPhone,
                 currency = currency,
                 amount = amount,
-                description = description
+                description = description,
+                pin = pin
             )
         )
     }

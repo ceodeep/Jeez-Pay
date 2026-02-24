@@ -49,6 +49,8 @@
             android:name=".ui.receipt.ReceiptActivity"
             android:exported="false" />
 
+        <activity android:name=".PinVerifyActivity" />
+
 
     </application>
 

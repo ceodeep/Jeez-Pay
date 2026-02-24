@@ -11,10 +11,12 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.jeezpay.app.PinVerifyActivity
 import com.jeezpay.app.R
 import com.jeezpay.app.storage.RecentRecipientsStore
 import com.jeezpay.app.storage.SessionManager
@@ -24,12 +26,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// ✅ Make sure this matches your actual BottomSheet package
+import com.jeezpay.app.SendReviewBottomSheet
+
 class SendMoneyActivity : AppCompatActivity() {
 
     private lateinit var vm: SendMoneyViewModel
     private lateinit var sendFlipper: ViewFlipper
 
-    // PAGE 0 (Recipient)
+    // PAGE 0
     private lateinit var etPhone: EditText
     private lateinit var btnNext: TextView
     private lateinit var btnUid: TextView
@@ -37,16 +42,15 @@ class SendMoneyActivity : AppCompatActivity() {
     private lateinit var recentStore: RecentRecipientsStore
     private lateinit var recentList: LinearLayout
 
-    // PAGE 1 (Amount)
+    // PAGE 1
     private lateinit var etAmount: EditText
-    private lateinit var ddCurrency: TextView              // ✅ now TextView (same id in XML)
-    private lateinit var currencyPill: View               // ✅ container (LinearLayout) id=currencyPill
+    private lateinit var ddCurrency: TextView
+    private lateinit var currencyPill: View
     private lateinit var etDesc: EditText
     private lateinit var btnSend: TextView
     private lateinit var progress: ProgressBar
     private lateinit var tvError: TextView
 
-    // PAGE 1 extra UI
     private lateinit var tvFee: TextView
     private lateinit var tvRecipientName: TextView
     private lateinit var tvAvailable: TextView
@@ -57,6 +61,44 @@ class SendMoneyActivity : AppCompatActivity() {
     private enum class IdMode { UID, PHONE }
     private var idMode: IdMode = IdMode.UID
 
+    // =========================
+    // ✅ PIN FLOW (CLEAN VERSION)
+    // =========================
+    private var pendingAction: (() -> Unit)? = null
+
+    private val pinLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val pin = result.data?.getStringExtra(
+                    PinVerifyActivity.RESULT_PIN
+                )
+
+                if (!pin.isNullOrBlank()) {
+                    pendingAction?.invoke()
+                }
+            }
+            pendingAction = null
+        }
+
+    private fun openPinThenConfirm(onConfirm: () -> Unit) {
+        pendingAction = onConfirm
+
+        val intent = Intent(this, PinVerifyActivity::class.java).apply {
+            putExtra(
+                PinVerifyActivity.EXTRA_TITLE,
+                "Enter your PIN"
+            )
+            putExtra(
+                PinVerifyActivity.EXTRA_SUBTITLE,
+                "Kindly enter your transaction PIN to continue"
+            )
+        }
+
+        pinLauncher.launch(intent)
+    }
+
+    // =========================
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_send_money)
@@ -64,10 +106,8 @@ class SendMoneyActivity : AppCompatActivity() {
         vm = ViewModelProvider(this)[SendMoneyViewModel::class.java]
         vm.loadBalances()
 
-        // Flipper
         sendFlipper = findViewById(R.id.sendFlipper)
 
-        // ===== PAGE 0 binds =====
         etPhone = findViewById(R.id.etPhone)
         btnNext = findViewById(R.id.btnNext)
         btnUid = findViewById(R.id.btnUid)
@@ -75,9 +115,8 @@ class SendMoneyActivity : AppCompatActivity() {
         recentStore = RecentRecipientsStore(this)
         recentList = findViewById(R.id.recentList)
 
-        // ===== PAGE 1 binds =====
         etAmount = findViewById(R.id.etAmount)
-        ddCurrency = findViewById(R.id.ddCurrency) // ✅ same id, but TextView now
+        ddCurrency = findViewById(R.id.ddCurrency)
         currencyPill = findViewById(R.id.currencyPill)
         etDesc = findViewById(R.id.etDesc)
         btnSend = findViewById(R.id.btnSend)
@@ -88,10 +127,8 @@ class SendMoneyActivity : AppCompatActivity() {
         tvRecipientName = findViewById(R.id.tvRecipientName)
         tvAvailable = findViewById(R.id.tvAvailable)
 
-        // Start on recipient page
         sendFlipper.displayedChild = 0
 
-        // Init page 0
         setMode(IdMode.UID)
         setNextEnabled(false)
         renderRecentRecipients()
@@ -108,35 +145,27 @@ class SendMoneyActivity : AppCompatActivity() {
         })
 
         btnNext.setOnClickListener {
-            tvError.visibility = View.GONE
-
             val receiverIdentifier = etPhone.text.toString().trim()
             if (receiverIdentifier.isEmpty()) {
                 showError("Receiver UID or phone is required")
                 return@setOnClickListener
             }
 
-            // Move to amount page
             sendFlipper.displayedChild = 1
-
-            // For now show identifier as recipient label (until lookup)
             tvRecipientName.text = receiverIdentifier
         }
 
-        // ===== Currency picker (dialog) =====
-        // default
         ddCurrency.text = "SSP"
         refreshFeeAndAvailable()
 
-        currencyPill.setOnClickListener {
-            showCurrencyPicker()
-        }
+        currencyPill.setOnClickListener { showCurrencyPicker() }
 
-        // ===== Send button =====
+        // =========================
+        // SEND BUTTON
+        // =========================
         btnSend.setOnClickListener {
-            tvError.visibility = View.GONE
 
-            val receiverIdentifier = etPhone.text.toString().trim() // stored from page 0
+            val receiverIdentifier = etPhone.text.toString().trim()
             val amountText = etAmount.text.toString().trim()
             val currency = ddCurrency.text.toString().trim().uppercase()
             val description = etDesc.text.toString().trim().ifEmpty { null }
@@ -145,14 +174,15 @@ class SendMoneyActivity : AppCompatActivity() {
 
             if (receiverIdentifier.isEmpty()) {
                 showError("Receiver UID or phone is required")
-                sendFlipper.displayedChild = 0
                 return@setOnClickListener
             }
+
             if (amount == null || amount <= 0) {
                 showError("Enter a valid amount")
                 return@setOnClickListener
             }
-            if (currency.isEmpty() || currency !in currencies.toList()) {
+
+            if (currency !in currencies) {
                 showError("Select a valid currency")
                 return@setOnClickListener
             }
@@ -166,42 +196,44 @@ class SendMoneyActivity : AppCompatActivity() {
                 amount = amount,
                 fee = fee
             ) {
-                vm.sendMoney(
-                    toPhone = receiverIdentifier, // backend resolves phone OR wallet_account_number
-                    currency = currency,
-                    amount = amount,
-                    description = description
-                )
+                // ✅ PIN FIRST
+                openPinThenConfirm {
+                    vm.sendMoney(
+                        toPhone = receiverIdentifier,
+                        currency = currency,
+                        amount = amount,
+                        description = description,
+                        pin = pin
+                    )
+                }
             }.show(supportFragmentManager, "SendReviewBottomSheet")
         }
 
-        // ===== Collect state =====
+        // =========================
+        // STATE OBSERVER
+        // =========================
         lifecycleScope.launch {
             vm.state.collect { state ->
                 when (state) {
                     is SendMoneyUiState.Idle -> {
                         progress.visibility = View.GONE
                         btnSend.isEnabled = true
-                        btnSend.alpha = 1f
                     }
 
                     is SendMoneyUiState.Loading -> {
                         progress.visibility = View.VISIBLE
                         btnSend.isEnabled = false
-                        btnSend.alpha = 0.7f
                     }
 
                     is SendMoneyUiState.Error -> {
                         progress.visibility = View.GONE
                         btnSend.isEnabled = true
-                        btnSend.alpha = 1f
                         showError(state.message)
                     }
 
                     is SendMoneyUiState.Success -> {
                         progress.visibility = View.GONE
                         btnSend.isEnabled = true
-                        btnSend.alpha = 1f
 
                         val res = state.res
 
@@ -215,13 +247,6 @@ class SendMoneyActivity : AppCompatActivity() {
                         )
 
                         vm.reset()
-
-                        // Save as recent
-                        val identifier = etPhone.text.toString().trim()
-                        recentStore.add(identifier, displayName = tvRecipientName.text.toString())
-
-                        // refresh UI for next time
-                        renderRecentRecipients()
                     }
                 }
             }
@@ -240,19 +265,17 @@ class SendMoneyActivity : AppCompatActivity() {
     }
 
     private fun refreshFeeAndAvailable() {
-        val cur = ddCurrency.text.toString().trim().uppercase()
+        val cur = ddCurrency.text.toString().uppercase()
         val fee = calcFixedFee(cur)
 
-        // ✅ IMPORTANT: tvFee should only be ONE line
         tvFee.text = "Fee: ${df.format(fee)} $cur"
 
-        val avail = vm.availableFor(ddCurrency.text.toString())
+        val avail = vm.availableFor(cur)
         tvAvailable.text = "Available: ${df.format(avail)}"
-
     }
 
     private fun showCurrencyPicker() {
-        val current = ddCurrency.text.toString().trim().uppercase()
+        val current = ddCurrency.text.toString().uppercase()
         val checked = currencies.indexOf(current).coerceAtLeast(0)
 
         MaterialAlertDialogBuilder(this)
@@ -273,13 +296,9 @@ class SendMoneyActivity : AppCompatActivity() {
         if (mode == IdMode.UID) {
             etPhone.hint = "UID"
             etPhone.inputType = android.text.InputType.TYPE_CLASS_NUMBER
-            btnUid.setTextColor(android.graphics.Color.parseColor("#5286C6"))
-            btnPhone.setTextColor(android.graphics.Color.parseColor("#C4000000"))
         } else {
             etPhone.hint = "Phone"
             etPhone.inputType = android.text.InputType.TYPE_CLASS_PHONE
-            btnUid.setTextColor(android.graphics.Color.parseColor("#C4000000"))
-            btnPhone.setTextColor(android.graphics.Color.parseColor("#5286C6"))
         }
 
         setNextEnabled(false)
@@ -328,20 +347,8 @@ class SendMoneyActivity : AppCompatActivity() {
         val items = recentStore.list(10)
         recentList.removeAllViews()
 
-        if (items.isEmpty()) {
-            val tv = TextView(this).apply {
-                text = "No recent recipients"
-                textSize = 12f
-                setTextColor(android.graphics.Color.parseColor("#6B000000"))
-                setPadding(0, 12, 0, 12)
-            }
-            recentList.addView(tv)
-            return
-        }
-
         items.forEach { rec ->
             val row = layoutInflater.inflate(R.layout.item_recent_recipient, recentList, false)
-
             val tvName = row.findViewById<TextView>(R.id.tvRecentName)
             val tvId = row.findViewById<TextView>(R.id.tvRecentId)
 
@@ -349,10 +356,7 @@ class SendMoneyActivity : AppCompatActivity() {
             tvId.text = rec.identifier
 
             row.setOnClickListener {
-                // fill input
                 etPhone.setText(rec.identifier)
-
-                // go to Amount page
                 sendFlipper.displayedChild = 1
                 tvRecipientName.text = rec.displayName ?: rec.identifier
             }

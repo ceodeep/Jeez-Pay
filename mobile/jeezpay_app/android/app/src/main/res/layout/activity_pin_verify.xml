@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+
+    <ImageView
+        android:id="@+id/ivBack"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginTop="22dp"
+        android:src="@drawable/ic_back"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="#000000" />
+
+    <TextView
+        android:id="@+id/tvHeader"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Verification"
+        android:textColor="#3A3A3A"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:layout_constraintTop_toTopOf="@id/ivBack"
+        app:layout_constraintBottom_toBottomOf="@id/ivBack"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <ImageView
+        android:id="@+id/ivFinger"
+        android:layout_width="110dp"
+        android:layout_height="110dp"
+        android:layout_marginTop="40dp"
+        android:src="@drawable/ic_fingerprint"
+        app:layout_constraintTop_toBottomOf="@id/tvHeader"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:text="Enter your PIN"
+        android:textColor="#3A3A3A"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        app:layout_constraintTop_toBottomOf="@id/ivFinger"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/tvSubTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="Kindly enter your transaction PIN to continue"
+        android:textColor="#8A8A8A"
+        android:textSize="13sp"
+        app:layout_constraintTop_toBottomOf="@id/tvTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- dots -->
+    <LinearLayout
+        android:id="@+id/pinDots"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:orientation="horizontal"
+        app:layout_constraintTop_toBottomOf="@id/tvSubTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:id="@+id/dot1"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="10dp" />
+
+        <ImageView
+            android:id="@+id/dot2"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="10dp" />
+
+        <ImageView
+            android:id="@+id/dot3"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="10dp" />
+
+        <ImageView
+            android:id="@+id/dot4"
+            android:layout_width="28dp"
+            android:layout_height="28dp" />
+    </LinearLayout>
+
+    <!-- keypad -->
+    <androidx.gridlayout.widget.GridLayout
+        android:id="@+id/keypad"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginTop="40dp"
+        app:columnCount="3"
+        app:rowCount="4"
+        app:layout_constraintTop_toBottomOf="@id/pinDots"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- ✅ IMPORTANT: add width/height + weights + clickable -->
+        <TextView
+            android:id="@+id/key1"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="1"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key2"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="2"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key3"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="3"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key4"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="4"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key5"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="5"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key6"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="6"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key7"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="7"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key8"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="8"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key9"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="9"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:text="•"
+            android:enabled="false"
+            android:alpha="0.3"
+            android:gravity="center"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <TextView
+            android:id="@+id/key0"
+            style="@style/PinKeyStyle"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="0"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1" />
+
+        <ImageView
+            android:id="@+id/btnBackspace"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="18dp"
+            android:src="@drawable/ic_backspace"
+            app:layout_columnWeight="1"
+            app:layout_rowWeight="1"
+            app:tint="#000000" />
+
+    </androidx.gridlayout.widget.GridLayout>
+
+    <!-- ✅ Constrain hidden pin so ConstraintLayout is happy (doesn't change design) -->
+    <EditText
+        android:id="@+id/etHiddenPin"
+        android:layout_width="1dp"
+        android:layout_height="1dp"
+        android:background="@android:color/transparent"
+        android:cursorVisible="false"
+        android:importantForAutofill="no"
+        android:inputType="numberPassword"
+        android:maxLength="4"
+        android:imeOptions="actionDone"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <TextView
+        android:id="@+id/btnConfirm"
+        android:layout_width="0dp"
+        android:layout_height="56dp"
+        android:layout_marginStart="18dp"
+        android:layout_marginEnd="18dp"
+        android:layout_marginBottom="22dp"
+        android:background="@drawable/bg_send_btn"
+        android:gravity="center"
+        android:text="Confirm"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -46,7 +46,8 @@ class SendMoneyViewModel : ViewModel() {
         toPhone: String,
         currency: String,
         amount: Double,
-        description: String?
+        description: String?,
+        pin: String
     ) {
         _state.value = SendMoneyUiState.Loading
 
@@ -56,7 +57,8 @@ class SendMoneyViewModel : ViewModel() {
                     toPhone = toPhone,
                     currency = currency,
                     amount = amount,
-                    description = description
+                    description = description,
+                    pin = pin
                 )
                 _state.value = SendMoneyUiState.Success(res)
             } catch (e: Exception) {

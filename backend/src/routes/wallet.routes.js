@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabase");
 const authMiddleware = require("../middlewares/auth.middleware");
+const bcrypt = require("bcrypt");
 
 // ---- helper: check admin ----
 async function isAdmin(userId) {
@@ -144,6 +145,45 @@ async function requireKycApproved(userId) {
   if (kycErr) throw kycErr;
   return !!kyc && kyc.status === "approved";
 }
+
+// ================= PIN HELPERS =================
+
+async function getUserPinState(userId) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("pin_hash, pin_failed_attempts, pin_locked_until")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+async function updatePinFail(userId, attempts, lockedUntil) {
+  const { error } = await supabase
+    .from("users")
+    .update({
+      pin_failed_attempts: attempts,
+      pin_locked_until: lockedUntil || null,
+    })
+    .eq("id", userId);
+
+  if (error) throw error;
+}
+
+async function resetPinFail(userId) {
+  const { error } = await supabase
+    .from("users")
+    .update({
+      pin_failed_attempts: 0,
+      pin_locked_until: null,
+    })
+    .eq("id", userId);
+
+  if (error) throw error;
+}
+
+// ==============================================
 
 /**
  * GET /wallet/balance
@@ -302,6 +342,54 @@ router.post("/transfer", authMiddleware, async (req, res) => {
       });
     }
 
+    // ✅ PIN check
+    const pin = String(req.body.pin || "").trim();
+    if (!pin) {
+      return res.status(400).json({ code: "PIN_REQUIRED", message: "PIN is required" });
+    }
+
+    const pinState = await getUserPinState(senderId);
+    if (!pinState?.pin_hash) {
+      return res.status(400).json({ code: "PIN_NOT_SET", message: "PIN not set for this account" });
+    }
+
+    // lockout
+    if (pinState.pin_locked_until) {
+      const lockedUntil = new Date(pinState.pin_locked_until);
+      if (lockedUntil > new Date()) {
+        return res.status(403).json({
+          code: "PIN_LOCKED",
+          message: "Too many attempts. Try again later.",
+        });
+      }
+    }
+
+    const okPin = await bcrypt.compare(pin, pinState.pin_hash);
+
+    if (!okPin) {
+      const attempts = (pinState.pin_failed_attempts || 0) + 1;
+
+      // lock after 5 wrong tries for 5 minutes
+      if (attempts >= 5) {
+        const lockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        await updatePinFail(senderId, attempts, lockedUntil);
+        return res.status(403).json({
+          code: "PIN_LOCKED",
+          message: "Too many wrong attempts. Locked for 5 minutes.",
+        });
+      } else {
+        await updatePinFail(senderId, attempts, null);
+        return res.status(403).json({
+          code: "PIN_INVALID",
+          message: "Invalid PIN",
+        });
+      }
+    }
+
+    // ✅ PIN correct: reset counters
+    await resetPinFail(senderId);
+
+    // ===== your existing transfer logic =====
     const phoneRaw = String(req.body.phone || "").trim();
     const amountRaw = req.body.amount;
     const currency = normalizeCurrency(req.body.currency);
@@ -318,12 +406,10 @@ router.post("/transfer", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Invalid amount" });
     }
 
-    // receiver lookup (try raw then normalized)
-   const receiverUser = await getUserByIdentifier(phoneRaw);
-
-if (!receiverUser) {
-  return res.status(400).json({ message: "Receiver not found" });
-}
+    const receiverUser = await getUserByIdentifier(phoneRaw);
+    if (!receiverUser) {
+      return res.status(400).json({ message: "Receiver not found" });
+    }
 
     const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
       p_sender_user_id: senderId,
@@ -339,16 +425,15 @@ if (!receiverUser) {
     }
 
     const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
-const payload = row?.wallet_transfer ?? row ?? {};
+    const payload = row?.wallet_transfer ?? row ?? {};
 
-return res.json({
-  message: payload.message || "Transfer successful",
-  currency: payload.currency || currency,
-  amount: Number(payload.amount ?? amount),
-  phone: payload.phone || phoneNorm,
-  reference: payload.reference || null,
-});
-
+    return res.json({
+      message: payload.message || "Transfer successful",
+      currency: payload.currency || currency,
+      amount: Number(payload.amount ?? amount),
+      phone: payload.phone || phoneNorm,
+      reference: payload.reference || null,
+    });
   } catch (err) {
     console.error("Transfer error:", err);
     return res.status(500).json({ message: "Transfer failed" });

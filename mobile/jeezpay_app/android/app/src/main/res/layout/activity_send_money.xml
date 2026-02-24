@@ -214,7 +214,7 @@
                 android:layout_height="24dp"
                 android:layout_marginStart="16dp"
                 android:layout_marginTop="16dp"
-                android:src="@android:drawable/ic_media_previous"
+                android:src="@drawable/ic_media_previous"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent"
                 app:tint="#000000" />
