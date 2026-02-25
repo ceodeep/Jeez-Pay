@@ -41,7 +41,8 @@ class AuthActivity : AppCompatActivity() {
 
     // Screen 3 (Unlock)
     private lateinit var btnUseAnotherAccount: TextView
-    private lateinit var btnUnlockWithPin: MaterialButton
+    private lateinit var btnUnlock: MaterialButton
+
 
     // ---- PIN verify launcher (uses your PinVerifyActivity keypad UI) ----
     private val pinLauncher =
@@ -85,6 +86,7 @@ class AuthActivity : AppCompatActivity() {
         etOtp = findViewById(R.id.etOtp)
         btnVerify = findViewById(R.id.btnVerify)
 
+
         // Screen 2
         btnBackPin = findViewById(R.id.btnBackPin)
         etPin = findViewById(R.id.etPin)
@@ -92,10 +94,11 @@ class AuthActivity : AppCompatActivity() {
 
         // Screen 3
         btnUseAnotherAccount = findViewById(R.id.btnUseAnotherAccount)
+        btnUnlock = findViewById(R.id.btnUnlock)
 
         // ✅ Add this button in your XML for screen 3 (or reuse existing)
         // If you don't have it, create a MaterialButton with id btnUnlockWithPin
-        btnUnlockWithPin = findViewById(R.id.btnUnlockWithPin)
+
     }
 
     private fun routeUser() {
@@ -187,7 +190,7 @@ class AuthActivity : AppCompatActivity() {
     }
 
     private fun setupUnlockScreen() {
-        btnUnlockWithPin.setOnClickListener {
+        btnUnlock.setOnClickListener {
             pendingPinAction = PinAction.VERIFY_LOGIN
             openPinScreen(
                 title = "Enter your PIN",
@@ -199,6 +202,7 @@ class AuthActivity : AppCompatActivity() {
             session.clearAll()
             flipper.displayedChild = 0
         }
+        android.util.Log.d("AUTH_DEBUG", "Unlock clicked")
     }
 
     private fun openPinScreen(title: String, subtitle: String) {

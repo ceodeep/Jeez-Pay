@@ -250,7 +250,7 @@
                 android:layout_marginTop="14dp"
                 android:text="Unlock"
                 android:textAllCaps="false"
-                android:enabled="false"
+                android:enabled="true"
                 app:cornerRadius="16dp"
                 app:backgroundTint="@color/paypal_blue"
                 android:textColor="@android:color/white"/>

@@ -137,27 +137,40 @@ const bcrypt = require("bcrypt");
 
 router.post("/set-pin", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user?.userId;
     const { pin } = req.body;
 
-    if (!pin || pin.length !== 4) {
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized (no userId)" });
+    }
+
+    if (!pin || String(pin).length !== 4) {
       return res.status(400).json({ message: "PIN must be 4 digits" });
     }
 
-    const pinHash = await bcrypt.hash(pin, 10);
+    const pinHash = await bcrypt.hash(String(pin), 10);
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("users")
       .update({ pin_hash: pinHash })
-      .eq("id", userId);
+      .eq("id", userId)
+      .select("id, phone, pin_hash")
+      .maybeSingle();
 
     if (error) {
       console.error("Set PIN error:", error);
       return res.status(500).json({ message: "Failed to set PIN" });
     }
 
-    return res.json({ message: "PIN set successfully" });
+    // ✅ if no row returned, nothing was updated
+    if (!data) {
+      return res.status(404).json({
+        message: "User not found (pin not saved)",
+        userId,
+      });
+    }
 
+    return res.json({ message: "PIN set successfully" });
   } catch (err) {
     console.error("set-pin crash:", err);
     return res.status(500).json({ message: "Internal server error" });
