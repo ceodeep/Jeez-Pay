@@ -6,6 +6,7 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.jeezpay.app.repository.AuthRepository
@@ -21,24 +22,40 @@ class AuthActivity : AppCompatActivity() {
     private val repo = AuthRepository()
 
     // Views
-    private lateinit var flipper: android.widget.ViewFlipper
+    private lateinit var flipper: ViewFlipper
 
+    // Screen 0
     private lateinit var etPhone: EditText
     private lateinit var btnContinue: MaterialButton
 
+    // Screen 1
     private lateinit var btnBackOtp: TextView
     private lateinit var tvOtpHint: TextView
     private lateinit var etOtp: EditText
     private lateinit var btnVerify: MaterialButton
 
+    // Screen 2 (Set PIN)
     private lateinit var btnBackPin: TextView
     private lateinit var etPin: EditText
     private lateinit var btnSetPin: MaterialButton
 
-    // PIN unlock screen (child index 3)
-    private lateinit var etUnlockPin: EditText
-    private lateinit var btnUnlock: MaterialButton
+    // Screen 3 (Unlock)
     private lateinit var btnUseAnotherAccount: TextView
+    private lateinit var btnUnlockWithPin: MaterialButton
+
+    // ---- PIN verify launcher (uses your PinVerifyActivity keypad UI) ----
+    private val pinLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                val pin = result.data?.getStringExtra(PinVerifyActivity.RESULT_PIN)
+                if (!pin.isNullOrBlank()) {
+                    onPinEntered(pin)
+                }
+            }
+        }
+
+    private enum class PinAction { VERIFY_LOGIN, SET_PIN }
+    private var pendingPinAction: PinAction = PinAction.VERIFY_LOGIN
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,43 +63,43 @@ class AuthActivity : AppCompatActivity() {
 
         session = SessionManager(this)
 
-        // ✅ Bind views first (IMPORTANT)
         bindViews()
-
-        // ✅ Decide which screen to show first
         routeUser()
 
-        // ✅ Setup listeners (they’ll work for whichever screen is shown)
         setupPhoneScreen()
         setupOtpScreen()
         setupPinSetScreen()
-        setupPinUnlockScreen()
+        setupUnlockScreen()
     }
 
     private fun bindViews() {
         flipper = findViewById(R.id.authFlipper)
 
+        // Screen 0
         etPhone = findViewById(R.id.etPhone)
         btnContinue = findViewById(R.id.btnContinue)
 
+        // Screen 1
         btnBackOtp = findViewById(R.id.btnBackOtp)
         tvOtpHint = findViewById(R.id.tvOtpHint)
         etOtp = findViewById(R.id.etOtp)
         btnVerify = findViewById(R.id.btnVerify)
 
+        // Screen 2
         btnBackPin = findViewById(R.id.btnBackPin)
         etPin = findViewById(R.id.etPin)
         btnSetPin = findViewById(R.id.btnSetPin)
 
-        // These MUST exist in activity_auth.xml (screen 3)
-        etUnlockPin = findViewById(R.id.etUnlockPin)
-        btnUnlock = findViewById(R.id.btnUnlock)
+        // Screen 3
         btnUseAnotherAccount = findViewById(R.id.btnUseAnotherAccount)
+
+        // ✅ Add this button in your XML for screen 3 (or reuse existing)
+        // If you don't have it, create a MaterialButton with id btnUnlockWithPin
+        btnUnlockWithPin = findViewById(R.id.btnUnlockWithPin)
     }
 
     private fun routeUser() {
         val token = session.getToken()
-        val pin = session.getPin()
         val savedPhone = session.getPhone()
 
         // 1) no token -> phone login screen
@@ -91,20 +108,13 @@ class AuthActivity : AppCompatActivity() {
             return
         }
 
-        // ✅ FIX: token exists but phone missing (user logged in before you added savePhone)
+        // token exists but phone missing -> force phone login once
         if (savedPhone.isNullOrBlank()) {
-            // force phone login once to capture phone into session
             flipper.displayedChild = 0
             return
         }
 
-        // 2) token exists but no pin -> set pin screen
-        if (pin.isNullOrBlank()) {
-            flipper.displayedChild = 2
-            return
-        }
-
-        // 3) token + pin -> unlock pin screen
+        // token exists -> go unlock screen
         flipper.displayedChild = 3
     }
 
@@ -138,12 +148,17 @@ class AuthActivity : AppCompatActivity() {
             val phone = etPhone.text.toString().trim()
             val otp = etOtp.text.toString().trim()
 
-            verifyOtp(phone, otp) { token ->
+            verifyOtp(phone, otp) { token, isNewUser ->
                 session.saveToken(token)
                 session.savePhone(phone)
-                android.util.Log.d("AUTH", "Saved phone = ${session.getPhone()}")
-                flipper.displayedChild = 2
 
+                if (isNewUser) {
+                    // ✅ new user -> must set pin (backend)
+                    flipper.displayedChild = 2
+                } else {
+                    // ✅ existing user -> unlock with pin
+                    flipper.displayedChild = 3
+                }
             }
         }
     }
@@ -166,33 +181,18 @@ class AuthActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            session.savePin(pin)
-            openMain()
+            // ✅ Send pin to backend to store securely (pin_hash)
+            setPinOnBackend(pin)
         }
     }
 
-    private fun setupPinUnlockScreen() {
-        btnUnlock.isEnabled = false
-        etUnlockPin.addTextChangedListener(SimpleTextWatcher {
-            btnUnlock.isEnabled = etUnlockPin.text.toString().trim().length == 4
-        })
-
-        btnUnlock.setOnClickListener {
-            val typed = etUnlockPin.text.toString().trim()
-            val saved = session.getPin()
-
-            if (saved.isNullOrBlank()) {
-                // Shouldn’t happen, but safe fallback
-                flipper.displayedChild = 2
-                return@setOnClickListener
-            }
-
-            if (typed != saved) {
-                Toast.makeText(this, "Wrong PIN", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            openMain()
+    private fun setupUnlockScreen() {
+        btnUnlockWithPin.setOnClickListener {
+            pendingPinAction = PinAction.VERIFY_LOGIN
+            openPinScreen(
+                title = "Enter your PIN",
+                subtitle = "Enter your PIN to unlock"
+            )
         }
 
         btnUseAnotherAccount.setOnClickListener {
@@ -200,6 +200,27 @@ class AuthActivity : AppCompatActivity() {
             flipper.displayedChild = 0
         }
     }
+
+    private fun openPinScreen(title: String, subtitle: String) {
+        val i = Intent(this, PinVerifyActivity::class.java).apply {
+            putExtra(PinVerifyActivity.EXTRA_TITLE, title)
+            putExtra(PinVerifyActivity.EXTRA_SUBTITLE, subtitle)
+        }
+        pinLauncher.launch(i)
+    }
+
+    private fun onPinEntered(pin: String) {
+        when (pendingPinAction) {
+            PinAction.VERIFY_LOGIN -> {
+                verifyPinOnBackend(pin)
+            }
+            PinAction.SET_PIN -> {
+                setPinOnBackend(pin)
+            }
+        }
+    }
+
+    // -------- NETWORK --------
 
     private fun requestOtp(phone: String, onSuccess: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -221,19 +242,62 @@ class AuthActivity : AppCompatActivity() {
         }
     }
 
-    private fun verifyOtp(phone: String, otp: String, onSuccess: (String) -> Unit) {
+    private fun verifyOtp(phone: String, otp: String, onSuccess: (token: String, isNewUser: Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val res = repo.verifyOtp(phone, otp)
+                val res = repo.verifyOtp(phone, otp) // ✅ must return isNewUser
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess(res.token)
+                    onSuccess(res.token, res.isNewUser)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@AuthActivity,
                         "Verify failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun setPinOnBackend(pin: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                repo.setPin(pin) // ✅ implement in AuthRepository
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, "PIN set successfully", Toast.LENGTH_SHORT).show()
+                    flipper.displayedChild = 3
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@AuthActivity,
+                        "Set PIN failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun verifyPinOnBackend(pin: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val ok = repo.verifyPin(pin) // ✅ implement in AuthRepository returns Boolean
+                withContext(Dispatchers.Main) {
+                    if (!ok) {
+                        Toast.makeText(this@AuthActivity, "Wrong PIN", Toast.LENGTH_SHORT).show()
+                        return@withContext
+                    }
+                    openMain()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@AuthActivity,
+                        "PIN verify failed: ${e.message}",
                         Toast.LENGTH_LONG
                     ).show()
                 }

@@ -19,5 +19,12 @@ data class RequestOtpResponse(
 
 data class VerifyOtpResponse(
     val message: String,
-    val token: String
+    val token: String,
+    val isNewUser: Boolean = false
+)
+
+data class AuthResponse(
+    val message: String,
+    val token: String,
+    val isNewUser: Boolean = false
 )

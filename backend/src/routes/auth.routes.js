@@ -66,13 +66,13 @@ router.post("/verify-otp", async (req, res) => {
     }
 
     // ✅ Normalize phone ONCE and use it everywhere
-    const phoneNorm = normalizePhoneSudan(phone); // ✅
+    const phoneNorm = normalizePhoneSudan(phone);
 
-    // 1) Find user by phone
+    // 1) Find user by normalized phone
     const { data: existingUser, error: fetchErr } = await supabase
       .from("users")
       .select("*")
-      .eq("phone", phoneNorm) // ✅ (was phone)
+      .eq("phone", phoneNorm)
       .maybeSingle();
 
     if (fetchErr) {
@@ -80,13 +80,15 @@ router.post("/verify-otp", async (req, res) => {
       return res.status(500).json({ message: "User lookup failed" });
     }
 
+    const isNewUser = !existingUser;
+
     let user = existingUser;
 
     // 2) Create user if not exists
     if (!user) {
       const { data: newUser, error: createErr } = await supabase
         .from("users")
-        .insert([{ phone: phoneNorm }]) // ✅ (was phone)
+        .insert([{ phone: phoneNorm }])
         .select()
         .single();
 
@@ -98,32 +100,21 @@ router.post("/verify-otp", async (req, res) => {
       user = newUser;
     }
 
-    // 3) Seed currency wallets
-    // ✅ CRITICAL FIX:
-    // Use "ignoreDuplicates: true" so it DOES NOT overwrite existing balances.
-    // This prevents balances resetting to 0 on every login.
+    // 3) Seed currency wallets ONLY for brand new users
+    if (isNewUser) {
+      const seedRows = DEFAULT_CURRENCIES.map((currency) => ({
+        user_id: user.id,
+        currency,
+        balance: 0,
+      }));
 
-    // 3) Seed currency wallets ONLY for new users (so no balance reset)
-if (!existingUser) {
-  const seedRows = DEFAULT_CURRENCIES.map((currency) => ({
-    user_id: user.id,
-    currency,
-    balance: 0,
-  }));
+      const { error: seedErr } = await supabase.from("wallets").insert(seedRows);
 
-  const { error: seedErr } = await supabase
-    .from("wallets")
-    .insert(seedRows);
-
-  if (seedErr) {
-    // If you already have unique(user_id,currency), duplicates will throw.
-    // You can ignore duplicate error code if needed, but usually it won't happen for new users.
-    console.error("Wallet seeding error:", seedErr);
-    return res.status(500).json({ message: "Wallet seeding failed" });
-  }
-}
-
-   
+      if (seedErr) {
+        console.error("Wallet seeding error:", seedErr);
+        return res.status(500).json({ message: "Wallet seeding failed" });
+      }
+    }
 
     // 4) Generate token
     const token = generateToken({
@@ -131,9 +122,84 @@ if (!existingUser) {
       phone: phoneNorm,
     });
 
-    return res.json({ message: "Authenticated", token });
+    return res.json({
+      message: "Authenticated",
+      token,
+      isNewUser, // ✅ IMPORTANT
+    });
   } catch (err) {
     console.error("verify-otp crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+const bcrypt = require("bcrypt");
+
+router.post("/set-pin", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { pin } = req.body;
+
+    if (!pin || pin.length !== 4) {
+      return res.status(400).json({ message: "PIN must be 4 digits" });
+    }
+
+    const pinHash = await bcrypt.hash(pin, 10);
+
+    const { error } = await supabase
+      .from("users")
+      .update({ pin_hash: pinHash })
+      .eq("id", userId);
+
+    if (error) {
+      console.error("Set PIN error:", error);
+      return res.status(500).json({ message: "Failed to set PIN" });
+    }
+
+    return res.json({ message: "PIN set successfully" });
+
+  } catch (err) {
+    console.error("set-pin crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/verify-pin", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { pin } = req.body;
+
+    if (!pin) {
+      return res.status(400).json({ message: "PIN required" });
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("pin_hash")
+      .eq("id", userId)
+      .single();
+
+    if (error || !user) {
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!user.pin_hash) {
+      return res.status(400).json({
+        code: "PIN_NOT_SET",
+        message: "PIN not set for this account"
+      });
+    }
+
+    const match = await bcrypt.compare(pin, user.pin_hash);
+
+    if (!match) {
+      return res.json({ ok: false, message: "Wrong PIN" });
+    }
+
+    return res.json({ ok: true });
+
+  } catch (err) {
+    console.error("verify-pin crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });

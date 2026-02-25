@@ -64,37 +64,30 @@ class SendMoneyActivity : AppCompatActivity() {
     // =========================
     // ✅ PIN FLOW (CLEAN VERSION)
     // =========================
-    private var pendingAction: (() -> Unit)? = null
+    private var pendingAction: ((String) -> Unit)? = null
 
     private val pinLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == RESULT_OK) {
-                val pin = result.data?.getStringExtra(
-                    PinVerifyActivity.RESULT_PIN
-                )
-
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == android.app.Activity.RESULT_OK) {
+                val pin = result.data?.getStringExtra(com.jeezpay.app.PinVerifyActivity.RESULT_PIN)
                 if (!pin.isNullOrBlank()) {
-                    pendingAction?.invoke()
+                    pendingAction?.invoke(pin)
                 }
             }
             pendingAction = null
         }
 
-    private fun openPinThenConfirm(onConfirm: () -> Unit) {
-        pendingAction = onConfirm
-
-        val intent = Intent(this, PinVerifyActivity::class.java).apply {
-            putExtra(
-                PinVerifyActivity.EXTRA_TITLE,
-                "Enter your PIN"
-            )
-            putExtra(
-                PinVerifyActivity.EXTRA_SUBTITLE,
-                "Kindly enter your transaction PIN to continue"
-            )
+    private fun openPinThenConfirm(onConfirmAfterPin: (String) -> Unit) {
+        pendingAction = { pin ->
+            onConfirmAfterPin(pin)
+            pendingAction = null
         }
 
-        pinLauncher.launch(intent)
+        val i = Intent(this, com.jeezpay.app.PinVerifyActivity::class.java).apply {
+            putExtra(com.jeezpay.app.PinVerifyActivity.EXTRA_TITLE, "Enter your PIN")
+            putExtra(com.jeezpay.app.PinVerifyActivity.EXTRA_SUBTITLE, "Kindly enter your transaction PIN to continue")
+        }
+        pinLauncher.launch(i)
     }
 
     // =========================
@@ -197,7 +190,7 @@ class SendMoneyActivity : AppCompatActivity() {
                 fee = fee
             ) {
                 // ✅ PIN FIRST
-                openPinThenConfirm {
+                openPinThenConfirm { pin ->
                     vm.sendMoney(
                         toPhone = receiverIdentifier,
                         currency = currency,
