@@ -125,7 +125,8 @@ router.post("/verify-otp", async (req, res) => {
     return res.json({
       message: "Authenticated",
       token,
-      isNewUser, // ✅ IMPORTANT
+      isNewUser,
+      hasPin: !!user.pin_hash // ✅ IMPORTANT
     });
   } catch (err) {
     console.error("verify-otp crash:", err);
@@ -138,17 +139,26 @@ const bcrypt = require("bcrypt");
 router.post("/set-pin", authMiddleware, async (req, res) => {
   try {
     const userId = req.user?.userId;
-    const { pin } = req.body;
+    const pin = String(req.body?.pin ?? "").trim();
+
+    console.log("[set-pin] userId:", userId);
+    console.log("[set-pin] pin length:", pin.length);
 
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized (no userId)" });
     }
 
-    if (!pin || String(pin).length !== 4) {
-      return res.status(400).json({ message: "PIN must be 4 digits" });
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ message: "PIN must be exactly 4 digits" });
     }
 
-    const pinHash = await bcrypt.hash(String(pin), 10);
+    // make sure bcrypt exists
+    if (!bcrypt?.hash) {
+      console.error("[set-pin] bcrypt is not defined / not imported");
+      return res.status(500).json({ message: "Server misconfig: bcrypt missing" });
+    }
+
+    const pinHash = await bcrypt.hash(pin, 10);
 
     const { data, error } = await supabase
       .from("users")
@@ -158,21 +168,18 @@ router.post("/set-pin", authMiddleware, async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      console.error("Set PIN error:", error);
+      console.error("[set-pin] supabase error:", error);
       return res.status(500).json({ message: "Failed to set PIN" });
     }
 
-    // ✅ if no row returned, nothing was updated
     if (!data) {
-      return res.status(404).json({
-        message: "User not found (pin not saved)",
-        userId,
-      });
+      console.error("[set-pin] update returned no row (user not found?) id:", userId);
+      return res.status(404).json({ message: "User not found (pin not saved)" });
     }
 
     return res.json({ message: "PIN set successfully" });
   } catch (err) {
-    console.error("set-pin crash:", err);
+    console.error("[set-pin] crash:", err?.message, err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });

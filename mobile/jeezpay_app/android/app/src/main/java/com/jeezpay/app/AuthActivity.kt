@@ -151,7 +151,7 @@ class AuthActivity : AppCompatActivity() {
             val phone = etPhone.text.toString().trim()
             val otp = etOtp.text.toString().trim()
 
-            verifyOtp(phone, otp) { token, isNewUser ->
+            verifyOtp(phone, otp) { token, isNewUser, hasPin ->
                 session.saveToken(token)
                 session.savePhone(phone)
 
@@ -160,6 +160,12 @@ class AuthActivity : AppCompatActivity() {
                     flipper.displayedChild = 2
                 } else {
                     // ✅ existing user -> unlock with pin
+                    flipper.displayedChild = 3
+                }
+                if (!hasPin) {
+                    // User has no transaction PIN set in backend
+                    flipper.displayedChild = 2
+                } else {
                     flipper.displayedChild = 3
                 }
             }
@@ -246,13 +252,13 @@ class AuthActivity : AppCompatActivity() {
         }
     }
 
-    private fun verifyOtp(phone: String, otp: String, onSuccess: (token: String, isNewUser: Boolean) -> Unit) {
+    private fun verifyOtp(phone: String, otp: String, onSuccess: (token: String, isNewUser: Boolean, hasPin: Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val res = repo.verifyOtp(phone, otp) // ✅ must return isNewUser
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess(res.token, res.isNewUser)
+                    onSuccess(res.token, res.isNewUser, res.hasPin)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
