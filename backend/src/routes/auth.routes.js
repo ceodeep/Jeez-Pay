@@ -139,6 +139,7 @@ const bcrypt = require("bcrypt");
 router.post("/set-pin", authMiddleware, async (req, res) => {
   try {
     const userId = req.user?.userId;
+    console.log("[set-pin] userId:", userId);
     const pin = String(req.body?.pin ?? "").trim();
 
     console.log("[set-pin] userId:", userId);
@@ -187,6 +188,7 @@ router.post("/set-pin", authMiddleware, async (req, res) => {
 router.post("/verify-pin", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
+    console.log("[verify-pin] userId:", userId);
     const { pin } = req.body;
 
     if (!pin) {

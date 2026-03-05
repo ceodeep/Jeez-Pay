@@ -333,6 +333,7 @@ router.post("/credit", authMiddleware, async (req, res) => {
 router.post("/transfer", authMiddleware, async (req, res) => {
   try {
     const senderId = req.user.userId;
+    console.log("[transfer] senderId:", senderId);
 
     const okKyc = await requireKycApproved(senderId);
     if (!okKyc) {

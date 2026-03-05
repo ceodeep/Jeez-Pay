@@ -19,8 +19,8 @@ class AuthRepository {
         return api.setPin(SetPinRequest(pin))
     }
 
-    suspend fun verifyPin(pin: String): Boolean {
-        val res = api.verifyPin(VerifyPinRequest(pin))
-        return res.ok
+    // ✅ IMPORTANT FIX
+    suspend fun verifyPin(pin: String): VerifyPinResponse {
+        return api.verifyPin(VerifyPinRequest(pin))
     }
 }
