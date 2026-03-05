@@ -188,41 +188,39 @@ router.post("/set-pin", authMiddleware, async (req, res) => {
 router.post("/verify-pin", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log("[verify-pin] userId:", userId);
-    const { pin } = req.body;
+    const pin = String(req.body?.pin ?? "").trim();
 
-    if (!pin) {
-      return res.status(400).json({ message: "PIN required" });
+    if (!/^\d{4}$/.test(pin)) {
+      return res.json({ ok: false, code: "INVALID_PIN", message: "PIN must be exactly 4 digits" });
     }
 
     const { data: user, error } = await supabase
       .from("users")
       .select("pin_hash")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
 
     if (error || !user) {
-      return res.status(500).json({ message: "User lookup failed" });
+      console.error("verify-pin lookup error:", error);
+      return res.status(500).json({ ok: false, code: "USER_LOOKUP_FAILED", message: "User lookup failed" });
     }
 
     if (!user.pin_hash) {
-      return res.status(400).json({
-        code: "PIN_NOT_SET",
-        message: "PIN not set for this account"
-      });
+      // ✅ IMPORTANT: keep HTTP 200 so app can read code/message
+      return res.json({ ok: false, code: "PIN_NOT_SET", message: "No transaction pin set for this account" });
     }
 
     const match = await bcrypt.compare(pin, user.pin_hash);
 
     if (!match) {
-      return res.json({ ok: false, message: "Wrong PIN" });
+      return res.json({ ok: false, code: "WRONG_PIN", message: "Wrong PIN" });
     }
 
     return res.json({ ok: true });
 
   } catch (err) {
     console.error("verify-pin crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ ok: false, code: "SERVER_ERROR", message: "Internal server error" });
   }
 });
 
