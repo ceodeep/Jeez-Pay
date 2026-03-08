@@ -26,7 +26,7 @@ class WalletRepository {
         currency: String,
         amount: Double,
         description: String?,
-        pin: String?
+        pin: String
     ): TransferResponse {
         return api.transfer(
             TransferRequest(

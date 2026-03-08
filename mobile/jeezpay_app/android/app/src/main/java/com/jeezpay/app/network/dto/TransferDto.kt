@@ -5,7 +5,7 @@ data class TransferRequest(
     val currency: String,
     val amount: Double,
     val description: String? = null,
-    val pin: String? = null
+    val pin: String
 )
 
 data class TransferResponse(

@@ -2,7 +2,10 @@ package com.jeezpay.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
@@ -21,29 +24,34 @@ class AuthActivity : AppCompatActivity() {
     private lateinit var session: SessionManager
     private val repo = AuthRepository()
 
-    // Views
     private lateinit var flipper: ViewFlipper
 
-    // Screen 0
     private lateinit var etPhone: EditText
     private lateinit var btnContinue: MaterialButton
+    private lateinit var actCountryCode: AutoCompleteTextView
+    private lateinit var createAccountRow: LinearLayout
+    private lateinit var tvForgotPassword: TextView
+    private lateinit var passwordBox: LinearLayout
 
-    // Screen 1
     private lateinit var btnBackOtp: TextView
     private lateinit var tvOtpHint: TextView
     private lateinit var etOtp: EditText
     private lateinit var btnVerify: MaterialButton
 
-    // Screen 2 (Set PIN)
     private lateinit var btnBackPin: TextView
     private lateinit var etPin: EditText
     private lateinit var btnSetPin: MaterialButton
 
-    // Screen 3 (Unlock)
     private lateinit var btnUseAnotherAccount: TextView
     private lateinit var btnUnlock: MaterialButton
 
-    // ---- PIN verify launcher (uses your PinVerifyActivity keypad UI) ----
+    private val countryCodes = listOf(
+        "Sudan (+249)",
+        "South Sudan (+211)",
+        "Uganda (+256)",
+        "Egypt (+20)"
+    )
+
     private val pinLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == android.app.Activity.RESULT_OK) {
@@ -64,46 +72,80 @@ class AuthActivity : AppCompatActivity() {
         session = SessionManager(this)
 
         bindViews()
+        setupCountryCodeDropdown()
         routeUser()
 
         setupPhoneScreen()
         setupOtpScreen()
         setupPinSetScreen()
         setupUnlockScreen()
+        setupExtraClicks()
     }
 
     private fun bindViews() {
         flipper = findViewById(R.id.authFlipper)
 
-        // Screen 0
         etPhone = findViewById(R.id.etPhone)
         btnContinue = findViewById(R.id.btnContinue)
+        actCountryCode = findViewById(R.id.actCountryCode)
+        createAccountRow = findViewById(R.id.createAccountRow)
+        tvForgotPassword = findViewById(R.id.tvForgotPassword)
+        passwordBox = findViewById(R.id.passwordBox)
 
-        // Screen 1
         btnBackOtp = findViewById(R.id.btnBackOtp)
         tvOtpHint = findViewById(R.id.tvOtpHint)
         etOtp = findViewById(R.id.etOtp)
         btnVerify = findViewById(R.id.btnVerify)
 
-        // Screen 2
         btnBackPin = findViewById(R.id.btnBackPin)
         etPin = findViewById(R.id.etPin)
         btnSetPin = findViewById(R.id.btnSetPin)
 
-        // Screen 3
         btnUseAnotherAccount = findViewById(R.id.btnUseAnotherAccount)
         btnUnlock = findViewById(R.id.btnUnlock)
     }
 
-    /**
-     * Routing rules:
-     * - No token -> Phone screen
-     * - Token exists -> Unlock screen (verify pin on backend)
-     *
-     * NOTE:
-     * After a brand new signup, we openMain directly after set-pin success,
-     * so user won't see Unlock immediately.
-     */
+    private fun setupCountryCodeDropdown() {
+        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, countryCodes)
+        actCountryCode.setAdapter(adapter)
+        actCountryCode.setText("Sudan (+249)", false)
+
+        actCountryCode.setOnClickListener {
+            actCountryCode.showDropDown()
+        }
+    }
+
+    private fun setupExtraClicks() {
+        passwordBox.setOnClickListener {
+            Toast.makeText(this, "Password login is not enabled yet. Please use OTP.", Toast.LENGTH_SHORT).show()
+        }
+
+        tvForgotPassword.setOnClickListener {
+            Toast.makeText(this, "Password reset is not enabled yet. Please use OTP login.", Toast.LENGTH_SHORT).show()
+        }
+
+        createAccountRow.setOnClickListener {
+            Toast.makeText(this, "Use your phone number and OTP to create a new account.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun buildFullPhone(): String {
+        val selected = actCountryCode.text.toString().trim()
+        val code = selected.substringAfter("(").substringBefore(")").ifBlank { selected }
+
+        var local = etPhone.text.toString().trim()
+        local = local.replace("\\s".toRegex(), "")
+
+        if (local.startsWith("0")) {
+            local = local.substring(1)
+        }
+        if (local.startsWith("+")) {
+            return local
+        }
+
+        return code + local
+    }
+
     private fun routeUser() {
         val token = session.getToken()
 
@@ -118,15 +160,14 @@ class AuthActivity : AppCompatActivity() {
     private fun setupPhoneScreen() {
         btnContinue.isEnabled = false
         etPhone.addTextChangedListener(SimpleTextWatcher {
-            btnContinue.isEnabled = etPhone.text.toString().trim().length >= 8
+            btnContinue.isEnabled = etPhone.text.toString().trim().length >= 6
         })
 
         btnContinue.setOnClickListener {
-            val phone = etPhone.text.toString().trim()
-
-            requestOtp(phone) {
+            val fullPhone = buildFullPhone()
+            requestOtp(fullPhone) {
                 flipper.displayedChild = 1
-                tvOtpHint.text = "Enter the code sent to your phone"
+                tvOtpHint.text = "Enter the code sent to $fullPhone"
             }
         }
     }
@@ -142,19 +183,16 @@ class AuthActivity : AppCompatActivity() {
         }
 
         btnVerify.setOnClickListener {
-            val phone = etPhone.text.toString().trim()
+            val fullPhone = buildFullPhone()
             val otp = etOtp.text.toString().trim()
 
-            verifyOtp(phone, otp) { token, isNewUser ->
-                // ✅ Save session
+            verifyOtp(fullPhone, otp) { token, isNewUser ->
                 session.saveToken(token)
-                session.savePhone(phone)
+                session.savePhone(fullPhone)
 
                 if (isNewUser) {
-                    // ✅ New user must set PIN on backend
                     flipper.displayedChild = 2
                 } else {
-                    // ✅ Existing user unlock
                     flipper.displayedChild = 3
                 }
             }
@@ -179,7 +217,6 @@ class AuthActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // ✅ Store PIN on backend (pin_hash)
             setPinOnBackend(pin)
         }
     }
@@ -213,8 +250,6 @@ class AuthActivity : AppCompatActivity() {
         }
     }
 
-    // -------- NETWORK --------
-
     private fun requestOtp(phone: String, onSuccess: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -225,11 +260,7 @@ class AuthActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "Request OTP failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this@AuthActivity, "Request OTP failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -249,36 +280,23 @@ class AuthActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "Verify failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this@AuthActivity, "Verify failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
 
     private fun setPinOnBackend(pin: String) {
-        android.util.Log.d("PIN_DEBUG", "setPin token=${session.getToken()} phone=${session.getPhone()}")
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                android.util.Log.d("PIN_DEBUG", "calling /auth/set-pin ...")
                 repo.setPin(pin)
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@AuthActivity, "PIN set successfully", Toast.LENGTH_SHORT).show()
-
-                    // ✅ IMPORTANT:
-                    // New user should go straight into the app after creating PIN.
                     openMain()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "Set PIN failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this@AuthActivity, "Set PIN failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -287,20 +305,9 @@ class AuthActivity : AppCompatActivity() {
     private fun verifyPinOnBackend(pin: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val res = repo.verifyPin(pin) // returns VerifyPinResponse
+                val res = repo.verifyPin(pin)
                 withContext(Dispatchers.Main) {
                     if (!res.ok) {
-                        // if backend says pin not set, route to set pin screen
-                        if (res.code == "PIN_NOT_SET") {
-                            Toast.makeText(
-                                this@AuthActivity,
-                                "No PIN set for this account. Please create one.",
-                                Toast.LENGTH_LONG
-                            ).show()
-                            flipper.displayedChild = 2
-                            return@withContext
-                        }
-
                         Toast.makeText(
                             this@AuthActivity,
                             res.message ?: "Wrong PIN",
@@ -308,16 +315,11 @@ class AuthActivity : AppCompatActivity() {
                         ).show()
                         return@withContext
                     }
-
                     openMain()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "PIN verify failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this@AuthActivity, "PIN verify failed: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }

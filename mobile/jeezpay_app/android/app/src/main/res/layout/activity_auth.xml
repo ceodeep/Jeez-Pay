@@ -4,8 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_main"
-    android:padding="18dp">
+    android:background="#FFFFFF">
 
     <ViewFlipper
         android:id="@+id/authFlipper"
@@ -17,86 +16,262 @@
         app:layout_constraintEnd_toEndOf="parent">
 
         <!-- =====================
-             SCREEN 1: PHONE
+             SCREEN 1: LOGIN / PHONE
              ===================== -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FFFFFF">
+
+            <ImageView
+                android:id="@+id/ivLoginProfile"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginTop="58dp"
+                android:src="@drawable/ic_user_circle"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:tint="#2A82EE" />
+
+            <TextView
+                android:id="@+id/tvLoginTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="213dp"
+                android:text="Login"
+                android:textColor="#20130B"
+                android:textSize="36sp"
+                android:fontFamily="sans-serif"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/tvLoginSubtitle"
+                android:layout_width="187dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="10dp"
+                android:text="Welcome back! Please sign in to continue"
+                android:textColor="#8B8B8B"
+                android:textSize="16sp"
+                android:lineSpacingExtra="2dp"
+                android:fontFamily="sans-serif"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvLoginTitle" />
+
+            <LinearLayout
+                android:id="@+id/loginInputSection"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="21dp"
+                android:layout_marginEnd="21dp"
+                android:layout_marginTop="417dp"
+                android:orientation="vertical"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <TextView
+                    android:id="@+id/tvPhoneLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Phone number"
+                    android:textColor="#20130B"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <!-- Country code box -->
+                    <LinearLayout
+                        android:id="@+id/countryCodeBox"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_auth_input_box"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_user_circle"
+                            app:tint="#2A82EE" />
+
+                        <AutoCompleteTextView
+                            android:id="@+id/actCountryCode"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:background="@android:color/transparent"
+                            android:drawableEnd="@android:drawable/arrow_down_float"
+                            android:focusable="false"
+                            android:clickable="true"
+                            android:inputType="none"
+                            android:padding="0dp"
+                            android:text="+249"
+                            android:textColor="#000000"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/etPhone"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_auth_input_box"
+                        android:hint="Phone"
+                        android:inputType="phone"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp"
+                        android:textColor="#000000"
+                        android:textColorHint="#80000000"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvPasswordLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:text="Password"
+                    android:textColor="#20130B"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif" />
+
+                <!-- Password visual block -->
+                <LinearLayout
+                    android:id="@+id/passwordBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_auth_input_box"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_lock"
+                        app:tint="#CCCCCC" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="18dp"
+                        android:layout_weight="1"
+                        android:text="Password"
+                        android:textColor="#8B8B8B"
+                        android:textSize="18sp"
+                        android:fontFamily="sans-serif" />
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_eye"
+                        app:tint="#8B8B8B" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvForgotPassword"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="24dp"
+                    android:text="Forgot password?"
+                    android:textColor="#2A82EE"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnContinue"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="16dp"
+                    android:backgroundTint="#2A82EE"
+                    android:enabled="false"
+                    android:text="Login"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/createAccountRow"
+                android:layout_width="wrap_content"
+                android:layout_height="55dp"
+                android:layout_marginBottom="103dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Don’t have an account?"
+                    android:textColor="#8B8B8B"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif" />
+
+                <TextView
+                    android:id="@+id/tvCreateAccount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="Create account"
+                    android:textColor="#2A82EE"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif" />
+            </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- KEEP THE REST EXACTLY AS YOU HAD THEM -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Welcome to JeezPay"
-                android:textColor="@color/text_primary"
-                android:textSize="24sp"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false"/>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Enter your phone number to continue"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                android:includeFontPadding="false"/>
-
-            <EditText
-                android:id="@+id/etPhone"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="18dp"
-                android:background="@drawable/input_bg"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:hint="Phone number"
-                android:inputType="phone"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_tertiary"
-                android:includeFontPadding="false"/>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnContinue"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="14dp"
-                android:text="Continue"
-                android:textAllCaps="false"
-                android:enabled="false"
-                app:cornerRadius="16dp"
-                app:backgroundTint="@color/paypal_blue"
-                android:textColor="@android:color/white"/>
-        </LinearLayout>
-
-        <!-- =====================
-             SCREEN 2: OTP
-             ===================== -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:padding="18dp"
+            android:background="#FFFFFF">
 
             <TextView
                 android:id="@+id/btnBackOtp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="← Back"
-                android:textColor="@color/paypal_blue"
-                android:textSize="13sp"
-                android:includeFontPadding="false"/>
+                android:textColor="#2A82EE"
+                android:textSize="13sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:text="Verify OTP"
-                android:textColor="@color/text_primary"
-                android:textSize="22sp"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false"/>
+                android:textColor="#20130B"
+                android:textSize="22sp" />
 
             <TextView
                 android:id="@+id/tvOtpHint"
@@ -104,24 +279,22 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Enter the code sent to your phone"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                android:includeFontPadding="false"/>
+                android:textColor="#8B8B8B"
+                android:textSize="13sp" />
 
             <EditText
                 android:id="@+id/etOtp"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="18dp"
-                android:background="@drawable/input_bg"
+                android:background="@drawable/bg_auth_input_box"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:hint="OTP code"
                 android:inputType="number"
                 android:maxLength="6"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_tertiary"
-                android:includeFontPadding="false"/>
+                android:textColor="#20130B"
+                android:textColorHint="#8B8B8B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVerify"
@@ -132,61 +305,55 @@
                 android:textAllCaps="false"
                 android:enabled="false"
                 app:cornerRadius="16dp"
-                app:backgroundTint="@color/paypal_blue"
-                android:textColor="@android:color/white"/>
+                app:backgroundTint="#2A82EE"
+                android:textColor="@android:color/white" />
         </LinearLayout>
 
-        <!-- =====================
-             SCREEN 3: PIN SET
-             ===================== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:padding="18dp"
+            android:background="#FFFFFF">
 
             <TextView
                 android:id="@+id/btnBackPin"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="← Back"
-                android:textColor="@color/paypal_blue"
-                android:textSize="13sp"
-                android:includeFontPadding="false"/>
+                android:textColor="#2A82EE"
+                android:textSize="13sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:text="Set PIN"
-                android:textColor="@color/text_primary"
-                android:textSize="22sp"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false"/>
+                android:textColor="#20130B"
+                android:textSize="22sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Create a 4-digit PIN for quick login"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                android:includeFontPadding="false"/>
+                android:textColor="#8B8B8B"
+                android:textSize="13sp" />
 
             <EditText
                 android:id="@+id/etPin"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="18dp"
-                android:background="@drawable/input_bg"
+                android:background="@drawable/bg_auth_input_box"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:hint="4-digit PIN"
                 android:inputType="numberPassword"
                 android:maxLength="4"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_tertiary"
-                android:includeFontPadding="false"/>
+                android:textColor="#20130B"
+                android:textColorHint="#8B8B8B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSetPin"
@@ -197,51 +364,46 @@
                 android:textAllCaps="false"
                 android:enabled="false"
                 app:cornerRadius="16dp"
-                app:backgroundTint="@color/paypal_blue"
-                android:textColor="@android:color/white"/>
+                app:backgroundTint="#2A82EE"
+                android:textColor="@android:color/white" />
         </LinearLayout>
 
-        <!-- =====================
-             SCREEN 4: PIN UNLOCK  ✅ NEW
-             ===================== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:padding="18dp"
+            android:background="#FFFFFF">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Enter PIN"
-                android:textColor="@color/text_primary"
-                android:textSize="22sp"
-                android:fontFamily="sans-serif-medium"
-                android:includeFontPadding="false"/>
+                android:textColor="#20130B"
+                android:textSize="22sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Unlock your account"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
-                android:includeFontPadding="false"/>
+                android:textColor="#8B8B8B"
+                android:textSize="13sp" />
 
             <EditText
                 android:id="@+id/etUnlockPin"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
                 android:layout_marginTop="18dp"
-                android:background="@drawable/input_bg"
+                android:background="@drawable/bg_auth_input_box"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
                 android:hint="4-digit PIN"
                 android:inputType="numberPassword"
                 android:maxLength="4"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_tertiary"
-                android:includeFontPadding="false"/>
+                android:textColor="#20130B"
+                android:textColorHint="#8B8B8B" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnUnlock"
@@ -252,8 +414,8 @@
                 android:textAllCaps="false"
                 android:enabled="true"
                 app:cornerRadius="16dp"
-                app:backgroundTint="@color/paypal_blue"
-                android:textColor="@android:color/white"/>
+                app:backgroundTint="#2A82EE"
+                android:textColor="@android:color/white" />
 
             <TextView
                 android:id="@+id/btnUseAnotherAccount"
@@ -261,9 +423,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="Use another account"
-                android:textColor="@color/paypal_blue"
-                android:textSize="13sp"
-                android:includeFontPadding="false"/>
+                android:textColor="#2A82EE"
+                android:textSize="13sp" />
         </LinearLayout>
 
     </ViewFlipper>

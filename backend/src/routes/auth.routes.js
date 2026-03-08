@@ -8,35 +8,19 @@ const authMiddleware = require("../middlewares/auth.middleware");
 // You can keep your currencies here
 const DEFAULT_CURRENCIES = ["USDT", "SDG", "SSP", "EGP", "UGX"];
 
-function normalizePhoneSudan(raw) {
+function normalizePhone(raw) {
   const p = String(raw || "").trim();
-
-  // keep digits only
   const digits = p.replace(/\D/g, "");
 
-  // If user types local "0XXXXXXXXX" (9 digits after 0), convert to +249XXXXXXXXX
-  // Adjust if your local format differs.
-  if (digits.startsWith("0") && digits.length >= 10) {
-    return "+249" + digits.substring(1);
-  }
+  if (!digits) return "";
 
-  // If they typed 249XXXXXXXXX
-  if (digits.startsWith("249")) {
-    return "+249" + digits.substring(3);
-  }
-
-  // If already includes country code with plus in original, keep it
-  if (p.startsWith("+") && digits.length >= 8) {
+  // If already international with +
+  if (p.startsWith("+")) {
     return "+" + digits;
   }
 
-  // Fallback: if they typed just 9 digits (e.g. 9XXXXXXXX), assume Sudan
-  if (digits.length === 9) {
-    return "+249" + digits;
-  }
-
-  // Last resort
-  return p;
+  // Otherwise assume caller already selected a country code and sent full number
+  return "+" + digits;
 }
 
 // ---- POST /auth/request-otp ----
@@ -66,7 +50,7 @@ router.post("/verify-otp", async (req, res) => {
     }
 
     // ✅ Normalize phone ONCE and use it everywhere
-    const phoneNorm = normalizePhoneSudan(phone);
+    const phoneNorm = normalizePhone(phone);
 
     // 1) Find user by normalized phone
     const { data: existingUser, error: fetchErr } = await supabase
