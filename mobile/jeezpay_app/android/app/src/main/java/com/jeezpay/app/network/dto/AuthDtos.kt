@@ -1,35 +1,50 @@
 package com.jeezpay.app.network.dto
 
-// -------- REQUESTS --------
+// -------- LOGIN --------
 
-data class RequestOtpRequest(
-    val phone: String
-)
-
-data class VerifyOtpRequest(
+data class LoginRequest(
     val phone: String,
-    val otp: String
+    val password: String
 )
 
-// -------- RESPONSES --------
-
-data class RequestOtpResponse(
-    val message: String
-)
-
-data class VerifyOtpResponse(
+data class LoginResponse(
     val message: String,
     val token: String,
-    val isNewUser: Boolean = false,
-    val hasPin: Boolean = false   // ✅ ADD THIS
-)
-
-data class AuthResponse(
-    val message: String,
-    val token: String,
+    val hasPin: Boolean = false,
     val isNewUser: Boolean = false
 )
 
+// -------- SIGNUP OTP --------
+
+data class SignupRequestOtpRequest(
+    val phone: String,
+    val password: String,
+    val accountType: String,
+    val countryCode: String,
+    val termsAccepted: Boolean
+)
+
+data class SignupRequestOtpResponse(
+    val message: String
+)
+
+data class SignupVerifyOtpRequest(
+    val phone: String,
+    val otp: String,
+    val password: String,
+    val accountType: String,
+    val countryCode: String,
+    val termsAccepted: Boolean
+)
+
+data class SignupVerifyOtpResponse(
+    val message: String,
+    val token: String,
+    val hasPin: Boolean = false,
+    val isNewUser: Boolean = true
+)
+
+// -------- PIN --------
 
 data class SetPinRequest(
     val pin: String

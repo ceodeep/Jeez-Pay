@@ -7,19 +7,57 @@ class AuthRepository {
 
     private val api = ApiClient.authApi
 
-    suspend fun requestOtp(phone: String): RequestOtpResponse {
-        return api.requestOtp(RequestOtpRequest(phone))
+    suspend fun login(phone: String, password: String): LoginResponse {
+        return api.login(
+            LoginRequest(
+                phone = phone,
+                password = password
+            )
+        )
     }
 
-    suspend fun verifyOtp(phone: String, otp: String): VerifyOtpResponse {
-        return api.verifyOtp(VerifyOtpRequest(phone, otp))
+    suspend fun signupRequestOtp(
+        phone: String,
+        password: String,
+        accountType: String,
+        countryCode: String,
+        termsAccepted: Boolean
+    ): SignupRequestOtpResponse {
+        return api.signupRequestOtp(
+            SignupRequestOtpRequest(
+                phone = phone,
+                password = password,
+                accountType = accountType,
+                countryCode = countryCode,
+                termsAccepted = termsAccepted
+            )
+        )
+    }
+
+    suspend fun signupVerifyOtp(
+        phone: String,
+        otp: String,
+        password: String,
+        accountType: String,
+        countryCode: String,
+        termsAccepted: Boolean
+    ): SignupVerifyOtpResponse {
+        return api.signupVerifyOtp(
+            SignupVerifyOtpRequest(
+                phone = phone,
+                otp = otp,
+                password = password,
+                accountType = accountType,
+                countryCode = countryCode,
+                termsAccepted = termsAccepted
+            )
+        )
     }
 
     suspend fun setPin(pin: String): SetPinResponse {
         return api.setPin(SetPinRequest(pin))
     }
 
-    // ✅ IMPORTANT FIX
     suspend fun verifyPin(pin: String): VerifyPinResponse {
         return api.verifyPin(VerifyPinRequest(pin))
     }

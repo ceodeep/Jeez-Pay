@@ -67,7 +67,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="21dp"
                 android:layout_marginEnd="21dp"
-                android:layout_marginTop="417dp"
+                android:layout_marginTop="360dp"
                 android:orientation="vertical"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -159,9 +159,7 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:clickable="true"
-                    android:focusable="true">
+                    android:paddingEnd="18dp">
 
                     <ImageView
                         android:layout_width="24dp"
@@ -169,20 +167,28 @@
                         android:src="@drawable/ic_lock"
                         app:tint="#CCCCCC" />
 
-                    <TextView
+                    <EditText
+                        android:id="@+id/etLoginPassword"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="18dp"
                         android:layout_weight="1"
-                        android:text="Password"
-                        android:textColor="#8B8B8B"
-                        android:textSize="18sp"
-                        android:fontFamily="sans-serif" />
+                        android:background="@android:color/transparent"
+                        android:hint="Password"
+                        android:inputType="textPassword"
+                        android:maxLines="1"
+                        android:textColor="#20130B"
+                        android:textColorHint="#8B8B8B"
+                        android:textSize="18sp" />
 
                     <ImageView
+                        android:id="@+id/ivLoginEye"
                         android:layout_width="24dp"
                         android:layout_height="24dp"
                         android:src="@drawable/ic_eye"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:padding="4dp"
                         app:tint="#8B8B8B" />
                 </LinearLayout>
 
@@ -217,8 +223,8 @@
             <LinearLayout
                 android:id="@+id/createAccountRow"
                 android:layout_width="wrap_content"
-                android:layout_height="55dp"
-                android:layout_marginBottom="103dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="28dp"
                 android:gravity="center"
                 android:orientation="horizontal"
                 android:clickable="true"
@@ -249,65 +255,196 @@
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- KEEP THE REST EXACTLY AS YOU HAD THEM -->
-        <LinearLayout
+        <!-- =====================
+          SCREEN 2: OTP
+          ===================== -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_vertical"
-            android:padding="18dp"
             android:background="#FFFFFF">
 
+            <!-- Back -->
             <TextView
                 android:id="@+id/btnBackOtp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="← Back"
-                android:textColor="#2A82EE"
-                android:textSize="13sp" />
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="58dp"
+                android:text="←"
+                android:textColor="#1E232C"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
+            <!-- OTP info container -->
+            <LinearLayout
+                android:id="@+id/otpInfoContainer"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="105dp"
+                android:layout_marginEnd="21dp"
+                android:orientation="vertical"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <TextView
+                    android:id="@+id/tvOtpTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="OTP Verification"
+                    android:textColor="#1E232C"
+                    android:textSize="30sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif" />
+
+                <TextView
+                    android:id="@+id/tvOtpHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="Enter the verification code we just sent to your phone number."
+                    android:textColor="#80807F"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="2dp"
+                    android:fontFamily="sans-serif" />
+            </LinearLayout>
+
+            <!-- OTP visible boxes -->
+            <LinearLayout
+                android:id="@+id/otpBoxesRow"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="Verify OTP"
-                android:textColor="#20130B"
-                android:textSize="22sp" />
+                android:layout_marginTop="30dp"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@id/otpInfoContainer"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
 
-            <TextView
-                android:id="@+id/tvOtpHint"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Enter the code sent to your phone"
-                android:textColor="#8B8B8B"
-                android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/otpBox1"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:background="@drawable/bg_otp_box"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="#1E232C"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
 
+                <TextView
+                    android:id="@+id/otpBox2"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:layout_marginStart="14dp"
+                    android:background="@drawable/bg_otp_box"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="#1E232C"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/otpBox3"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:layout_marginStart="14dp"
+                    android:background="@drawable/bg_otp_box"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="#1E232C"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/otpBox4"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:layout_marginStart="14dp"
+                    android:background="@drawable/bg_otp_box"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="#1E232C"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/otpBox5"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:layout_marginStart="14dp"
+                    android:background="@drawable/bg_otp_box"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="#1E232C"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/otpBox6"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:layout_marginStart="14dp"
+                    android:background="@drawable/bg_otp_box"
+                    android:gravity="center"
+                    android:text=""
+                    android:textColor="#1E232C"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Hidden real input -->
             <EditText
                 android:id="@+id/etOtp"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="18dp"
-                android:background="@drawable/bg_auth_input_box"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:hint="OTP code"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:alpha="0"
+                android:background="@android:color/transparent"
                 android:inputType="number"
                 android:maxLength="6"
-                android:textColor="#20130B"
-                android:textColorHint="#8B8B8B" />
+                android:textColor="#000000"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                android:focusable="true"
+                android:focusableInTouchMode="true"/>
 
+            <!-- Resend text -->
+            <TextView
+                android:id="@+id/tvResendOtp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Didn’t receive code? Resend"
+                android:textColor="#80807F"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif"
+                app:layout_constraintTop_toBottomOf="@id/otpBoxesRow"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Verify button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVerify"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="14dp"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="21dp"
+                android:layout_marginEnd="21dp"
+                android:layout_marginBottom="182dp"
+                android:backgroundTint="#2A82EE"
+                android:enabled="false"
                 android:text="Verify"
                 android:textAllCaps="false"
-                android:enabled="false"
-                app:cornerRadius="16dp"
-                app:backgroundTint="#2A82EE"
-                android:textColor="@android:color/white" />
-        </LinearLayout>
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -426,6 +563,318 @@
                 android:textColor="#2A82EE"
                 android:textSize="13sp" />
         </LinearLayout>
+
+        <!-- =====================
+     SCREEN 5: CREATE ACCOUNT
+     ===================== -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FFFFFF">
+
+            <!-- Top icon -->
+            <ImageView
+                android:id="@+id/ivSignupProfile"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:layout_marginTop="58dp"
+                android:src="@drawable/ic_user_circle"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:tint="#2A82EE" />
+
+            <!-- Header -->
+            <TextView
+                android:id="@+id/tvSignupTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="215dp"
+                android:text="Create Account"
+                android:textColor="#20130B"
+                android:textSize="36sp"
+                android:fontFamily="sans-serif"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/tvSignupDesc"
+                android:layout_width="311dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="8dp"
+                android:text="Create an account so you can send, receive, and manage your money easily."
+                android:textColor="#8B8B8B"
+                android:textSize="16sp"
+                android:lineSpacingExtra="2dp"
+                android:fontFamily="sans-serif"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/tvSignupTitle" />
+
+            <!-- Form -->
+            <LinearLayout
+                android:id="@+id/signupForm"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="365dp"
+                android:layout_marginEnd="21dp"
+                android:orientation="vertical"
+                android:padding="0dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <!-- Account type -->
+                <LinearLayout
+                    android:id="@+id/accountTypeBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:background="@drawable/bg_auth_input_box"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_user_circle"
+                        app:tint="#CCCCCC" />
+
+                    <AutoCompleteTextView
+                        android:id="@+id/actAccountType"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="18dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:drawableEnd="@android:drawable/arrow_down_float"
+                        android:focusable="false"
+                        android:clickable="true"
+                        android:inputType="none"
+                        android:padding="0dp"
+                        android:text="Personal"
+                        android:textColor="#20130B"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <!-- Phone row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:id="@+id/signupCountryCodeBox"
+                        android:layout_width="120dp"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_auth_input_box"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_user_circle"
+                            app:tint="#2A82EE" />
+
+                        <AutoCompleteTextView
+                            android:id="@+id/actSignupCountryCode"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:background="@android:color/transparent"
+                            android:drawableEnd="@android:drawable/arrow_down_float"
+                            android:focusable="false"
+                            android:clickable="true"
+                            android:inputType="none"
+                            android:padding="0dp"
+                            android:text="+249"
+                            android:textColor="#000000"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <EditText
+                        android:id="@+id/etSignupPhone"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_auth_input_box"
+                        android:hint="Phone"
+                        android:inputType="phone"
+                        android:paddingStart="18dp"
+                        android:paddingEnd="18dp"
+                        android:textColor="#000000"
+                        android:textColorHint="#80000000"
+                        android:textSize="16sp" />
+                </LinearLayout>
+
+                <!-- Create password -->
+                <LinearLayout
+                    android:id="@+id/createPasswordBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_auth_input_box"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_lock"
+                        app:tint="#CCCCCC" />
+
+                    <EditText
+                        android:id="@+id/etSignupPassword"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="18dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:hint="Create password"
+                        android:inputType="textPassword"
+                        android:maxLines="1"
+                        android:textColor="#20130B"
+                        android:textColorHint="#8B8B8B"
+                        android:textSize="13sp" />
+
+                    <ImageView
+                        android:id="@+id/ivSignupEye1"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_eye"
+                        app:tint="#8B8B8B" />
+                </LinearLayout>
+
+                <!-- Confirm password -->
+                <LinearLayout
+                    android:id="@+id/confirmPasswordBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_auth_input_box"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_lock"
+                        app:tint="#CCCCCC" />
+
+                    <EditText
+                        android:id="@+id/etSignupConfirmPassword"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="18dp"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:hint="Confirm password"
+                        android:inputType="textPassword"
+                        android:maxLines="1"
+                        android:textColor="#20130B"
+                        android:textColorHint="#8B8B8B"
+                        android:textSize="13sp" />
+
+                    <ImageView
+                        android:id="@+id/ivSignupEye2"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_eye"
+                        app:tint="#8B8B8B" />
+                </LinearLayout>
+
+                <!-- Terms -->
+                <LinearLayout
+                    android:id="@+id/termsRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="top"
+                    android:orientation="horizontal">
+
+                    <CheckBox
+                        android:id="@+id/cbTerms"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:buttonTint="#2A82EE"
+                        android:minWidth="14dp"
+                        android:minHeight="14dp" />
+
+                    <TextView
+                        android:id="@+id/tvTermsText"
+                        android:layout_width="255dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="I agree to the Terms &amp; Conditions and Privacy Policy."
+                        android:textColor="#000000"
+                        android:textSize="12sp"
+                        android:fontFamily="sans-serif" />
+                </LinearLayout>
+
+                <!-- Create account button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCreateAccount"
+                    android:layout_width="match_parent"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="12dp"
+                    android:backgroundTint="#2A82EE"
+                    android:enabled="false"
+                    android:text="Create Account"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
+
+            <!-- Bottom login row -->
+            <LinearLayout
+                android:id="@+id/loginInsteadRow"
+                android:layout_width="wrap_content"
+                android:layout_height="55dp"
+                android:layout_marginBottom="103dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Already have an account?"
+                    android:textColor="#8B8B8B"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif" />
+
+                <TextView
+                    android:id="@+id/tvLoginInstead"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:text="Login"
+                    android:textColor="#2A82EE"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif" />
+            </LinearLayout>
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
     </ViewFlipper>
 
