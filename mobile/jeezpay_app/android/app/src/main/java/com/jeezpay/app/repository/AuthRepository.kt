@@ -3,6 +3,7 @@ package com.jeezpay.app.repository
 import com.jeezpay.app.network.ApiClient
 import com.jeezpay.app.network.dto.*
 
+
 class AuthRepository {
 
     private val api = ApiClient.authApi
@@ -60,5 +61,25 @@ class AuthRepository {
 
     suspend fun verifyPin(pin: String): VerifyPinResponse {
         return api.verifyPin(VerifyPinRequest(pin))
+    }
+
+    suspend fun forgotPasswordRequestOtp(phone: String): ForgotPasswordRequestOtpResponse {
+        return api.forgotPasswordRequestOtp(
+            ForgotPasswordRequestOtpRequest(phone)
+        )
+    }
+
+    suspend fun forgotPasswordVerifyOtp(
+        phone: String,
+        otp: String,
+        newPassword: String
+    ): ForgotPasswordVerifyOtpResponse {
+        return api.forgotPasswordVerifyOtp(
+            ForgotPasswordVerifyOtpRequest(
+                phone = phone,
+                otp = otp,
+                newPassword = newPassword
+            )
+        )
     }
 }

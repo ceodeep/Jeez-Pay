@@ -46,6 +46,15 @@ class AuthActivity : AppCompatActivity() {
     private lateinit var otpBox4: TextView
     private lateinit var otpBox5: TextView
     private lateinit var otpBox6: TextView
+    private lateinit var setPinDot1: android.widget.ImageView
+    private lateinit var setPinDot2: android.widget.ImageView
+    private lateinit var setPinDot3: android.widget.ImageView
+    private lateinit var setPinDot4: android.widget.ImageView
+    private lateinit var unlockDot1: android.widget.ImageView
+    private lateinit var unlockDot2: android.widget.ImageView
+    private lateinit var unlockDot3: android.widget.ImageView
+    private lateinit var unlockDot4: android.widget.ImageView
+    private lateinit var etUnlockPin: EditText
     private lateinit var otpBoxesRow: LinearLayout
     private lateinit var btnVerify: MaterialButton
 
@@ -71,8 +80,18 @@ class AuthActivity : AppCompatActivity() {
     private lateinit var loginInsteadRow: LinearLayout
     private lateinit var etLoginPassword: EditText
     private lateinit var ivLoginEye: android.widget.ImageView
+    private lateinit var btnAccountCreatedContinue: MaterialButton
 
     private val countryCodes = listOf("+249", "+211", "+256", "+20")
+
+    private enum class OtpFlowMode {
+        SIGNUP,
+        FORGOT_PASSWORD
+    }
+
+    private var otpFlowMode: OtpFlowMode = OtpFlowMode.SIGNUP
+    private var pendingForgotPasswordPhone: String? = null
+    private var pendingForgotPasswordNewPassword: String? = null
 
 
 
@@ -115,6 +134,7 @@ class AuthActivity : AppCompatActivity() {
         setupUnlockScreen()
         setupExtraClicks()
         setupCreateAccountScreen()
+        setupAccountCreatedScreen()
     }
 
     private fun bindViews() {
@@ -133,6 +153,11 @@ class AuthActivity : AppCompatActivity() {
         otpBox4 = findViewById(R.id.otpBox4)
         otpBox5 = findViewById(R.id.otpBox5)
         otpBox6 = findViewById(R.id.otpBox6)
+        unlockDot1 = findViewById(R.id.unlockDot1)
+        unlockDot2 = findViewById(R.id.unlockDot2)
+        unlockDot3 = findViewById(R.id.unlockDot3)
+        unlockDot4 = findViewById(R.id.unlockDot4)
+        etUnlockPin = findViewById(R.id.etUnlockPin)
         otpBoxesRow = findViewById(R.id.otpBoxesRow)
 
         btnBackOtp = findViewById(R.id.btnBackOtp)
@@ -160,6 +185,12 @@ class AuthActivity : AppCompatActivity() {
 
         etLoginPassword = findViewById(R.id.etLoginPassword)
         ivLoginEye = findViewById(R.id.ivLoginEye)
+
+        setPinDot1 = findViewById(R.id.setPinDot1)
+        setPinDot2 = findViewById(R.id.setPinDot2)
+        setPinDot3 = findViewById(R.id.setPinDot3)
+        setPinDot4 = findViewById(R.id.setPinDot4)
+        btnAccountCreatedContinue = findViewById(R.id.btnAccountCreatedContinue)
     }
 
     private fun setupCountryCodeDropdown() {
@@ -175,7 +206,42 @@ class AuthActivity : AppCompatActivity() {
 
     private fun setupExtraClicks() {
         tvForgotPassword.setOnClickListener {
-            Toast.makeText(this, "Forgot password flow is not added yet.", Toast.LENGTH_SHORT).show()
+            val fullPhone = buildFullPhone()
+
+            if (etPhone.text.toString().trim().length < 6) {
+                Toast.makeText(this, "Enter your phone number first", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val input = EditText(this).apply {
+                hint = "Enter new password"
+                inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                        android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
+
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Reset Password")
+                .setView(input)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Continue") { _, _ ->
+                    val newPassword = input.text.toString().trim()
+
+                    if (newPassword.length < 4) {
+                        Toast.makeText(this, "Password must be at least 4 characters", Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+
+                    otpFlowMode = OtpFlowMode.FORGOT_PASSWORD
+                    pendingForgotPasswordPhone = fullPhone
+                    pendingForgotPasswordNewPassword = newPassword
+
+                    forgotPasswordRequestOtp(fullPhone) {
+                        flipper.displayedChild = 1
+                        tvOtpHint.text = "Enter the code sent to $fullPhone"
+                        etOtp.text?.clear()
+                    }
+                }
+                .show()
         }
 
         createAccountRow.setOnClickListener {
@@ -307,39 +373,83 @@ class AuthActivity : AppCompatActivity() {
         }
 
         btnBackOtp.setOnClickListener {
-            flipper.displayedChild = if (pendingSignup != null) 4 else 0
+            flipper.displayedChild = if (otpFlowMode == OtpFlowMode.SIGNUP) 4 else 0
         }
 
         btnVerify.setOnClickListener {
-            val signup = pendingSignup
             val otp = etOtp.text.toString().trim()
 
-            if (signup == null) {
-                Toast.makeText(this, "No signup request found. Please create account again.", Toast.LENGTH_LONG).show()
-                flipper.displayedChild = 4
-                return@setOnClickListener
-            }
+            when (otpFlowMode) {
+                OtpFlowMode.SIGNUP -> {
+                    val signup = pendingSignup
+                    if (signup == null) {
+                        Toast.makeText(
+                            this,
+                            "No signup request found. Please create account again.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        flipper.displayedChild = 4
+                        return@setOnClickListener
+                    }
 
-            signupVerifyOtp(
-                phone = signup.phone,
-                otp = otp,
-                password = signup.password,
-                accountType = signup.accountType,
-                countryCode = signup.countryCode,
-                termsAccepted = signup.termsAccepted
-            ) { token, hasPin ->
-                session.saveToken(token)
-                session.savePhone(signup.phone)
-                pendingSignup = null
+                    signupVerifyOtp(
+                        phone = signup.phone,
+                        otp = otp,
+                        password = signup.password,
+                        accountType = signup.accountType,
+                        countryCode = signup.countryCode,
+                        termsAccepted = signup.termsAccepted
+                    ) { token, hasPin ->
+                        session.saveToken(token)
+                        session.savePhone(signup.phone)
+                        pendingSignup = null
 
-                if (hasPin) {
-                    flipper.displayedChild = 3
-                } else {
-                    flipper.displayedChild = 2
+                        if (hasPin) {
+                            flipper.displayedChild = 3
+                        } else {
+                            flipper.displayedChild = 5
+                        }
+
+                        etOtp.text?.clear()
+                        renderOtpBoxes("")
+                    }
                 }
 
-                etOtp.text?.clear()
-                renderOtpBoxes("")
+                OtpFlowMode.FORGOT_PASSWORD -> {
+                    val phone = pendingForgotPasswordPhone
+                    val newPassword = pendingForgotPasswordNewPassword
+
+                    if (phone.isNullOrBlank() || newPassword.isNullOrBlank()) {
+                        Toast.makeText(
+                            this,
+                            "Reset request expired. Please try again.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        flipper.displayedChild = 0
+                        return@setOnClickListener
+                    }
+
+                    forgotPasswordVerifyOtp(
+                        phone = phone,
+                        otp = otp,
+                        newPassword = newPassword
+                    ) { token, hasPin ->
+                        session.saveToken(token)
+                        session.savePhone(phone)
+
+                        pendingForgotPasswordPhone = null
+                        pendingForgotPasswordNewPassword = null
+
+                        if (hasPin) {
+                            flipper.displayedChild = 3
+                        } else {
+                            flipper.displayedChild = 2
+                        }
+
+                        etOtp.text?.clear()
+                        renderOtpBoxes("")
+                    }
+                }
             }
         }
 
@@ -347,11 +457,70 @@ class AuthActivity : AppCompatActivity() {
     }
 
     private fun setupPinSetScreen() {
-        btnSetPin.isEnabled = false
 
-        etPin.addTextChangedListener(SimpleTextWatcher {
-            btnSetPin.isEnabled = etPin.text.toString().trim().length == 4
-        })
+        val key1 = findViewById<TextView>(R.id.setPinKey1)
+        val key2 = findViewById<TextView>(R.id.setPinKey2)
+        val key3 = findViewById<TextView>(R.id.setPinKey3)
+        val key4 = findViewById<TextView>(R.id.setPinKey4)
+        val key5 = findViewById<TextView>(R.id.setPinKey5)
+        val key6 = findViewById<TextView>(R.id.setPinKey6)
+        val key7 = findViewById<TextView>(R.id.setPinKey7)
+        val key8 = findViewById<TextView>(R.id.setPinKey8)
+        val key9 = findViewById<TextView>(R.id.setPinKey9)
+        val key0 = findViewById<TextView>(R.id.setPinKey0)
+        val backspace = findViewById<android.widget.ImageView>(R.id.setPinBackspace)
+
+        fun renderSetPinDots(pin: String) {
+            setPinDot1.setImageResource(
+                if (pin.length >= 1) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+            )
+            setPinDot2.setImageResource(
+                if (pin.length >= 2) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+            )
+            setPinDot3.setImageResource(
+                if (pin.length >= 3) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+            )
+            setPinDot4.setImageResource(
+                if (pin.length >= 4) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+            )
+
+            btnSetPin.isEnabled = pin.length == 4
+        }
+
+        fun appendDigit(digit: String) {
+            val current = etPin.text.toString()
+            if (current.length >= 4) return
+
+            val updated = current + digit
+            etPin.setText(updated)
+            etPin.setSelection(updated.length)
+            renderSetPinDots(updated)
+        }
+
+        fun removeLastDigit() {
+            val current = etPin.text.toString()
+            if (current.isEmpty()) return
+
+            val updated = current.dropLast(1)
+            etPin.setText(updated)
+            etPin.setSelection(updated.length)
+            renderSetPinDots(updated)
+        }
+
+        key1.setOnClickListener { appendDigit("1") }
+        key2.setOnClickListener { appendDigit("2") }
+        key3.setOnClickListener { appendDigit("3") }
+        key4.setOnClickListener { appendDigit("4") }
+        key5.setOnClickListener { appendDigit("5") }
+        key6.setOnClickListener { appendDigit("6") }
+        key7.setOnClickListener { appendDigit("7") }
+        key8.setOnClickListener { appendDigit("8") }
+        key9.setOnClickListener { appendDigit("9") }
+        key0.setOnClickListener { appendDigit("0") }
+
+        backspace.setOnClickListener {
+            removeLastDigit()
+        }
 
         btnBackPin.setOnClickListener {
             flipper.displayedChild = 0
@@ -367,22 +536,90 @@ class AuthActivity : AppCompatActivity() {
 
             setPinOnBackend(pin)
         }
+
+        renderSetPinDots("")
     }
 
     private fun setupUnlockScreen() {
-        btnUnlock.setOnClickListener {
-            pendingPinAction = PinAction.VERIFY_LOGIN
-            openPinScreen(
-                title = "Enter your PIN",
-                subtitle = "Enter your PIN to unlock"
+
+        val key1 = findViewById<TextView>(R.id.unlockKey1)
+        val key2 = findViewById<TextView>(R.id.unlockKey2)
+        val key3 = findViewById<TextView>(R.id.unlockKey3)
+        val key4 = findViewById<TextView>(R.id.unlockKey4)
+        val key5 = findViewById<TextView>(R.id.unlockKey5)
+        val key6 = findViewById<TextView>(R.id.unlockKey6)
+        val key7 = findViewById<TextView>(R.id.unlockKey7)
+        val key8 = findViewById<TextView>(R.id.unlockKey8)
+        val key9 = findViewById<TextView>(R.id.unlockKey9)
+        val key0 = findViewById<TextView>(R.id.unlockKey0)
+        val backspace = findViewById<android.widget.ImageView>(R.id.unlockBackspace)
+
+        fun renderUnlockDots(pin: String) {
+            unlockDot1.setImageResource(
+                if (pin.length >= 1) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
             )
+            unlockDot2.setImageResource(
+                if (pin.length >= 2) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+            )
+            unlockDot3.setImageResource(
+                if (pin.length >= 3) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+            )
+            unlockDot4.setImageResource(
+                if (pin.length >= 4) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+            )
+
+            btnUnlock.isEnabled = pin.length == 4
+        }
+
+        fun appendDigit(digit: String) {
+            val current = etUnlockPin.text.toString()
+            if (current.length >= 4) return
+
+            val updated = current + digit
+            etUnlockPin.setText(updated)
+            etUnlockPin.setSelection(updated.length)
+            renderUnlockDots(updated)
+        }
+
+        fun removeLastDigit() {
+            val current = etUnlockPin.text.toString()
+            if (current.isEmpty()) return
+
+            val updated = current.dropLast(1)
+            etUnlockPin.setText(updated)
+            etUnlockPin.setSelection(updated.length)
+            renderUnlockDots(updated)
+        }
+
+        key1.setOnClickListener { appendDigit("1") }
+        key2.setOnClickListener { appendDigit("2") }
+        key3.setOnClickListener { appendDigit("3") }
+        key4.setOnClickListener { appendDigit("4") }
+        key5.setOnClickListener { appendDigit("5") }
+        key6.setOnClickListener { appendDigit("6") }
+        key7.setOnClickListener { appendDigit("7") }
+        key8.setOnClickListener { appendDigit("8") }
+        key9.setOnClickListener { appendDigit("9") }
+        key0.setOnClickListener { appendDigit("0") }
+        backspace.setOnClickListener { removeLastDigit() }
+
+        btnUnlock.setOnClickListener {
+            val pin = etUnlockPin.text.toString().trim()
+            if (pin.length != 4) {
+                Toast.makeText(this, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            pendingPinAction = PinAction.VERIFY_LOGIN
+            verifyPinOnBackend(pin)
         }
 
         btnUseAnotherAccount.setOnClickListener {
             session.clearAll()
-            pendingSignup = null
             flipper.displayedChild = 0
         }
+
+        renderUnlockDots("")
     }
 
     private fun openPinScreen(title: String, subtitle: String) {
@@ -604,6 +841,7 @@ class AuthActivity : AppCompatActivity() {
                 Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            otpFlowMode = OtpFlowMode.SIGNUP
 
             pendingSignup = PendingSignup(
                 phone = phone,
@@ -632,5 +870,55 @@ class AuthActivity : AppCompatActivity() {
         }
 
         validateSignup()
+    }
+    private fun setupAccountCreatedScreen() {
+        btnAccountCreatedContinue.setOnClickListener {
+            flipper.displayedChild = 2
+        }
+    }
+
+    private fun forgotPasswordRequestOtp(phone: String, onSuccess: () -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val res = repo.forgotPasswordRequestOtp(phone)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@AuthActivity,
+                        "Reset OTP failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun forgotPasswordVerifyOtp(
+        phone: String,
+        otp: String,
+        newPassword: String,
+        onSuccess: (token: String, hasPin: Boolean) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val res = repo.forgotPasswordVerifyOtp(phone, otp, newPassword)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                    onSuccess(res.token, res.hasPin)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@AuthActivity,
+                        "Reset verify failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
     }
 }

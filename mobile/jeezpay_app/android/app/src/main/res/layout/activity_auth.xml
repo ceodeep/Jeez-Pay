@@ -246,10 +246,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
+                    android:fontFamily="sans-serif"
                     android:text="Create account"
                     android:textColor="#2A82EE"
-                    android:textSize="13sp"
-                    android:fontFamily="sans-serif" />
+                    android:textSize="13sp" />
             </LinearLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
@@ -431,7 +431,7 @@
                 android:layout_height="46dp"
                 android:layout_marginStart="21dp"
                 android:layout_marginEnd="21dp"
-                android:layout_marginBottom="182dp"
+                android:layout_marginBottom="32dp"
                 android:backgroundTint="#2A82EE"
                 android:enabled="false"
                 android:text="Verify"
@@ -446,123 +446,556 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <LinearLayout
+        <!-- =====================
+      SCREEN 3: PIN SET
+      ===================== -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_vertical"
-            android:padding="18dp"
             android:background="#FFFFFF">
 
+            <!-- Back -->
             <TextView
                 android:id="@+id/btnBackPin"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="← Back"
-                android:textColor="#2A82EE"
-                android:textSize="13sp" />
+                android:layout_marginStart="21dp"
+                android:layout_marginTop="46dp"
+                android:text="←"
+                android:textColor="#3E3E3F"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
+            <!-- Header -->
             <TextView
+                android:id="@+id/tvSetPinHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="Set PIN"
-                android:textColor="#20130B"
-                android:textSize="22sp" />
+                android:text="Verification"
+                android:textColor="#3E3E3F"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                app:layout_constraintTop_toTopOf="@id/btnBackPin"
+                app:layout_constraintBottom_toBottomOf="@id/btnBackPin"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
+            <!-- Icon box -->
+            <LinearLayout
+                android:id="@+id/setPinIconBox"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:layout_marginTop="110dp"
+                android:background="#2A82EE"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="18dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <ImageView
+                    android:layout_width="46dp"
+                    android:layout_height="60dp"
+                    android:src="@drawable/ic_lock"
+                    app:tint="#FFFFFF" />
+            </LinearLayout>
+
+            <!-- Title -->
             <TextView
+                android:id="@+id/tvSetPinTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Create a 4-digit PIN for quick login"
-                android:textColor="#8B8B8B"
-                android:textSize="13sp" />
+                android:layout_marginTop="32dp"
+                android:text="Create a PIN code"
+                android:textColor="#3E3E3F"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                app:layout_constraintTop_toBottomOf="@id/setPinIconBox"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
+            <!-- Instruction -->
+            <TextView
+                android:id="@+id/tvSetPinInstruction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Set a 4-digit PIN to secure your account"
+                android:textColor="#3E3E3F"
+                android:textSize="12sp"
+                app:layout_constraintTop_toBottomOf="@id/tvSetPinTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Dots -->
+            <LinearLayout
+                android:id="@+id/setPinDots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@id/tvSetPinInstruction"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <ImageView
+                    android:id="@+id/setPinDot1"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+
+                <ImageView
+                    android:id="@+id/setPinDot2"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+
+                <ImageView
+                    android:id="@+id/setPinDot3"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+
+                <ImageView
+                    android:id="@+id/setPinDot4"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+            </LinearLayout>
+
+            <!-- Hidden real input: KEEP SAME ID -->
             <EditText
                 android:id="@+id/etPin"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="18dp"
-                android:background="@drawable/bg_auth_input_box"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:hint="4-digit PIN"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:alpha="0"
+                android:background="@android:color/transparent"
                 android:inputType="numberPassword"
                 android:maxLength="4"
-                android:textColor="#20130B"
-                android:textColorHint="#8B8B8B" />
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent" />
 
+            <!-- Keypad -->
+            <androidx.gridlayout.widget.GridLayout
+                android:id="@+id/setPinKeypad"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginEnd="18dp"
+                android:layout_marginTop="70dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                app:columnCount="3"
+                app:rowCount="4"
+                app:layout_constraintTop_toBottomOf="@id/setPinDots"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <TextView
+                    android:id="@+id/setPinKey1"
+                    style="@style/PinKeyStyle"
+                    android:text="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey2"
+                    style="@style/PinKeyStyle"
+                    android:text="2"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey3"
+                    style="@style/PinKeyStyle"
+                    android:text="3"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey4"
+                    style="@style/PinKeyStyle"
+                    android:text="4"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey5"
+                    style="@style/PinKeyStyle"
+                    android:text="5"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey6"
+                    style="@style/PinKeyStyle"
+                    android:text="6"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey7"
+                    style="@style/PinKeyStyle"
+                    android:text="7"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey8"
+                    style="@style/PinKeyStyle"
+                    android:text="8"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey9"
+                    style="@style/PinKeyStyle"
+                    android:text="9"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKeyBlank"
+                    style="@style/PinKeyStyle"
+                    android:text=""
+                    android:enabled="false"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/setPinKey0"
+                    style="@style/PinKeyStyle"
+                    android:text="0"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <ImageView
+                    android:id="@+id/setPinBackspace"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_backspace"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1"
+                    app:layout_gravity="center"
+                    app:layout_rowWeight="1"
+                    app:tint="#000000" />
+            </androidx.gridlayout.widget.GridLayout>
+
+            <!-- Confirm button: KEEP SAME ID -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSetPin"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="14dp"
-                android:text="Finish"
-                android:textAllCaps="false"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="21dp"
+                android:layout_marginEnd="21dp"
+                android:layout_marginBottom="46dp"
+                android:backgroundTint="#2A82EE"
                 android:enabled="false"
-                app:cornerRadius="16dp"
-                app:backgroundTint="#2A82EE"
-                android:textColor="@android:color/white" />
-        </LinearLayout>
+                android:text="Confirm"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
-        <LinearLayout
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- =====================
+         SCREEN 4: PIN UNLOCK
+         ===================== -->
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center_vertical"
-            android:padding="18dp"
             android:background="#FFFFFF">
 
+            <!-- Header -->
             <TextView
+                android:id="@+id/tvUnlockHeader"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Enter PIN"
-                android:textColor="#20130B"
-                android:textSize="22sp" />
+                android:layout_marginTop="46dp"
+                android:text="Verification"
+                android:textColor="#3E3E3F"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
+            <!-- Icon box -->
+            <LinearLayout
+                android:id="@+id/unlockIconBox"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:layout_marginTop="110dp"
+                android:background="#2A82EE"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="18dp"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <ImageView
+                    android:layout_width="46dp"
+                    android:layout_height="60dp"
+                    android:src="@drawable/ic_lock"
+                    app:tint="#FFFFFF" />
+            </LinearLayout>
+
+            <!-- Title -->
             <TextView
+                android:id="@+id/tvUnlockTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Unlock your account"
-                android:textColor="#8B8B8B"
-                android:textSize="13sp" />
+                android:layout_marginTop="32dp"
+                android:text="Enter your PIN"
+                android:textColor="#3E3E3F"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                app:layout_constraintTop_toBottomOf="@id/unlockIconBox"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
+            <!-- Instruction -->
+            <TextView
+                android:id="@+id/tvUnlockInstruction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Enter your 4-digit PIN to unlock your account"
+                android:textColor="#3E3E3F"
+                android:textSize="12sp"
+                app:layout_constraintTop_toBottomOf="@id/tvUnlockTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Dots -->
+            <LinearLayout
+                android:id="@+id/unlockDots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:orientation="horizontal"
+                app:layout_constraintTop_toBottomOf="@id/tvUnlockInstruction"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <ImageView
+                    android:id="@+id/unlockDot1"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+
+                <ImageView
+                    android:id="@+id/unlockDot2"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+
+                <ImageView
+                    android:id="@+id/unlockDot3"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginEnd="6dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+
+                <ImageView
+                    android:id="@+id/unlockDot4"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_pin_dot_empty" />
+            </LinearLayout>
+
+            <!-- Hidden real input: KEEP SAME ID -->
             <EditText
                 android:id="@+id/etUnlockPin"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="18dp"
-                android:background="@drawable/bg_auth_input_box"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:hint="4-digit PIN"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:alpha="0"
+                android:background="@android:color/transparent"
                 android:inputType="numberPassword"
                 android:maxLength="4"
-                android:textColor="#20130B"
-                android:textColorHint="#8B8B8B" />
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent" />
 
+            <!-- Keypad -->
+            <androidx.gridlayout.widget.GridLayout
+                android:id="@+id/unlockKeypad"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:layout_marginEnd="18dp"
+                android:layout_marginTop="70dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                app:columnCount="3"
+                app:rowCount="4"
+                app:layout_constraintTop_toBottomOf="@id/unlockDots"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent">
+
+                <TextView
+                    android:id="@+id/unlockKey1"
+                    style="@style/PinKeyStyle"
+                    android:text="1"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey2"
+                    style="@style/PinKeyStyle"
+                    android:text="2"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey3"
+                    style="@style/PinKeyStyle"
+                    android:text="3"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey4"
+                    style="@style/PinKeyStyle"
+                    android:text="4"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey5"
+                    style="@style/PinKeyStyle"
+                    android:text="5"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey6"
+                    style="@style/PinKeyStyle"
+                    android:text="6"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey7"
+                    style="@style/PinKeyStyle"
+                    android:text="7"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey8"
+                    style="@style/PinKeyStyle"
+                    android:text="8"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey9"
+                    style="@style/PinKeyStyle"
+                    android:text="9"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKeyBlank"
+                    style="@style/PinKeyStyle"
+                    android:text=""
+                    android:enabled="false"
+                    app:layout_columnWeight="1" />
+
+                <TextView
+                    android:id="@+id/unlockKey0"
+                    style="@style/PinKeyStyle"
+                    android:text="0"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1" />
+
+                <ImageView
+                    android:id="@+id/unlockBackspace"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:padding="18dp"
+                    android:src="@drawable/ic_backspace"
+                    android:clickable="true"
+                    android:focusable="true"
+                    app:layout_columnWeight="1"
+                    app:layout_gravity="center"
+                    app:layout_rowWeight="1"
+                    app:tint="#000000" />
+            </androidx.gridlayout.widget.GridLayout>
+
+            <!-- Keep existing button ID -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnUnlock"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="14dp"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="21dp"
+                android:layout_marginEnd="21dp"
+                android:layout_marginBottom="24dp"
+                android:backgroundTint="#2A82EE"
+                android:enabled="false"
                 android:text="Unlock"
                 android:textAllCaps="false"
-                android:enabled="true"
-                app:cornerRadius="16dp"
-                app:backgroundTint="#2A82EE"
-                android:textColor="@android:color/white" />
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                app:layout_constraintBottom_toTopOf="@id/btnUseAnotherAccount"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
+            <!-- Keep existing ID -->
             <TextView
                 android:id="@+id/btnUseAnotherAccount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginBottom="32dp"
                 android:text="Use another account"
                 android:textColor="#2A82EE"
-                android:textSize="13sp" />
-        </LinearLayout>
+                android:textSize="13sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- =====================
      SCREEN 5: CREATE ACCOUNT
@@ -826,31 +1259,35 @@
                 </LinearLayout>
 
                 <!-- Create account button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnCreateAccount"
-                    android:layout_width="match_parent"
-                    android:layout_height="46dp"
-                    android:layout_marginTop="12dp"
-                    android:backgroundTint="#2A82EE"
-                    android:enabled="false"
-                    android:text="Create Account"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    app:cornerRadius="8dp" />
+
             </LinearLayout>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCreateAccount"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="21dp"
+                android:layout_marginEnd="21dp"
+                android:layout_marginBottom="90dp"
+                android:backgroundTint="#2A82EE"
+                android:enabled="false"
+                android:text="Create Account"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
 
             <!-- Bottom login row -->
             <LinearLayout
                 android:id="@+id/loginInsteadRow"
                 android:layout_width="wrap_content"
                 android:layout_height="55dp"
-                android:layout_marginBottom="103dp"
-                android:gravity="center"
                 android:orientation="horizontal"
-                android:clickable="true"
-                android:focusable="true"
+                android:gravity="center"
+                android:layout_marginBottom="45dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent">
@@ -864,17 +1301,94 @@
                     android:fontFamily="sans-serif" />
 
                 <TextView
-                    android:id="@+id/tvLoginInstead"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="Login"
+                    android:text=" Login"
                     android:textColor="#2A82EE"
                     android:textSize="13sp"
                     android:fontFamily="sans-serif" />
             </LinearLayout>
 
         </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- =====================
+     SCREEN 6: ACCOUNT CREATED
+     ===================== -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#FFFFFF">
+
+            <!-- Success icon -->
+            <ImageView
+                android:id="@+id/ivAccountCreated"
+                android:layout_width="90dp"
+                android:layout_height="90dp"
+                android:layout_marginTop="170dp"
+                android:src="@drawable/ic_user_created"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Title -->
+            <TextView
+                android:id="@+id/tvAccountCreatedTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:layout_marginStart="38dp"
+                android:layout_marginEnd="38dp"
+                android:text="Account Created!"
+                android:textAlignment="center"
+                android:textColor="#1E232C"
+                android:textSize="30sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif"
+                app:layout_constraintTop_toBottomOf="@id/ivAccountCreated"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Description -->
+            <TextView
+                android:id="@+id/tvAccountCreatedDesc"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginStart="38dp"
+                android:layout_marginEnd="38dp"
+                android:text="Your account has been created
+successfully.  JEEZPAY! YOUR MONEY, YOUR WAY."
+                android:textAlignment="center"
+                android:textColor="#80807F"
+                android:textSize="14sp"
+                android:lineSpacingExtra="2dp"
+                android:fontFamily="sans-serif"
+                app:layout_constraintTop_toBottomOf="@id/tvAccountCreatedTitle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Continue button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAccountCreatedContinue"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="21dp"
+                android:layout_marginEnd="21dp"
+                android:layout_marginBottom="32dp"
+                android:backgroundTint="#2A82EE"
+                android:text="Continue"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+
 
     </ViewFlipper>
 

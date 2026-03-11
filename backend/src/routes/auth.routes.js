@@ -475,4 +475,104 @@ router.get("/me", authMiddleware, async (req, res) => {
   }
 });
 
+router.post("/forgot-password/request-otp", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+
+    if (!phone) {
+      return res.status(400).json({ message: "Phone is required" });
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, phone")
+      .eq("phone", phone)
+      .maybeSingle();
+
+    if (error) {
+      console.error("forgot-password/request-otp lookup error:", error);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    // Mock OTP for now
+    return res.json({
+      message: "Enter the code sent to your phone",
+    });
+  } catch (err) {
+    console.error("forgot-password/request-otp crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/forgot-password/verify-otp", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    const otp = String(req.body.otp || "").trim();
+    const newPassword = String(req.body.newPassword || "");
+
+    if (!phone || !otp || !newPassword) {
+      return res.status(400).json({
+        message: "phone, otp and newPassword are required",
+      });
+    }
+
+    if (newPassword.length < 4) {
+      return res.status(400).json({
+        message: "Password must be at least 4 characters",
+      });
+    }
+
+    // Mock OTP check
+    if (otp !== "123456") {
+      return res.status(401).json({ message: "Invalid OTP" });
+    }
+
+    const { data: user, error: fetchErr } = await supabase
+      .from("users")
+      .select("id, phone, pin_hash")
+      .eq("phone", phone)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error("forgot-password/verify-otp lookup error:", fetchErr);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    const { error: updateErr } = await supabase
+      .from("users")
+      .update({ password_hash: passwordHash })
+      .eq("id", user.id);
+
+    if (updateErr) {
+      console.error("forgot-password/verify-otp update error:", updateErr);
+      return res.status(500).json({ message: "Failed to reset password" });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+    });
+
+    return res.json({
+      message: "Password reset successfully",
+      token,
+      hasPin: !!user.pin_hash,
+      isNewUser: false,
+    });
+  } catch (err) {
+    console.error("forgot-password/verify-otp crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 module.exports = router;
