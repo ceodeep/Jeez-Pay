@@ -986,10 +986,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Forgot PIN?"
-                android:textColor="#2A82EE"
+                android:textColor="@color/paypal_blue"
                 android:textSize="14sp"
-                android:layout_marginTop="12dp"
-                android:layout_gravity="center_horizontal"/>
+
+                app:layout_constraintTop_toBottomOf="@id/btnUnlock"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"/>
 
             <!-- Keep existing ID -->
             <TextView

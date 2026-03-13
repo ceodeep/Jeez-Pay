@@ -412,6 +412,10 @@ router.post("/transfer", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Receiver not found" });
     }
 
+    if (receiverUser.id === senderId) {
+  return res.status(400).json({ message: "You can't send money to yourself" });
+}
+    
     const { data: rpcData, error: rpcErr } = await supabase.rpc("wallet_transfer", {
       p_sender_user_id: senderId,
       p_receiver_phone: phoneRaw,
