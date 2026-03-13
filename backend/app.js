@@ -6,6 +6,7 @@ const authRoutes = require("./src/routes/auth.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
 const kycRoutes = require("./src/routes/kyc.routes");
+const adminRoutes = require("./src/routes/admin.routes");
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use("/kyc", kycRoutes);
 
 app.use("/auth", authRoutes);
 app.use("/wallet", authMiddleware, walletRoutes);
+app.use("/admin", adminRoutes);
 
 app.get("/health", (req, res) => {
     res.json({status: "OK"});

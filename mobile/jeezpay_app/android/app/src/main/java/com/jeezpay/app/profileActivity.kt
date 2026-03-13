@@ -14,6 +14,7 @@ import java.util.Locale
 class ProfileActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityProfileBinding
+    private var approvedKyc: com.jeezpay.app.network.dto.KycProfile? = null
     private val kycRepo = KycRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,7 +27,30 @@ class ProfileActivity : AppCompatActivity() {
 
         // Menu rows (placeholders for now)
         binding.rowProfile.setOnClickListener {
-            toast("Profile details (coming soon)")
+            lifecycleScope.launch {
+                try {
+                    val resp = kycRepo.me()
+                    val kyc = resp.kyc
+                    val status = (kyc?.status ?: "").trim().lowercase(Locale.ROOT)
+
+                    if (kyc == null || (status != "approved" && status != "verified")) {
+                        toast("Complete and approve KYC first")
+                        return@launch
+                    }
+
+                    approvedKyc = kyc
+
+                    val i = Intent(this@ProfileActivity, ProfileDetailsActivity::class.java).apply {
+                        putExtra("full_name", kyc.full_name ?: "")
+                        putExtra("dob", kyc.dob ?: "")
+                        putExtra("address", kyc.address ?: "")
+                        putExtra("status", kyc.status ?: "")
+                    }
+                    startActivity(i)
+                } catch (e: Exception) {
+                    toast("Unable to load profile right now")
+                }
+            }
         }
         binding.rowSecurity.setOnClickListener {
             toast("Security settings (coming soon)")
@@ -69,6 +93,7 @@ class ProfileActivity : AppCompatActivity() {
 
                 // No record => show Start KYC
                 if (kyc == null) {
+                    approvedKyc = null
                     showKycCard(
                         statusChip = "Not verified",
                         title = "Complete your KYC",
@@ -79,16 +104,14 @@ class ProfileActivity : AppCompatActivity() {
                     return@launch
                 }
 
-                val status = (kyc.status ?: "").lowercase(Locale.ROOT)
-
+                val status = (kyc.status ?: "").trim().lowercase(Locale.ROOT)
                 when (status) {
                     "approved", "verified" -> {
-                        // Hide card completely or show a “verified” card — your choice.
-                        // I’ll hide it (cleaner).
                         binding.kycCard.visibility = View.GONE
                     }
 
                     "pending" -> {
+                        approvedKyc = null
                         showKycCard(
                             statusChip = "Pending review",
                             title = "KYC Submitted",
@@ -99,6 +122,7 @@ class ProfileActivity : AppCompatActivity() {
                     }
 
                     "rejected" -> {
+                        approvedKyc = null
                         showKycCard(
                             statusChip = "Rejected",
                             title = "KYC Rejected",
@@ -109,6 +133,7 @@ class ProfileActivity : AppCompatActivity() {
                     }
 
                     else -> {
+                        approvedKyc = null
                         // Unknown status => treat as not verified
                         showKycCard(
                             statusChip = "Not verified",
@@ -123,6 +148,7 @@ class ProfileActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 // If API fails, don’t block the screen; just keep card hidden or show fallback
                 // I’ll show a safe fallback:
+                approvedKyc = null
                 showKycCard(
                     statusChip = "KYC",
                     title = "Complete your KYC",

@@ -333,6 +333,20 @@ router.post("/credit", authMiddleware, async (req, res) => {
 router.post("/transfer", authMiddleware, async (req, res) => {
   try {
     const senderId = req.user.userId;
+    const { data: senderUser, error: senderErr } = await supabase
+  .from("users")
+  .select("is_active")
+  .eq("id", senderId)
+  .maybeSingle();
+
+if (senderErr) {
+  console.error("transfer sender lookup error:", senderErr);
+  return res.status(500).json({ message: "Sender lookup failed" });
+}
+
+if (!senderUser || senderUser.is_active === false) {
+  return res.status(403).json({ message: "Account is suspended" });
+}
     console.log("[transfer] senderId:", senderId);
 
     const okKyc = await requireKycApproved(senderId);
@@ -411,6 +425,21 @@ router.post("/transfer", authMiddleware, async (req, res) => {
     if (!receiverUser) {
       return res.status(400).json({ message: "Receiver not found" });
     }
+
+    const { data: receiverActive, error: receiverActiveErr } = await supabase
+  .from("users")
+  .select("is_active")
+  .eq("id", receiverUser.id)
+  .maybeSingle();
+
+if (receiverActiveErr) {
+  console.error("transfer receiver lookup error:", receiverActiveErr);
+  return res.status(500).json({ message: "Receiver lookup failed" });
+}
+
+if (!receiverActive || receiverActive.is_active === false) {
+  return res.status(400).json({ message: "Receiver account is suspended" });
+}
 
     if (receiverUser.id === senderId) {
   return res.status(400).json({ message: "You can't send money to yourself" });

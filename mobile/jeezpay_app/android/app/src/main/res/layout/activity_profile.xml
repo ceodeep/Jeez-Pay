@@ -81,7 +81,9 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="Verify your identity to unlock all features."
-                android:textColor="@color/text_secondary"/>
+                android:textColor="@color/text_secondary"
+                android:lineSpacingExtra="2dp"
+                android:maxLines="6" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStartKyc"

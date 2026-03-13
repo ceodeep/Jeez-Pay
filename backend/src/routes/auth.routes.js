@@ -267,7 +267,7 @@ router.post("/login", async (req, res) => {
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone, password_hash, pin_hash, role, phone_verified")
+      .select("id, phone, password_hash, pin_hash, role, phone_verified, is_active")
       .eq("phone", phone)
       .maybeSingle();
 
@@ -283,6 +283,10 @@ router.post("/login", async (req, res) => {
     if (!user.phone_verified) {
       return res.status(403).json({ message: "Phone number is not verified" });
     }
+
+    if (user.is_active === false) {
+  return res.status(403).json({ message: "Account is suspended" });
+}
 
     const match = await bcrypt.compare(password, user.password_hash);
 
