@@ -82,4 +82,22 @@ class AuthRepository {
             )
         )
     }
+
+    suspend fun forgotPinRequestOtp(phone: String): ForgotPinRequestOtpResponse {
+        return api.forgotPinRequestOtp(
+            ForgotPinRequestOtpRequest(phone)
+        )
+    }
+
+    suspend fun forgotPinVerifyOtp(
+        phone: String,
+        otp: String
+    ): ForgotPinVerifyOtpResponse {
+        return api.forgotPinVerifyOtp(
+            ForgotPinVerifyOtpRequest(
+                phone = phone,
+                otp = otp
+            )
+        )
+    }
 }

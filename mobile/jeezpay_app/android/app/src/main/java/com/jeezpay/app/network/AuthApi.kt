@@ -4,6 +4,10 @@ import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpRequest
 import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpResponse
 import com.jeezpay.app.network.dto.ForgotPasswordVerifyOtpRequest
 import com.jeezpay.app.network.dto.ForgotPasswordVerifyOtpResponse
+import com.jeezpay.app.network.dto.ForgotPinRequestOtpRequest
+import com.jeezpay.app.network.dto.ForgotPinRequestOtpResponse
+import com.jeezpay.app.network.dto.ForgotPinVerifyOtpRequest
+import com.jeezpay.app.network.dto.ForgotPinVerifyOtpResponse
 import com.jeezpay.app.network.dto.LoginRequest
 import com.jeezpay.app.network.dto.LoginResponse
 import com.jeezpay.app.network.dto.SetPinRequest
@@ -43,5 +47,16 @@ interface AuthApi {
     suspend fun forgotPasswordVerifyOtp(
         @Body body: ForgotPasswordVerifyOtpRequest
     ): ForgotPasswordVerifyOtpResponse
+
+    @POST("auth/forgot-pin/request-otp")
+    suspend fun forgotPinRequestOtp(
+        @Body body: ForgotPinRequestOtpRequest
+    ): ForgotPinRequestOtpResponse
+
+    @POST("auth/forgot-pin/verify-otp")
+    suspend fun forgotPinVerifyOtp(
+        @Body body: ForgotPinVerifyOtpRequest
+    ): ForgotPinVerifyOtpResponse
 }
+
 

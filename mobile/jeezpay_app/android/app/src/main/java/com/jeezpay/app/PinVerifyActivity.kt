@@ -20,19 +20,19 @@ class PinVerifyActivity : AppCompatActivity() {
 
     private val pin = StringBuilder()
 
+    private lateinit var sessionManager: SessionManager
+
     private lateinit var dot1: ImageView
     private lateinit var dot2: ImageView
     private lateinit var dot3: ImageView
     private lateinit var dot4: ImageView
     private lateinit var btnConfirm: TextView
 
-    private var savedPin: String? = null
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pin_verify)
 
-        savedPin = SessionManager(this).getPin()
+        sessionManager = SessionManager(this)
 
         // Header
         val tvHeader = findViewById<TextView>(R.id.tvHeader)
@@ -73,36 +73,57 @@ class PinVerifyActivity : AppCompatActivity() {
         bindDigit(R.id.key9, 9)
         bindDigit(R.id.key0, 0)
 
-        // Backspace (your XML id is btnBackspace)
+        // Backspace
         findViewById<View>(R.id.btnBackspace).setOnClickListener {
             onBackspace()
         }
 
-        // If no saved PIN, stop here (don’t allow “any pin”)
-        if (savedPin.isNullOrBlank()) {
-            Toast.makeText(this, "No transaction PIN set. Please set a PIN first.", Toast.LENGTH_LONG).show()
-            // Optional: finish() or navigate to set-pin screen if you have one
+        if (!sessionManager.hasPin()) {
+            Toast.makeText(
+                this,
+                "No transaction PIN set. Please set a PIN first.",
+                Toast.LENGTH_LONG
+            ).show()
+            finish()
+            return
         }
 
+        checkLockedState()
         updateDots()
     }
 
     private fun bindDigit(viewId: Int, digit: Int) {
-        findViewById<View>(viewId).setOnClickListener { onDigit(digit) }
+        findViewById<View>(viewId).setOnClickListener {
+            if (sessionManager.isPinLocked()) {
+                showLockedMessage()
+                return@setOnClickListener
+            }
+            onDigit(digit)
+        }
     }
 
     private fun onDigit(digit: Int) {
+        if (sessionManager.isPinLocked()) {
+            showLockedMessage()
+            return
+        }
+
         if (pin.length >= 4) return
+
         pin.append(digit)
         updateDots()
 
-        // Optional auto-check when reaches 4
         if (pin.length == 4) {
             verifyOrReject()
         }
     }
 
     private fun onBackspace() {
+        if (sessionManager.isPinLocked()) {
+            showLockedMessage()
+            return
+        }
+
         if (pin.isNotEmpty()) {
             pin.deleteCharAt(pin.length - 1)
             updateDots()
@@ -110,23 +131,65 @@ class PinVerifyActivity : AppCompatActivity() {
     }
 
     private fun verifyOrReject() {
-        val entered = pin.toString()
-        val saved = savedPin
+        if (sessionManager.isPinLocked()) {
+            showLockedMessage()
+            clearPin()
+            return
+        }
 
-        if (saved.isNullOrBlank()) {
+        val entered = pin.toString()
+
+        if (!sessionManager.hasPin()) {
             Toast.makeText(this, "No transaction PIN set for this account.", Toast.LENGTH_SHORT).show()
             clearPin()
+            finish()
             return
         }
 
-        if (entered != saved) {
-            Toast.makeText(this, "Wrong PIN", Toast.LENGTH_SHORT).show()
+        val verified = sessionManager.verifyPin(entered)
+
+        if (!verified) {
+            val attempts = sessionManager.incrementFailedPinAttempts()
+
+            if (attempts >= SessionManager.MAX_PIN_ATTEMPTS) {
+                sessionManager.lockPinForMillis(SessionManager.PIN_LOCK_DURATION_MS)
+                Toast.makeText(
+                    this,
+                    "Too many attempts. Locked for 60 seconds.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                val remaining = SessionManager.MAX_PIN_ATTEMPTS - attempts
+                Toast.makeText(
+                    this,
+                    "Wrong PIN. $remaining attempt(s) left.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
             clearPin()
+            updateDots()
             return
         }
 
-        // ✅ success
+        sessionManager.resetFailedPinAttempts()
         finishWithPin(entered)
+    }
+
+    private fun checkLockedState() {
+        if (sessionManager.isPinLocked()) {
+            showLockedMessage()
+        }
+    }
+
+    private fun showLockedMessage() {
+        val seconds = (sessionManager.getPinLockRemainingMillis() / 1000L)
+            .coerceAtLeast(1L)
+        Toast.makeText(
+            this,
+            "Too many failed attempts. Try again in ${seconds}s.",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 
     private fun clearPin() {
@@ -142,7 +205,7 @@ class PinVerifyActivity : AppCompatActivity() {
         dot3.setImageResource(if (len >= 3) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty)
         dot4.setImageResource(if (len >= 4) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty)
 
-        val ok = len == 4
+        val ok = len == 4 && !sessionManager.isPinLocked()
         btnConfirm.isEnabled = ok
         btnConfirm.alpha = if (ok) 1f else 0.6f
     }

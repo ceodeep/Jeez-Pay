@@ -30,7 +30,7 @@ class SendMoneyViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val res = repo.fetchBalances()
-                val map = res.balances.associate { it.currency.uppercase() to (it.balance ?: 0.0) }
+                val map = res.balances.associate { it.currency.uppercase() to it.balance }
                 _balances.value = map
             } catch (_: Exception) {
                 // keep old balances (don’t break send screen if balance fails)

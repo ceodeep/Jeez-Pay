@@ -981,6 +981,15 @@
                 app:layout_constraintBottom_toTopOf="@id/btnUseAnotherAccount"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
+            <TextView
+                android:id="@+id/tvForgotPin"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Forgot PIN?"
+                android:textColor="#2A82EE"
+                android:textSize="14sp"
+                android:layout_marginTop="12dp"
+                android:layout_gravity="center_horizontal"/>
 
             <!-- Keep existing ID -->
             <TextView

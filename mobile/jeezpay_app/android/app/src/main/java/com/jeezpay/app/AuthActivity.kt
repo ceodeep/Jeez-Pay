@@ -23,6 +23,8 @@ import kotlinx.coroutines.withContext
 
 class AuthActivity : AppCompatActivity() {
 
+    companion object{const val EXTRA_FORCE_LOGIN = "extra_force_login"}
+
     private lateinit var session: SessionManager
     private val repo = AuthRepository()
 
@@ -81,12 +83,14 @@ class AuthActivity : AppCompatActivity() {
     private lateinit var etLoginPassword: EditText
     private lateinit var ivLoginEye: android.widget.ImageView
     private lateinit var btnAccountCreatedContinue: MaterialButton
+    private lateinit var tvForgotPin: TextView
 
     private val countryCodes = listOf("+249", "+211", "+256", "+20")
 
     private enum class OtpFlowMode {
         SIGNUP,
-        FORGOT_PASSWORD
+        FORGOT_PASSWORD,
+        FORGOT_PIN
     }
 
     private var otpFlowMode: OtpFlowMode = OtpFlowMode.SIGNUP
@@ -145,6 +149,7 @@ class AuthActivity : AppCompatActivity() {
         actCountryCode = findViewById(R.id.actCountryCode)
         createAccountRow = findViewById(R.id.createAccountRow)
         tvForgotPassword = findViewById(R.id.tvForgotPassword)
+        tvForgotPin = findViewById(R.id.tvForgotPin)
         passwordBox = findViewById(R.id.passwordBox)
 
         otpBox1 = findViewById(R.id.otpBox1)
@@ -302,6 +307,13 @@ class AuthActivity : AppCompatActivity() {
     }
 
     private fun routeUser() {
+        val forceLogin = intent.getBooleanExtra(EXTRA_FORCE_LOGIN, false)
+
+        if (forceLogin) {
+            flipper.displayedChild = 0
+            return
+        }
+
         val token = session.getToken()
 
         if (token.isNullOrBlank()) {
@@ -450,6 +462,38 @@ class AuthActivity : AppCompatActivity() {
                         renderOtpBoxes("")
                     }
                 }
+
+                OtpFlowMode.FORGOT_PIN -> {
+                    val phone = session.getPhone()
+
+                    if (phone.isNullOrBlank()) {
+                        Toast.makeText(
+                            this,
+                            "PIN reset request expired. Please login again.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        flipper.displayedChild = 0
+                        return@setOnClickListener
+                    }
+
+                    forgotPinVerifyOtp(
+                        phone = phone,
+                        otp = otp
+                    ) { token, hasPin ->
+                        session.saveToken(token)
+                        session.savePhone(phone)
+                        session.clearPin()
+
+                        if (hasPin) {
+                            flipper.displayedChild = 3
+                        } else {
+                            flipper.displayedChild = 2
+                        }
+
+                        etOtp.text?.clear()
+                        renderOtpBoxes("")
+                    }
+                }
             }
         }
 
@@ -554,41 +598,38 @@ class AuthActivity : AppCompatActivity() {
         val key0 = findViewById<TextView>(R.id.unlockKey0)
         val backspace = findViewById<android.widget.ImageView>(R.id.unlockBackspace)
 
-        fun renderUnlockDots(pin: String) {
-            unlockDot1.setImageResource(
-                if (pin.length >= 1) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
-            )
-            unlockDot2.setImageResource(
-                if (pin.length >= 2) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
-            )
-            unlockDot3.setImageResource(
-                if (pin.length >= 3) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
-            )
-            unlockDot4.setImageResource(
-                if (pin.length >= 4) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
-            )
 
-            btnUnlock.isEnabled = pin.length == 4
-        }
 
         fun appendDigit(digit: String) {
+            if (session.isPinLocked()) {
+                val seconds = (session.getPinLockRemainingMillis() / 1000L).coerceAtLeast(1L)
+                Toast.makeText(
+                    this,
+                    "Too many failed attempts. Try again in ${seconds}s.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return
+            }
+
             val current = etUnlockPin.text.toString()
             if (current.length >= 4) return
 
             val updated = current + digit
             etUnlockPin.setText(updated)
             etUnlockPin.setSelection(updated.length)
-            renderUnlockDots(updated)
+            renderUnlockDotsSafe(updated)
         }
 
         fun removeLastDigit() {
+            if (session.isPinLocked()) return
+
             val current = etUnlockPin.text.toString()
             if (current.isEmpty()) return
 
             val updated = current.dropLast(1)
             etUnlockPin.setText(updated)
             etUnlockPin.setSelection(updated.length)
-            renderUnlockDots(updated)
+            renderUnlockDotsSafe(updated)
         }
 
         key1.setOnClickListener { appendDigit("1") }
@@ -604,6 +645,16 @@ class AuthActivity : AppCompatActivity() {
         backspace.setOnClickListener { removeLastDigit() }
 
         btnUnlock.setOnClickListener {
+            if (session.isPinLocked()) {
+                val seconds = (session.getPinLockRemainingMillis() / 1000L).coerceAtLeast(1L)
+                Toast.makeText(
+                    this,
+                    "Too many failed attempts. Try again in ${seconds}s.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@setOnClickListener
+            }
+
             val pin = etUnlockPin.text.toString().trim()
             if (pin.length != 4) {
                 Toast.makeText(this, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
@@ -619,7 +670,30 @@ class AuthActivity : AppCompatActivity() {
             flipper.displayedChild = 0
         }
 
-        renderUnlockDots("")
+        renderUnlockDotsSafe("")
+
+        tvForgotPin.setOnClickListener {
+            val phone = session.getPhone()
+
+            if (phone.isNullOrBlank()) {
+                Toast.makeText(
+                    this,
+                    "Session expired. Please login again.",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                session.clearAll()
+                flipper.displayedChild = 0
+                return@setOnClickListener
+            }
+
+            forgotPinRequestOtp(phone) {
+                otpFlowMode = OtpFlowMode.FORGOT_PIN
+                flipper.displayedChild = 1
+                tvOtpHint.text = "Enter the code sent to $phone"
+                etOtp.text?.clear()
+            }
+        }
     }
 
     private fun openPinScreen(title: String, subtitle: String) {
@@ -721,7 +795,12 @@ class AuthActivity : AppCompatActivity() {
             try {
                 repo.setPin(pin)
                 withContext(Dispatchers.Main) {
+                    session.savePin(pin)
+                    session.resetFailedPinAttempts()
+
                     Toast.makeText(this@AuthActivity, "PIN set successfully", Toast.LENGTH_SHORT).show()
+
+                    etPin.text?.clear()
                     openMain()
                 }
             } catch (e: Exception) {
@@ -733,18 +812,49 @@ class AuthActivity : AppCompatActivity() {
     }
 
     private fun verifyPinOnBackend(pin: String) {
+        if (session.isPinLocked()) {
+            val seconds = (session.getPinLockRemainingMillis() / 1000L).coerceAtLeast(1L)
+            Toast.makeText(
+                this,
+                "Too many failed attempts. Try again in ${seconds}s.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val res = repo.verifyPin(pin)
                 withContext(Dispatchers.Main) {
                     if (!res.ok) {
-                        Toast.makeText(
-                            this@AuthActivity,
-                            res.message ?: "Wrong PIN",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        val attempts = session.incrementFailedPinAttempts()
+
+                        if (attempts >= SessionManager.MAX_PIN_ATTEMPTS) {
+                            session.lockPinForMillis(SessionManager.PIN_LOCK_DURATION_MS)
+                            Toast.makeText(
+                                this@AuthActivity,
+                                "Too many attempts. Locked for 60 seconds.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            val remaining = SessionManager.MAX_PIN_ATTEMPTS - attempts
+                            Toast.makeText(
+                                this@AuthActivity,
+                                "${res.message ?: "Wrong PIN"}. $remaining attempt(s) left.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+
+                        etUnlockPin.text?.clear()
+                        renderUnlockDotsSafe("")
                         return@withContext
                     }
+
+                    session.savePin(pin)
+                    session.resetFailedPinAttempts()
+                    etUnlockPin.text?.clear()
+                    renderUnlockDotsSafe("")
+
                     openMain()
                 }
             } catch (e: Exception) {
@@ -921,4 +1031,66 @@ class AuthActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun forgotPinRequestOtp(phone: String, onSuccess: () -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val res = repo.forgotPinRequestOtp(phone)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@AuthActivity,
+                        "PIN reset OTP failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun forgotPinVerifyOtp(
+        phone: String,
+        otp: String,
+        onSuccess: (token: String, hasPin: Boolean) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val res = repo.forgotPinVerifyOtp(phone, otp)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                    onSuccess(res.token, res.hasPin)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@AuthActivity,
+                        "PIN reset verify failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+    private fun renderUnlockDotsSafe(pin: String) {
+        unlockDot1.setImageResource(
+            if (pin.length >= 1) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+        )
+        unlockDot2.setImageResource(
+            if (pin.length >= 2) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+        )
+        unlockDot3.setImageResource(
+            if (pin.length >= 3) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+        )
+        unlockDot4.setImageResource(
+            if (pin.length >= 4) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
+        )
+
+        val enabled = pin.length == 4 && !session.isPinLocked()
+        btnUnlock.isEnabled = enabled
+    }
+
 }

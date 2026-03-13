@@ -613,15 +613,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun doLogout() {
-        // clear token + pin (REAL logout)
         SessionManager(this).clearAll()
+        prefs.edit().clear().commit()
 
-        // optional: also clear UI prefs like hide_balance / selected_wallet
-        prefs.edit().clear().apply()
-
-        // go to Auth and clear backstack
         val intent = Intent(this, AuthActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(AuthActivity.EXTRA_FORCE_LOGIN, true)
         }
         startActivity(intent)
         finish()
@@ -652,17 +649,12 @@ class MainActivity : AppCompatActivity() {
             try {
                 // 1) Fetch balances for ALL wallets
                 val balancesMap: Map<String, Double> = withContext(Dispatchers.IO) {
-                    val map = mutableMapOf<String, Double>()
-                    for (w in wallets) {
-                        try {
-                            val res = walletRepo.fetchBalance(w.code)
-                            map[w.code] = res.balances.firstOrNull { it.currency == w.code }?.balance ?: 0.0
-
-                        } catch (_: Exception) {
-                            // keep last known value if one currency fails
-                        }
+                    try {
+                        val res = walletRepo.fetchBalances()
+                        res.balances.associate { it.currency to it.balance }
+                    } catch (_: Exception) {
+                        emptyMap()
                     }
-                    map
                 }
 
                 // apply balances to list

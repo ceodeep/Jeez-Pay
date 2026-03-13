@@ -575,4 +575,101 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
   }
 });
 
+router.post("/forgot-pin/request-otp", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+
+    if (!phone) {
+      return res.status(400).json({ message: "Phone is required" });
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("id, phone")
+      .eq("phone", phone)
+      .maybeSingle();
+
+    if (error) {
+      console.error("forgot-pin/request-otp lookup error:", error);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    // Mock OTP for now
+    return res.json({
+      message: "Enter the code sent to your phone",
+    });
+  } catch (err) {
+    console.error("forgot-pin/request-otp crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/forgot-pin/verify-otp", async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    const otp = String(req.body.otp || "").trim();
+
+    if (!phone || !otp) {
+      return res.status(400).json({
+        message: "phone and otp are required",
+      });
+    }
+
+    // Mock OTP check
+    if (otp !== "123456") {
+      return res.status(401).json({ message: "Invalid OTP" });
+    }
+
+    const { data: user, error: fetchErr } = await supabase
+      .from("users")
+      .select("id, phone")
+      .eq("phone", phone)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error("forgot-pin/verify-otp lookup error:", fetchErr);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const { error: updateErr } = await supabase
+      .from("users")
+      .update({
+        pin_hash: null,
+        pin_failed_attempts: 0,
+        pin_locked_until: null,
+      })
+      .eq("id", user.id);
+
+    if (updateErr) {
+      console.error("forgot-pin/verify-otp update error:", updateErr);
+      return res.status(500).json({ message: "Failed to reset PIN" });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+    });
+
+    return res.json({
+      message: "PIN reset successfully",
+      token,
+      hasPin: false,
+      isNewUser: false,
+    });
+  } catch (err) {
+    console.error("forgot-pin/verify-otp crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+
+
 module.exports = router;

@@ -84,3 +84,23 @@ data class ForgotPasswordVerifyOtpResponse(
     val hasPin: Boolean = false,
     val isNewUser: Boolean = false
 )
+
+data class ForgotPinRequestOtpRequest(
+    val phone: String
+)
+
+data class ForgotPinRequestOtpResponse(
+    val message: String
+)
+
+data class ForgotPinVerifyOtpRequest(
+    val phone: String,
+    val otp: String
+)
+
+data class ForgotPinVerifyOtpResponse(
+    val message: String,
+    val token: String,
+    val hasPin: Boolean = false,
+    val isNewUser: Boolean = false
+)

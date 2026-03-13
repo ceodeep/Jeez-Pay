@@ -37,6 +37,7 @@ class SendMoneyActivity : AppCompatActivity() {
     // PAGE 0
     private lateinit var etPhone: EditText
     private lateinit var btnNext: TextView
+    private lateinit var ivBack: View
     private lateinit var btnUid: TextView
     private lateinit var btnPhone: TextView
     private lateinit var recentStore: RecentRecipientsStore
@@ -107,6 +108,7 @@ class SendMoneyActivity : AppCompatActivity() {
         btnPhone = findViewById(R.id.btnPhone)
         recentStore = RecentRecipientsStore(this)
         recentList = findViewById(R.id.recentList)
+        ivBack = findViewById(R.id.ivBack)
 
         etAmount = findViewById(R.id.etAmount)
         ddCurrency = findViewById(R.id.ddCurrency)
@@ -121,6 +123,16 @@ class SendMoneyActivity : AppCompatActivity() {
         tvAvailable = findViewById(R.id.tvAvailable)
 
         sendFlipper.displayedChild = 0
+        ivBack.setOnClickListener {
+            if (sendFlipper.displayedChild == 1) {
+                sendFlipper.displayedChild = 0
+                tvError.visibility = View.GONE
+            } else {
+                finish()
+            }
+        }
+
+
 
         setMode(IdMode.UID)
         setNextEnabled(false)
@@ -136,6 +148,8 @@ class SendMoneyActivity : AppCompatActivity() {
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+
+
 
         btnNext.setOnClickListener {
             val receiverIdentifier = etPhone.text.toString().trim()
@@ -181,6 +195,13 @@ class SendMoneyActivity : AppCompatActivity() {
             }
 
             val fee = calcFixedFee(currency)
+            val available = vm.availableFor(currency)
+            val total = amount + fee
+
+            if (total > available) {
+                showError("Insufficient balance")
+                return@setOnClickListener
+            }
 
             SendReviewBottomSheet(
                 receiverIdentifier = receiverIdentifier,
@@ -229,6 +250,13 @@ class SendMoneyActivity : AppCompatActivity() {
                         btnSend.isEnabled = true
 
                         val res = state.res
+                        recentStore.add(
+                            etPhone.text.toString().trim(),
+                            tvRecipientName.text.toString().trim()
+                        )
+                        renderRecentRecipients()
+
+                        vm.loadBalances()
 
                         openReceipt(
                             toPhone = etPhone.text.toString().trim(),
@@ -357,4 +385,6 @@ class SendMoneyActivity : AppCompatActivity() {
             recentList.addView(row)
         }
     }
+
+
 }
