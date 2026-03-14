@@ -203,6 +203,7 @@ router.get("/users", authMiddleware, async (req, res) => {
         role,
         account_type,
         phone_verified,
+        is_active,
         created_at,
         kyc_profiles (
           status
@@ -542,6 +543,100 @@ router.post("/wallet/adjust", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("admin/wallet/adjust crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// =====================================
+// GET /admin/dashboard/stats
+// =====================================
+router.get("/dashboard/stats", authMiddleware, async (req, res) => {
+  try {
+    const adminId = req.user.userId;
+
+    const admin = await isAdmin(adminId);
+    if (!admin) {
+      return res.status(403).json({ message: "Only admin can view dashboard stats" });
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [
+      usersRes,
+      pendingKycRes,
+      txRes,
+      suspendedRes,
+      agentsRes,
+      merchantsRes,
+    ] = await Promise.all([
+      supabase.from("users").select("id", { count: "exact", head: true }),
+      supabase
+        .from("kyc_profiles")
+        .select("user_id", { count: "exact", head: true })
+        .eq("status", "pending"),
+      supabase
+        .from("transactions")
+        .select("amount, created_at")
+        .gte("created_at", todayStart.toISOString()),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("is_active", false),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "agent"),
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "merchant"),
+    ]);
+
+    if (usersRes.error) {
+      console.error("dashboard stats users error:", usersRes.error);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+    if (pendingKycRes.error) {
+      console.error("dashboard stats pending KYC error:", pendingKycRes.error);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+    if (txRes.error) {
+      console.error("dashboard stats transactions error:", txRes.error);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+    if (suspendedRes.error) {
+      console.error("dashboard stats suspended users error:", suspendedRes.error);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+    if (agentsRes.error) {
+      console.error("dashboard stats agents error:", agentsRes.error);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+    if (merchantsRes.error) {
+      console.error("dashboard stats merchants error:", merchantsRes.error);
+      return res.status(500).json({ message: "Failed to load dashboard stats" });
+    }
+
+    const todayTransactions = txRes.data || [];
+    const totalVolumeToday = todayTransactions.reduce(
+      (sum, tx) => sum + Number(tx.amount || 0),
+      0
+    );
+
+    return res.json({
+      stats: {
+        totalUsers: usersRes.count || 0,
+        pendingKyc: pendingKycRes.count || 0,
+        suspendedUsers: suspendedRes.count || 0,
+        totalTransactionsToday: todayTransactions.length,
+        totalVolumeToday,
+        totalAgents: agentsRes.count || 0,
+        totalMerchants: merchantsRes.count || 0,
+      },
+    });
+  } catch (err) {
+    console.error("admin/dashboard/stats crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
