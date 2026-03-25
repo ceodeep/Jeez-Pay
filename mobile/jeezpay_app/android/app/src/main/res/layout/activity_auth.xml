@@ -1403,4 +1403,6 @@ successfully.  JEEZPAY! YOUR MONEY, YOUR WAY."
 
     </ViewFlipper>
 
+    <include layout="@layout/view_loader_overlay" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

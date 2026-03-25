@@ -439,17 +439,11 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintBottom_toBottomOf="parent" />
 
-            <ProgressBar
-                android:id="@+id/progress"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginEnd="16dp"
-                android:visibility="gone"
-                app:layout_constraintTop_toTopOf="@id/btnSend"
-                app:layout_constraintBottom_toBottomOf="@id/btnSend"
-                app:layout_constraintEnd_toEndOf="@id/btnSend" />
+            <include layout="@layout/view_loader_overlay" />
+
 
         </androidx.constraintlayout.widget.ConstraintLayout>
+
 
     </ViewFlipper>
 

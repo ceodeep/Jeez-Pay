@@ -1,13 +1,32 @@
 package com.jeezpay.app.repository
 
+import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.ApiClient
-import com.jeezpay.app.network.dto.*
-
+import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpRequest
+import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpResponse
+import com.jeezpay.app.network.dto.ForgotPasswordVerifyOtpRequest
+import com.jeezpay.app.network.dto.ForgotPasswordVerifyOtpResponse
+import com.jeezpay.app.network.dto.ForgotPinRequestOtpRequest
+import com.jeezpay.app.network.dto.ForgotPinRequestOtpResponse
+import com.jeezpay.app.network.dto.ForgotPinVerifyOtpRequest
+import com.jeezpay.app.network.dto.ForgotPinVerifyOtpResponse
+import com.jeezpay.app.network.dto.LoginRequest
+import com.jeezpay.app.network.dto.LoginResponse
+import com.jeezpay.app.network.dto.SetPinRequest
+import com.jeezpay.app.network.dto.SetPinResponse
+import com.jeezpay.app.network.dto.SignupRequestOtpRequest
+import com.jeezpay.app.network.dto.SignupRequestOtpResponse
+import com.jeezpay.app.network.dto.SignupVerifyOtpRequest
+import com.jeezpay.app.network.dto.SignupVerifyOtpResponse
+import com.jeezpay.app.network.dto.VerifyPinRequest
+import com.jeezpay.app.network.dto.VerifyPinResponse
+import com.jeezpay.app.network.safeApiCall
 
 class AuthRepository {
 
     private val api = ApiClient.authApi
 
+    // Existing direct methods
     suspend fun login(phone: String, password: String): LoginResponse {
         return api.login(
             LoginRequest(
@@ -99,5 +118,104 @@ class AuthRepository {
                 otp = otp
             )
         )
+    }
+
+    // Safe methods
+    suspend fun loginSafe(phone: String, password: String): ApiResult<LoginResponse> {
+        return safeApiCall {
+            api.login(LoginRequest(phone = phone, password = password))
+        }
+    }
+
+    suspend fun signupRequestOtpSafe(
+        phone: String,
+        password: String,
+        accountType: String,
+        countryCode: String,
+        termsAccepted: Boolean
+    ): ApiResult<SignupRequestOtpResponse> {
+        return safeApiCall {
+            api.signupRequestOtp(
+                SignupRequestOtpRequest(
+                    phone = phone,
+                    password = password,
+                    accountType = accountType,
+                    countryCode = countryCode,
+                    termsAccepted = termsAccepted
+                )
+            )
+        }
+    }
+
+    suspend fun signupVerifyOtpSafe(
+        phone: String,
+        otp: String,
+        password: String,
+        accountType: String,
+        countryCode: String,
+        termsAccepted: Boolean
+    ): ApiResult<SignupVerifyOtpResponse> {
+        return safeApiCall {
+            api.signupVerifyOtp(
+                SignupVerifyOtpRequest(
+                    phone = phone,
+                    otp = otp,
+                    password = password,
+                    accountType = accountType,
+                    countryCode = countryCode,
+                    termsAccepted = termsAccepted
+                )
+            )
+        }
+    }
+
+    suspend fun setPinSafe(pin: String): ApiResult<SetPinResponse> {
+        return safeApiCall { api.setPin(SetPinRequest(pin)) }
+    }
+
+    suspend fun verifyPinSafe(pin: String): ApiResult<VerifyPinResponse> {
+        return safeApiCall { api.verifyPin(VerifyPinRequest(pin)) }
+    }
+
+    suspend fun forgotPasswordRequestOtpSafe(phone: String): ApiResult<ForgotPasswordRequestOtpResponse> {
+        return safeApiCall {
+            api.forgotPasswordRequestOtp(ForgotPasswordRequestOtpRequest(phone))
+        }
+    }
+
+    suspend fun forgotPasswordVerifyOtpSafe(
+        phone: String,
+        otp: String,
+        newPassword: String
+    ): ApiResult<ForgotPasswordVerifyOtpResponse> {
+        return safeApiCall {
+            api.forgotPasswordVerifyOtp(
+                ForgotPasswordVerifyOtpRequest(
+                    phone = phone,
+                    otp = otp,
+                    newPassword = newPassword
+                )
+            )
+        }
+    }
+
+    suspend fun forgotPinRequestOtpSafe(phone: String): ApiResult<ForgotPinRequestOtpResponse> {
+        return safeApiCall {
+            api.forgotPinRequestOtp(ForgotPinRequestOtpRequest(phone))
+        }
+    }
+
+    suspend fun forgotPinVerifyOtpSafe(
+        phone: String,
+        otp: String
+    ): ApiResult<ForgotPinVerifyOtpResponse> {
+        return safeApiCall {
+            api.forgotPinVerifyOtp(
+                ForgotPinVerifyOtpRequest(
+                    phone = phone,
+                    otp = otp
+                )
+            )
+        }
     }
 }

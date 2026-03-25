@@ -15,6 +15,78 @@ async function isAdmin(userId) {
   return data.role === "admin";
 }
 
+// ---------- helper: normalize phone ----------
+function normalizePhone(raw) {
+  const p = String(raw || "").trim();
+  const digits = p.replace(/\D/g, "");
+
+  if (!digits) return "";
+
+  if (p.startsWith("+")) return "+" + digits;
+  return "+" + digits;
+}
+
+// ---------- helper: find user by admin identifier ----------
+// identifier can be:
+// - phone
+// - normalized phone
+// - wallet_account_number
+// - user UUID
+async function getUserByAdminIdentifier(identifierRaw) {
+  const raw = String(identifierRaw || "").trim();
+  const digitsOnly = /^\d+$/.test(raw);
+
+  // 1) Try exact phone
+  let { data, error } = await supabase
+    .from("users")
+    .select("id, phone, role, wallet_account_number, is_active")
+    .eq("phone", raw)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (data) return data;
+
+  // 2) Try normalized phone
+  const normalizedPhone = normalizePhone(raw);
+  if (normalizedPhone && normalizedPhone !== raw) {
+    const r2 = await supabase
+      .from("users")
+      .select("id, phone, role, wallet_account_number, is_active")
+      .eq("phone", normalizedPhone)
+      .maybeSingle();
+
+    if (r2.error) throw r2.error;
+    if (r2.data) return r2.data;
+  }
+
+  // 3) Try wallet account number
+  if (digitsOnly) {
+    const acc = Number(raw);
+    if (Number.isSafeInteger(acc)) {
+      const r3 = await supabase
+        .from("users")
+        .select("id, phone, role, wallet_account_number, is_active")
+        .eq("wallet_account_number", acc)
+        .maybeSingle();
+
+      if (r3.error) throw r3.error;
+      if (r3.data) return r3.data;
+    }
+  }
+
+  // 4) Try UUID as id
+  const r4 = await supabase
+    .from("users")
+    .select("id, phone, role, wallet_account_number, is_active")
+    .eq("id", raw)
+    .maybeSingle();
+
+  if (r4.error) throw r4.error;
+  if (r4.data) return r4.data;
+
+  return null;
+}
+
 // =====================================
 // GET /admin/kyc/list
 // List KYC submissions
@@ -184,6 +256,10 @@ router.post("/kyc/reject", authMiddleware, async (req, res) => {
   }
 });
 
+// =====================================
+// GET /admin/users
+// Optional query: ?role=user
+// =====================================
 router.get("/users", authMiddleware, async (req, res) => {
   try {
     const adminId = req.user.userId;
@@ -205,6 +281,7 @@ router.get("/users", authMiddleware, async (req, res) => {
         phone_verified,
         is_active,
         created_at,
+        wallet_account_number,
         kyc_profiles (
           status
         )
@@ -412,7 +489,8 @@ router.post("/user/activate", authMiddleware, async (req, res) => {
 
 // =====================================
 // POST /admin/wallet/adjust
-// Body: { userId, currency, amount, type, description }
+// Body: { identifier, currency, amount, type, description }
+// identifier can be wallet_account_number OR phone OR user UUID
 // type = "credit" | "debit"
 // =====================================
 router.post("/wallet/adjust", authMiddleware, async (req, res) => {
@@ -424,15 +502,16 @@ router.post("/wallet/adjust", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: "Only admin can adjust balances" });
     }
 
-    const userId = String(req.body.userId || "").trim();
+    const identifier = String(req.body.identifier || "").trim();
     const currency = String(req.body.currency || "").trim().toUpperCase();
     const type = String(req.body.type || "").trim().toLowerCase();
     const amount = Number(req.body.amount);
-    const description = String(req.body.description || "").trim() || "Admin balance adjustment";
+    const description =
+      String(req.body.description || "").trim() || "Admin balance adjustment";
 
-    if (!userId || !currency || !type || req.body.amount == null) {
+    if (!identifier || !currency || !type || req.body.amount == null) {
       return res.status(400).json({
-        message: "userId, currency, amount and type are required",
+        message: "identifier, currency, amount and type are required",
       });
     }
 
@@ -444,22 +523,14 @@ router.post("/wallet/adjust", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Amount must be a positive number" });
     }
 
-    const { data: user, error: userErr } = await supabase
-      .from("users")
-      .select("id, phone, is_active")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (userErr) {
-      console.error("admin/wallet/adjust user lookup error:", userErr);
-      return res.status(500).json({ message: "User lookup failed" });
-    }
+    const user = await getUserByAdminIdentifier(identifier);
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ensure wallet exists
+    const userId = user.id;
+
     const { data: walletExisting, error: walletFetchErr } = await supabase
       .from("wallets")
       .select("id, balance, currency")
@@ -513,12 +584,14 @@ router.post("/wallet/adjust", authMiddleware, async (req, res) => {
 
     const { data: tx, error: txErr } = await supabase
       .from("transactions")
-      .insert([{
-        wallet_id: wallet.id,
-        type,
-        amount,
-        description,
-      }])
+      .insert([
+        {
+          wallet_id: wallet.id,
+          type,
+          amount,
+          description,
+        },
+      ])
       .select()
       .single();
 
@@ -532,6 +605,7 @@ router.post("/wallet/adjust", authMiddleware, async (req, res) => {
       user: {
         id: user.id,
         phone: user.phone,
+        wallet_account_number: user.wallet_account_number,
       },
       wallet: {
         id: wallet.id,

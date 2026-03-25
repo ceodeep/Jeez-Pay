@@ -5,6 +5,8 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
 
     <application
         android:name=".JeezPayApp"
@@ -42,7 +44,7 @@
         <activity android:name=".AboutActivity" android:exported="false"/>
 
         <activity
-            android:name=".ui.send.SendMoneyActivity"
+            android:name=".send.SendMoneyActivity"
             android:exported="false" />
 
         <activity

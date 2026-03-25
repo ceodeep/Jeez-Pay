@@ -11,7 +11,7 @@ import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import com.jeezpay.app.base.BaseFintechActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jeezpay.app.repository.AuthRepository
@@ -20,8 +20,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.appcompat.app.AlertDialog
+import android.widget.ImageView
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.AppError
+import com.jeezpay.app.utils.NetworkUtils
+import com.jeezpay.app.common.LoaderOverlayController
 
-class AuthActivity : AppCompatActivity() {
+class AuthActivity : BaseFintechActivity() {
 
     companion object{const val EXTRA_FORCE_LOGIN = "extra_force_login"}
 
@@ -85,6 +91,9 @@ class AuthActivity : AppCompatActivity() {
     private lateinit var btnAccountCreatedContinue: MaterialButton
     private lateinit var tvForgotPin: TextView
 
+
+    private lateinit var loaderOverlay: LoaderOverlayController
+
     private val countryCodes = listOf("+249", "+211", "+256", "+20")
 
     private enum class OtpFlowMode {
@@ -125,6 +134,7 @@ class AuthActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_auth)
+        initBlockingLoader()
 
         session = SessionManager(this)
 
@@ -139,6 +149,8 @@ class AuthActivity : AppCompatActivity() {
         setupExtraClicks()
         setupCreateAccountScreen()
         setupAccountCreatedScreen()
+        flipper.inAnimation = android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_in)
+        flipper.outAnimation = android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_out)
     }
 
     private fun bindViews() {
@@ -715,16 +727,26 @@ class AuthActivity : AppCompatActivity() {
         password: String,
         onSuccess: (token: String, hasPin: Boolean) -> Unit
     ) {
+        setFullScreenLoading(true)
+
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.login(phone, password)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess(res.token, res.hasPin)
+            when (val result = repo.loginSafe(phone, password)) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        setFullScreenLoading(false)
+                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                        onSuccess(res.token, res.hasPin)
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, "Login failed: ${e.message}", Toast.LENGTH_LONG).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        setFullScreenLoading(false)
+                        handleAuthError(result.error) {
+                            login(phone, password, onSuccess)
+                        }
+                    }
                 }
             }
         }
@@ -738,27 +760,38 @@ class AuthActivity : AppCompatActivity() {
         termsAccepted: Boolean,
         onSuccess: () -> Unit
     ) {
+        setMaterialButtonLoading(btnCreateAccount, true, "Create account", "Requesting OTP...")
+
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.signupRequestOtp(
+            when (
+                val result = repo.signupRequestOtpSafe(
                     phone = phone,
                     password = password,
                     accountType = accountType,
                     countryCode = countryCode,
                     termsAccepted = termsAccepted
                 )
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess()
+            ) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        setMaterialButtonLoading(btnCreateAccount, false, "Create account")
+                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                        onSuccess()
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, "Request OTP failed: ${e.message}", Toast.LENGTH_LONG).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        setMaterialButtonLoading(btnCreateAccount, false, "Create account")
+                        handleAuthError(result.error) {
+                            signupRequestOtp(phone, password, accountType, countryCode, termsAccepted, onSuccess)
+                        }
+                    }
                 }
             }
         }
     }
-
     private fun signupVerifyOtp(
         phone: String,
         otp: String,
@@ -768,9 +801,11 @@ class AuthActivity : AppCompatActivity() {
         termsAccepted: Boolean,
         onSuccess: (token: String, hasPin: Boolean) -> Unit
     ) {
+        setFullScreenLoading(true)
+
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.signupVerifyOtp(
+            when (
+                val result = repo.signupVerifyOtpSafe(
                     phone = phone,
                     otp = otp,
                     password = password,
@@ -778,34 +813,51 @@ class AuthActivity : AppCompatActivity() {
                     countryCode = countryCode,
                     termsAccepted = termsAccepted
                 )
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess(res.token, res.hasPin)
+            ) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        setFullScreenLoading(false)
+                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                        onSuccess(res.token, res.hasPin)
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, "Verify failed: ${e.message}", Toast.LENGTH_LONG).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        setFullScreenLoading(false)
+                        handleAuthError(result.error) {
+                            signupVerifyOtp(phone, otp, password, accountType, countryCode, termsAccepted, onSuccess)
+                        }
+                    }
                 }
             }
         }
     }
 
     private fun setPinOnBackend(pin: String) {
+        setMaterialButtonLoading(btnSetPin, true, "Set PIN", "Saving PIN...")
+
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                repo.setPin(pin)
-                withContext(Dispatchers.Main) {
-                    session.savePin(pin)
-                    session.resetFailedPinAttempts()
-
-                    Toast.makeText(this@AuthActivity, "PIN set successfully", Toast.LENGTH_SHORT).show()
-
-                    etPin.text?.clear()
-                    openMain()
+            when (val result = repo.setPinSafe(pin)) {
+                is ApiResult.Success -> {
+                    withContext(Dispatchers.Main) {
+                        setMaterialButtonLoading(btnSetPin, false, "Set PIN")
+                        session.savePin(pin)
+                        session.resetFailedPinAttempts()
+                        Toast.makeText(this@AuthActivity, "PIN set successfully", Toast.LENGTH_SHORT).show()
+                        etPin.text?.clear()
+                        openMain()
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, "Set PIN failed: ${e.message}", Toast.LENGTH_LONG).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        setMaterialButtonLoading(btnSetPin, false, "Set PIN")
+                        handleAuthError(result.error) {
+                            setPinOnBackend(pin)
+                        }
+                    }
                 }
             }
         }
@@ -822,44 +874,54 @@ class AuthActivity : AppCompatActivity() {
             return
         }
 
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.verifyPin(pin)
-                withContext(Dispatchers.Main) {
-                    if (!res.ok) {
-                        val attempts = session.incrementFailedPinAttempts()
+        setFullScreenLoading(true)
 
-                        if (attempts >= SessionManager.MAX_PIN_ATTEMPTS) {
-                            session.lockPinForMillis(SessionManager.PIN_LOCK_DURATION_MS)
-                            Toast.makeText(
-                                this@AuthActivity,
-                                "Too many attempts. Locked for 60 seconds.",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } else {
-                            val remaining = SessionManager.MAX_PIN_ATTEMPTS - attempts
-                            Toast.makeText(
-                                this@AuthActivity,
-                                "${res.message ?: "Wrong PIN"}. $remaining attempt(s) left.",
-                                Toast.LENGTH_SHORT
-                            ).show()
+        CoroutineScope(Dispatchers.IO).launch {
+            when (val result = repo.verifyPinSafe(pin)) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        setMaterialButtonLoading(btnUnlock, false, "Unlock")
+
+                        if (!res.ok) {
+                            val attempts = session.incrementFailedPinAttempts()
+
+                            if (attempts >= SessionManager.MAX_PIN_ATTEMPTS) {
+                                session.lockPinForMillis(SessionManager.PIN_LOCK_DURATION_MS)
+                                Toast.makeText(
+                                    this@AuthActivity,
+                                    "Too many attempts. Locked for 60 seconds.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                val remaining = SessionManager.MAX_PIN_ATTEMPTS - attempts
+                                Toast.makeText(
+                                    this@AuthActivity,
+                                    "${res.message ?: "Wrong PIN"}. $remaining attempt(s) left.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+
+                            etUnlockPin.text?.clear()
+                            renderUnlockDotsSafe("")
+                            return@withContext
                         }
 
+                        session.savePin(pin)
+                        session.resetFailedPinAttempts()
                         etUnlockPin.text?.clear()
                         renderUnlockDotsSafe("")
-                        return@withContext
+                        openMain()
                     }
-
-                    session.savePin(pin)
-                    session.resetFailedPinAttempts()
-                    etUnlockPin.text?.clear()
-                    renderUnlockDotsSafe("")
-
-                    openMain()
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, "PIN verify failed: ${e.message}", Toast.LENGTH_LONG).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        setMaterialButtonLoading(btnUnlock, false, "Unlock")
+                        handleAuthError(result.error) {
+                            verifyPinOnBackend(pin)
+                        }
+                    }
                 }
             }
         }
@@ -989,19 +1051,21 @@ class AuthActivity : AppCompatActivity() {
 
     private fun forgotPasswordRequestOtp(phone: String, onSuccess: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.forgotPasswordRequestOtp(phone)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess()
+            when (val result = repo.forgotPasswordRequestOtpSafe(phone)) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                        onSuccess()
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "Reset OTP failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        handleAuthError(result.error) {
+                            forgotPasswordRequestOtp(phone, onSuccess)
+                        }
+                    }
                 }
             }
         }
@@ -1014,19 +1078,21 @@ class AuthActivity : AppCompatActivity() {
         onSuccess: (token: String, hasPin: Boolean) -> Unit
     ) {
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.forgotPasswordVerifyOtp(phone, otp, newPassword)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess(res.token, res.hasPin)
+            when (val result = repo.forgotPasswordVerifyOtpSafe(phone, otp, newPassword)) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                        onSuccess(res.token, res.hasPin)
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "Reset verify failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        handleAuthError(result.error) {
+                            forgotPasswordVerifyOtp(phone, otp, newPassword, onSuccess)
+                        }
+                    }
                 }
             }
         }
@@ -1034,19 +1100,21 @@ class AuthActivity : AppCompatActivity() {
 
     private fun forgotPinRequestOtp(phone: String, onSuccess: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.forgotPinRequestOtp(phone)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess()
+            when (val result = repo.forgotPinRequestOtpSafe(phone)) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                        onSuccess()
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "PIN reset OTP failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        handleAuthError(result.error) {
+                            forgotPinRequestOtp(phone, onSuccess)
+                        }
+                    }
                 }
             }
         }
@@ -1058,22 +1126,44 @@ class AuthActivity : AppCompatActivity() {
         onSuccess: (token: String, hasPin: Boolean) -> Unit
     ) {
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val res = repo.forgotPinVerifyOtp(phone, otp)
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                    onSuccess(res.token, res.hasPin)
+            when (val result = repo.forgotPinVerifyOtpSafe(phone, otp)) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+                        onSuccess(res.token, res.hasPin)
+                    }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@AuthActivity,
-                        "PIN reset verify failed: ${e.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
+
+                is ApiResult.Error -> {
+                    withContext(Dispatchers.Main) {
+                        handleAuthError(result.error) {
+                            forgotPinVerifyOtp(phone, otp, onSuccess)
+                        }
+                    }
                 }
             }
         }
+    }
+
+
+
+
+
+
+
+    private fun handleAuthError(
+        error: AppError,
+        retryAction: () -> Unit = {}
+    ) {
+        handleCommonError(
+            error = error,
+            retryAction = retryAction,
+            onUnauthorized = {
+                session.clearAll()
+                flipper.displayedChild = 0
+            }
+        )
     }
     private fun renderUnlockDotsSafe(pin: String) {
         unlockDot1.setImageResource(
@@ -1091,6 +1181,40 @@ class AuthActivity : AppCompatActivity() {
 
         val enabled = pin.length == 4 && !session.isPinLocked()
         btnUnlock.isEnabled = enabled
+    }
+
+    private fun setButtonLoading(
+        button: TextView,
+        loading: Boolean,
+        idleText: String,
+        loadingText: String = "Loading..."
+    ) {
+        button.isEnabled = !loading
+        button.alpha = if (loading) 0.7f else 1f
+        button.text = if (loading) loadingText else idleText
+    }
+
+    private fun setMaterialButtonLoading(
+        button: com.google.android.material.button.MaterialButton,
+        loading: Boolean,
+        idleText: String,
+        loadingText: String = "Loading..."
+    ) {
+        button.isEnabled = !loading
+        button.alpha = if (loading) 0.7f else 1f
+        button.text = if (loading) loadingText else idleText
+    }
+
+    private fun setFullScreenLoading(loading: Boolean) {
+
+        if (loading) showBlockingLoader()
+        else hideBlockingLoader()
+
+        btnContinue.isEnabled = !loading
+        btnVerify.isEnabled = !loading
+        btnCreateAccount.isEnabled = !loading
+        btnSetPin.isEnabled = !loading
+        btnUnlock.isEnabled = !loading
     }
 
 }

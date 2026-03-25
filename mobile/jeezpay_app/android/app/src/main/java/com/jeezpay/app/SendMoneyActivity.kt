@@ -1,4 +1,4 @@
-package com.jeezpay.app.ui.send
+package com.jeezpay.app.send
 
 import android.content.Intent
 import android.os.Bundle
@@ -6,18 +6,23 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.jeezpay.app.PinVerifyActivity
+import com.jeezpay.app.AuthActivity
 import com.jeezpay.app.R
+import com.jeezpay.app.SendMoneyUiState
+import com.jeezpay.app.SendMoneyViewModel
+import com.jeezpay.app.SendReviewBottomSheet
+import com.jeezpay.app.base.BaseFintechActivity
+import com.jeezpay.app.network.AppError
 import com.jeezpay.app.storage.RecentRecipientsStore
 import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.launch
@@ -25,11 +30,9 @@ import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.jeezpay.app.common.LoaderOverlayController
 
-// ✅ Make sure this matches your actual BottomSheet package
-import com.jeezpay.app.SendReviewBottomSheet
-
-class SendMoneyActivity : AppCompatActivity() {
+class SendMoneyActivity : BaseFintechActivity() {
 
     private lateinit var vm: SendMoneyViewModel
     private lateinit var sendFlipper: ViewFlipper
@@ -44,12 +47,12 @@ class SendMoneyActivity : AppCompatActivity() {
     private lateinit var recentList: LinearLayout
 
     // PAGE 1
+    private lateinit var loaderOverlay: LoaderOverlayController
     private lateinit var etAmount: EditText
     private lateinit var ddCurrency: TextView
     private lateinit var currencyPill: View
     private lateinit var etDesc: EditText
     private lateinit var btnSend: TextView
-    private lateinit var progress: ProgressBar
     private lateinit var tvError: TextView
 
     private lateinit var tvFee: TextView
@@ -62,10 +65,15 @@ class SendMoneyActivity : AppCompatActivity() {
     private enum class IdMode { UID, PHONE }
     private var idMode: IdMode = IdMode.UID
 
-    // =========================
-    // ✅ PIN FLOW (CLEAN VERSION)
-    // =========================
     private var pendingAction: ((String) -> Unit)? = null
+    private var loaderShownAt = 0L
+    private val MIN_LOADER_TIME = 800L
+
+
+    private var lastConfirmedReceiverIdentifier: String? = null
+    private var lastConfirmedCurrency: String? = null
+    private var lastConfirmedAmount: Double? = null
+    private var lastConfirmedDescription: String? = null
 
     private val pinLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
@@ -86,12 +94,13 @@ class SendMoneyActivity : AppCompatActivity() {
 
         val i = Intent(this, com.jeezpay.app.PinVerifyActivity::class.java).apply {
             putExtra(com.jeezpay.app.PinVerifyActivity.EXTRA_TITLE, "Enter your PIN")
-            putExtra(com.jeezpay.app.PinVerifyActivity.EXTRA_SUBTITLE, "Kindly enter your transaction PIN to continue")
+            putExtra(
+                com.jeezpay.app.PinVerifyActivity.EXTRA_SUBTITLE,
+                "Kindly enter your transaction PIN to continue"
+            )
         }
         pinLauncher.launch(i)
     }
-
-    // =========================
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,6 +110,10 @@ class SendMoneyActivity : AppCompatActivity() {
         vm.loadBalances()
 
         sendFlipper = findViewById(R.id.sendFlipper)
+        sendFlipper.inAnimation =
+            android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_in)
+        sendFlipper.outAnimation =
+            android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_out)
 
         etPhone = findViewById(R.id.etPhone)
         btnNext = findViewById(R.id.btnNext)
@@ -115,12 +128,14 @@ class SendMoneyActivity : AppCompatActivity() {
         currencyPill = findViewById(R.id.currencyPill)
         etDesc = findViewById(R.id.etDesc)
         btnSend = findViewById(R.id.btnSend)
-        progress = findViewById(R.id.progress)
+        initBlockingLoader()
         tvError = findViewById(R.id.tvError)
 
         tvFee = findViewById(R.id.tvFee)
         tvRecipientName = findViewById(R.id.tvRecipientName)
         tvAvailable = findViewById(R.id.tvAvailable)
+
+
 
         sendFlipper.displayedChild = 0
         ivBack.setOnClickListener {
@@ -131,8 +146,6 @@ class SendMoneyActivity : AppCompatActivity() {
                 finish()
             }
         }
-
-
 
         setMode(IdMode.UID)
         setNextEnabled(false)
@@ -145,11 +158,18 @@ class SendMoneyActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 setNextEnabled(!s.isNullOrBlank())
+                tvError.visibility = View.GONE
             }
             override fun afterTextChanged(s: Editable?) {}
         })
 
-
+        etAmount.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                tvError.visibility = View.GONE
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
 
         btnNext.setOnClickListener {
             val receiverIdentifier = etPhone.text.toString().trim()
@@ -167,11 +187,7 @@ class SendMoneyActivity : AppCompatActivity() {
 
         currencyPill.setOnClickListener { showCurrencyPicker() }
 
-        // =========================
-        // SEND BUTTON
-        // =========================
         btnSend.setOnClickListener {
-
             val receiverIdentifier = etPhone.text.toString().trim()
             val amountText = etAmount.text.toString().trim()
             val currency = ddCurrency.text.toString().trim().uppercase()
@@ -210,8 +226,13 @@ class SendMoneyActivity : AppCompatActivity() {
                 amount = amount,
                 fee = fee
             ) {
-                // ✅ PIN FIRST
                 openPinThenConfirm { pin ->
+
+                    lastConfirmedReceiverIdentifier = receiverIdentifier
+                    lastConfirmedCurrency = currency
+                    lastConfirmedAmount = amount
+                    lastConfirmedDescription = description
+
                     vm.sendMoney(
                         toPhone = receiverIdentifier,
                         currency = currency,
@@ -223,51 +244,74 @@ class SendMoneyActivity : AppCompatActivity() {
             }.show(supportFragmentManager, "SendReviewBottomSheet")
         }
 
-        // =========================
-        // STATE OBSERVER
-        // =========================
         lifecycleScope.launch {
-            vm.state.collect { state ->
-                when (state) {
-                    is SendMoneyUiState.Idle -> {
-                        progress.visibility = View.GONE
-                        btnSend.isEnabled = true
-                    }
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                vm.state.collect { state ->
+                    when (state) {
+                        is SendMoneyUiState.Idle -> {
+                            setSendLoading(false)
+                        }
 
-                    is SendMoneyUiState.Loading -> {
-                        progress.visibility = View.VISIBLE
-                        btnSend.isEnabled = false
-                    }
+                        is SendMoneyUiState.Loading -> {
+                            loaderShownAt = System.currentTimeMillis()
+                            setSendLoading(true)
+                        }
 
-                    is SendMoneyUiState.Error -> {
-                        progress.visibility = View.GONE
-                        btnSend.isEnabled = true
-                        showError(state.message)
-                    }
+                        is SendMoneyUiState.Error -> {
 
-                    is SendMoneyUiState.Success -> {
-                        progress.visibility = View.GONE
-                        btnSend.isEnabled = true
+                            val delay = MIN_LOADER_TIME - (System.currentTimeMillis() - loaderShownAt)
 
-                        val res = state.res
-                        recentStore.add(
-                            etPhone.text.toString().trim(),
-                            tvRecipientName.text.toString().trim()
-                        )
-                        renderRecentRecipients()
+                            lifecycleScope.launch {
 
-                        vm.loadBalances()
+                                if (delay > 0) kotlinx.coroutines.delay(delay)
 
-                        openReceipt(
-                            toPhone = etPhone.text.toString().trim(),
-                            currency = res.currency ?: "-",
-                            amount = res.amount ?: 0.0,
-                            description = etDesc.text.toString().trim(),
-                            createdAtIso = nowLocal(),
-                            reference = res.reference ?: "-"
-                        )
+                                setSendLoading(false)
 
-                        vm.reset()
+                                handleSendError(state.error) {
+                                    openPinThenConfirm { pin ->
+                                        retryLastConfirmedTransfer(pin)
+                                    }
+                                }
+                            }
+                        }
+
+                        is SendMoneyUiState.Success -> {
+
+                            val delay = MIN_LOADER_TIME - (System.currentTimeMillis() - loaderShownAt)
+
+                            lifecycleScope.launch {
+
+                                if (delay > 0) kotlinx.coroutines.delay(delay)
+
+                                setSendLoading(false)
+
+                                val res = state.res
+
+                                recentStore.add(
+                                    etPhone.text.toString().trim(),
+                                    tvRecipientName.text.toString().trim()
+                                )
+                                renderRecentRecipients()
+
+                                vm.loadBalances()
+
+                                openReceipt(
+                                    toPhone = etPhone.text.toString().trim(),
+                                    currency = res.currency ?: "-",
+                                    amount = res.amount ?: 0.0,
+                                    description = etDesc.text.toString().trim(),
+                                    createdAtIso = nowLocal(),
+                                    reference = res.reference ?: "-"
+                                )
+
+                                lastConfirmedReceiverIdentifier = null
+                                lastConfirmedCurrency = null
+                                lastConfirmedAmount = null
+                                lastConfirmedDescription = null
+
+                                vm.reset()
+                            }
+                        }
                     }
                 }
             }
@@ -333,6 +377,7 @@ class SendMoneyActivity : AppCompatActivity() {
     private fun showError(msg: String) {
         tvError.text = msg
         tvError.visibility = View.VISIBLE
+        tvError.alpha = 1f
         Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
     }
 
@@ -364,6 +409,23 @@ class SendMoneyActivity : AppCompatActivity() {
         return sdf.format(Date())
     }
 
+
+
+
+
+
+
+    private fun handleSendError(
+        error: AppError,
+        retryAction: () -> Unit = {}
+    ) {
+        handleCommonError(
+            error = error,
+            retryAction = retryAction,
+            onValidation = { showError(it) }
+        )
+    }
+
     private fun renderRecentRecipients() {
         val items = recentStore.list(10)
         recentList.removeAllViews()
@@ -387,4 +449,36 @@ class SendMoneyActivity : AppCompatActivity() {
     }
 
 
+
+    private fun setSendLoading(loading: Boolean) {
+        if (loading) showBlockingLoader() else hideBlockingLoader()
+
+        btnSend.isEnabled = !loading
+        btnSend.alpha = if (loading) 0.7f else 1f
+
+        etAmount.isEnabled = !loading
+        etDesc.isEnabled = !loading
+        currencyPill.isEnabled = !loading
+
+        etPhone.isEnabled = !loading
+        btnNext.isEnabled = !loading
+        btnUid.isEnabled = !loading
+        btnPhone.isEnabled = !loading
+        ivBack.isEnabled = !loading
+    }
+
+    private fun retryLastConfirmedTransfer(pin: String) {
+        val receiverIdentifier = lastConfirmedReceiverIdentifier ?: return
+        val currency = lastConfirmedCurrency ?: return
+        val amount = lastConfirmedAmount ?: return
+        val description = lastConfirmedDescription
+
+        vm.sendMoney(
+            toPhone = receiverIdentifier,
+            currency = currency,
+            amount = amount,
+            description = description,
+            pin = pin
+        )
+    }
 }

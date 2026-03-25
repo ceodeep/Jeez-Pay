@@ -15,6 +15,7 @@ import java.util.Locale
 class WalletStripAdapter(
     private val items: List<WalletBalance>,
     private var selectedCode: String,
+    private var hideBalances: Boolean,
     private val onClick: (WalletBalance) -> Unit
 ) : RecyclerView.Adapter<WalletStripAdapter.VH>() {
 
@@ -28,14 +29,26 @@ class WalletStripAdapter(
         notifyDataSetChanged()
     }
 
+    fun setHideBalances(hidden: Boolean) {
+        hideBalances = hidden
+        notifyDataSetChanged()
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val v = LayoutInflater.from(parent.context).inflate(R.layout.item_wallet_strip, parent, false)
+        val v = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_wallet_strip, parent, false)
         return VH(v)
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        holder.bind(item, item.code == selectedCode, onClick, nf)
+        holder.bind(
+            item = item,
+            selected = item.code == selectedCode,
+            hideBalances = hideBalances,
+            onClick = onClick,
+            nf = nf
+        )
     }
 
     override fun getItemCount(): Int = items.size
@@ -50,13 +63,14 @@ class WalletStripAdapter(
         fun bind(
             item: WalletBalance,
             selected: Boolean,
+            hideBalances: Boolean,
             onClick: (WalletBalance) -> Unit,
             nf: NumberFormat
         ) {
             img.setImageResource(item.iconRes)
             tvCode.text = item.code
             tvName.text = item.name
-            tvAmount.text = nf.format(item.amount)
+            tvAmount.text = if (hideBalances) "••••••" else nf.format(item.amount)
 
             if (selected) {
                 card.setCardBackgroundColor(itemView.context.getColor(R.color.bg_soft_blue))

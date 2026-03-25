@@ -16,6 +16,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Locale
+import android.content.Intent
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.AppError
+import com.jeezpay.app.storage.SessionManager
 
 class KycActivity : AppCompatActivity() {
 
@@ -69,29 +76,31 @@ class KycActivity : AppCompatActivity() {
 
     private fun prefillFromServer() {
         lifecycleScope.launch {
-            try {
-                val kyc = repo.me().kyc ?: return@launch
+            when (val result = repo.meSafe()) {
+                is ApiResult.Success -> {
+                    val kyc = result.data.kyc ?: return@launch
 
-                binding.etFullName.setText(kyc.full_name ?: "")
-                binding.etDob.setText(kyc.dob ?: "")
-                binding.etAddress.setText(kyc.address ?: "")
+                    binding.etFullName.setText(kyc.full_name ?: "")
+                    binding.etDob.setText(kyc.dob ?: "")
+                    binding.etAddress.setText(kyc.address ?: "")
 
-                // Since your bucket is private, we can't reliably preview existing uploads here
-                // without another endpoint to generate signed READ url.
-                // We still show a helpful hint via button text.
-                if (!kyc.id_path.isNullOrBlank()) binding.btnPickId.text = "ID uploaded (replace)"
-                if (!kyc.selfie_path.isNullOrBlank()) binding.btnPickSelfie.text = "Selfie uploaded (replace)"
+                    if (!kyc.id_path.isNullOrBlank()) binding.btnPickId.text = "ID uploaded (replace)"
+                    if (!kyc.selfie_path.isNullOrBlank()) binding.btnPickSelfie.text = "Selfie uploaded (replace)"
 
-                // Optional: if pending/approved, you can change submit button text
-                val status = kyc.status?.lowercase(Locale.ROOT)
-                if (status == "approved") {
-                    binding.btnSubmitKyc.text = "KYC Approved"
-                    binding.btnSubmitKyc.isEnabled = false
-                } else if (status == "pending") {
-                    binding.btnSubmitKyc.text = "Update & Resubmit"
+                    val status = kyc.status?.lowercase(Locale.ROOT)
+                    if (status == "approved") {
+                        binding.btnSubmitKyc.text = "KYC Approved"
+                        binding.btnSubmitKyc.isEnabled = false
+                    } else if (status == "pending") {
+                        binding.btnSubmitKyc.text = "Update & Resubmit"
+                    }
                 }
-            } catch (_: Exception) {
-                // ignore; user can still submit
+
+                is ApiResult.Error -> {
+                    handleKycError(result.error) {
+                        prefillFromServer()
+                    }
+                }
             }
         }
     }
@@ -126,7 +135,6 @@ class KycActivity : AppCompatActivity() {
             return
         }
 
-        // Require fresh selections for now (keeps flow simple + matches milestone)
         if (localIdUri == null || localSelfieUri == null) {
             toast("Please choose both ID photo and selfie")
             return
@@ -136,42 +144,195 @@ class KycActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // 1) Get signed upload for ID
                 val idContentType = contentResolver.getType(localIdUri) ?: "image/jpeg"
-                val idUpload = repo.uploadUrl("id", idContentType)
+
+                val idUploadResult = repo.uploadUrlSafe("id", idContentType)
+                if (idUploadResult is ApiResult.Error) {
+                    setLoading(false)
+                    handleKycError(idUploadResult.error) {
+                        submitKyc()
+                    }
+                    return@launch
+                }
+                val idUpload = (idUploadResult as ApiResult.Success).data
                 val idBytes = readAllBytes(localIdUri)
 
                 withContext(Dispatchers.IO) {
                     SignedUploader.putBytes(idUpload.signedUrl, idBytes, idContentType)
                 }
 
-                // 2) Get signed upload for Selfie
                 val selfieContentType = contentResolver.getType(localSelfieUri) ?: "image/jpeg"
-                val selfieUpload = repo.uploadUrl("selfie", selfieContentType)
+
+                val selfieUploadResult = repo.uploadUrlSafe("selfie", selfieContentType)
+                if (selfieUploadResult is ApiResult.Error) {
+                    setLoading(false)
+                    handleKycError(selfieUploadResult.error) {
+                        submitKyc()
+                    }
+                    return@launch
+                }
+                val selfieUpload = (selfieUploadResult as ApiResult.Success).data
                 val selfieBytes = readAllBytes(localSelfieUri)
 
                 withContext(Dispatchers.IO) {
                     SignedUploader.putBytes(selfieUpload.signedUrl, selfieBytes, selfieContentType)
                 }
 
-                // 3) Submit KYC with storage paths
-                repo.submit(
-                    KycSubmitRequest(
-                        fullName = fullName,
-                        dob = dob,
-                        address = address,
-                        idPath = idUpload.path,
-                        selfiePath = selfieUpload.path
+                when (
+                    val submitResult = repo.submitSafe(
+                        KycSubmitRequest(
+                            fullName = fullName,
+                            dob = dob,
+                            address = address,
+                            idPath = idUpload.path,
+                            selfiePath = selfieUpload.path
+                        )
                     )
-                )
+                ) {
+                    is ApiResult.Success -> {
+                        toast("KYC submitted (pending)")
+                        finish()
+                    }
 
-                toast("KYC submitted (pending)")
-                finish()
+                    is ApiResult.Error -> {
+                        handleKycError(submitResult.error) {
+                            submitKyc()
+                        }
+                    }
+                }
 
             } catch (e: Exception) {
-                toast(e.message ?: "KYC submission failed")
+                showServerFailureDialog(
+                    message = e.message ?: "KYC submission failed",
+                    onRetry = { submitKyc() }
+                )
             } finally {
                 setLoading(false)
+            }
+        }
+    }
+
+    private fun showNoInternetDialog(onRetry: () -> Unit = {}) {
+        showCustomConfirmDialog(
+            message = "No internet connection. Please check your network and try again.",
+            confirmText = "Retry",
+            cancelText = "Close",
+            onConfirm = onRetry
+        )
+    }
+
+    private fun showServerFailureDialog(
+        title: String = "Error occured",
+        message: String = "We couldn't complete your request right now.",
+        retryText: String = "Try again",
+        closeText: String = "Close",
+        onRetry: () -> Unit = {}
+    ) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_error_retry, null)
+
+        val tvTitle = dialogView.findViewById<TextView>(R.id.tvErrorTitle)
+        val tvMessage = dialogView.findViewById<TextView>(R.id.tvErrorMessage)
+        val btnClose = dialogView.findViewById<TextView>(R.id.btnErrorClose)
+        val btnRetry = dialogView.findViewById<TextView>(R.id.btnErrorRetry)
+
+        tvTitle.text = title
+        tvMessage.text = message
+        btnClose.text = closeText
+        btnRetry.text = retryText
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnRetry.setOnClickListener {
+            dialog.dismiss()
+            onRetry()
+        }
+
+        dialog.show()
+    }
+
+    private fun showCustomConfirmDialog(
+        message: String,
+        confirmText: String = "Confirm",
+        cancelText: String = "Cancel",
+        onConfirm: () -> Unit = {}
+    ) {
+        val view = layoutInflater.inflate(R.layout.dialog_action_confirm, null)
+
+        val tvMessage = view.findViewById<TextView>(R.id.tvDialogMessage)
+        val btnCancel = view.findViewById<TextView>(R.id.btnCancelDialog)
+        val btnConfirm = view.findViewById<TextView>(R.id.btnConfirmDialog)
+        val ivIcon = view.findViewById<ImageView>(R.id.ivDialogIcon)
+
+        tvMessage.text = message
+        btnCancel.text = cancelText
+        btnConfirm.text = confirmText
+        ivIcon.setImageResource(R.drawable.ic_warning_red)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
+            .setCancelable(false)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnConfirm.setOnClickListener {
+            dialog.dismiss()
+            onConfirm()
+        }
+
+        dialog.show()
+    }
+
+    private fun handleKycError(
+        error: AppError,
+        retryAction: () -> Unit = {}
+    ) {
+        when (error) {
+            is AppError.NoInternet -> {
+                showNoInternetDialog(onRetry = retryAction)
+            }
+
+            is AppError.Server -> {
+                showServerFailureDialog(
+                    message = error.message,
+                    onRetry = retryAction
+                )
+            }
+
+            is AppError.Validation -> {
+                toast(error.message)
+            }
+
+            is AppError.Unauthorized -> {
+                toast(error.message)
+                SessionManager(this).clearAll()
+
+                val i = Intent(this, AuthActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    putExtra(AuthActivity.EXTRA_FORCE_LOGIN, true)
+                }
+                startActivity(i)
+                finish()
+            }
+
+            is AppError.Unknown -> {
+                showServerFailureDialog(
+                    message = error.message,
+                    onRetry = retryAction
+                )
             }
         }
     }

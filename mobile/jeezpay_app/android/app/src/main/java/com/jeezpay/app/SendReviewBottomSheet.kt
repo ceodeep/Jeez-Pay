@@ -20,8 +20,13 @@ class SendReviewBottomSheet(
 ) : BottomSheetDialogFragment() {
 
     private val df = DecimalFormat("#,##0.##")
+    private var confirmLocked = false
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
         return inflater.inflate(R.layout.bottom_sheet_send_review, container, false)
     }
 
@@ -41,9 +46,16 @@ class SendReviewBottomSheet(
         tvReviewFee.text = "${df.format(fee)} $currency"
 
         btnClose.setOnClickListener { dismiss() }
+
         btnConfirm.setOnClickListener {
-            dismiss()
+            if (confirmLocked) return@setOnClickListener
+
+            confirmLocked = true
+            btnConfirm.isEnabled = false
+            btnConfirm.alpha = 0.7f
+
             onConfirm()
+            dismissAllowingStateLoss()
         }
     }
 }

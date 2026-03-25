@@ -7,7 +7,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import com.jeezpay.app.base.BaseFintechActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -18,20 +18,20 @@ import com.jeezpay.app.adapters.WalletPickerAdapter
 import com.jeezpay.app.adapters.WalletStripAdapter
 import com.jeezpay.app.repository.WalletRepository
 import com.jeezpay.app.storage.SessionManager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Locale
-import com.jeezpay.app.ProfileActivity
-import com.jeezpay.app.repository.KycRepository
 import androidx.appcompat.app.AlertDialog
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.AppError
+import com.jeezpay.app.common.LoaderOverlayController
 
 
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : BaseFintechActivity() {
     private lateinit var imgProfile: View
 
 
@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences("jeezpay_prefs", MODE_PRIVATE) }
 
     private lateinit var screenFlipper: android.widget.ViewFlipper
+    private lateinit var loaderOverlay: LoaderOverlayController
 
     // top/balance UI
     private lateinit var tvBalance: TextView
@@ -64,11 +65,44 @@ class MainActivity : AppCompatActivity() {
         actionText.visibility = android.view.View.GONE
     }
 
+    private fun showInfoState(message: String) {
+        actionText.text = message
+        actionText.visibility = View.VISIBLE
+        actionText.alpha = 1f
+    }
+
+    private fun showErrorState(message: String) {
+        actionText.text = message
+        actionText.visibility = View.VISIBLE
+        actionText.alpha = 1f
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun fadeBalanceText(newText: String) {
+        tvBalance.animate()
+            .alpha(0f)
+            .setDuration(120)
+            .withEndAction {
+                tvBalance.text = newText
+                tvBalance.animate()
+                    .alpha(1f)
+                    .setDuration(120)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun setRefreshing(refreshing: Boolean) {
+        if (::swipeRefreshLayout.isInitialized) {
+            swipeRefreshLayout.isRefreshing = refreshing
+        }
+    }
+
     private fun setBalanceLoading() {
         if (isBalanceHidden) {
-            tvBalance.text = "••••••"
+            fadeBalanceText("••••••")
         } else {
-            tvBalance.text = "Loading..."
+            fadeBalanceText("Loading...")
         }
     }
 
@@ -112,21 +146,25 @@ class MainActivity : AppCompatActivity() {
     private fun fetchBalance(currency: String) {
         setBalanceLoading()
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val res = walletRepo.fetchBalance(currency)
-                val bal = res.balances.firstOrNull { it.currency == currency }?.balance ?: 0.0
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                walletRepo.fetchBalanceSafe(currency)
+            }) {
+                is ApiResult.Success -> {
+                    val res = result.data
+                    val bal = res.balances.firstOrNull { it.currency == currency }?.balance ?: 0.0
 
-                withContext(Dispatchers.Main) {
                     val w = wallets.firstOrNull { it.code == currency }
                     if (w != null) {
                         w.amount = bal
                     }
                     applyBalanceVisibility()
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showStatus("Balance failed: ${e.message}")
+
+                is ApiResult.Error -> {
+                    handleMainError(result.error) {
+                        fetchBalance(currency)
+                    }
                 }
             }
         }
@@ -135,25 +173,27 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun fetchHistory(currency: String) {
-        showStatus("Loading transactions...")
+        showInfoState("Loading transactions...")
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val res = walletRepo.fetchHistory(currency)
-
-                withContext(Dispatchers.Main) {
-                    val list = res.transactions ?: emptyList()
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                walletRepo.fetchHistorySafe(currency)
+            }) {
+                is ApiResult.Success -> {
+                    val list = result.data.transactions ?: emptyList()
                     txAdapter.submit(list)
 
                     if (list.isEmpty()) {
-                        showStatus("No transactions yet")
+                        showInfoState("No transactions yet")
                     } else {
                         hideStatus()
                     }
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showStatus("History failed: ${e.message}")
+
+                is ApiResult.Error -> {
+                    handleMainError(result.error) {
+                        fetchHistory(currency)
+                    }
                 }
             }
         }
@@ -200,6 +240,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        initBlockingLoader()
 
         val imgProfile = findViewById<View>(R.id.imgProfile)
 
@@ -211,6 +252,7 @@ class MainActivity : AppCompatActivity() {
 
         bindViews()
         swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
+        swipeRefreshLayout.setColorSchemeResources(R.color.paypal_blue)
         swipeRefreshLayout.setOnRefreshListener {
             fetchBalanceAndHistory()
         }
@@ -294,19 +336,22 @@ class MainActivity : AppCompatActivity() {
         applySelectedWallet(selectedCode)
         applyBalanceVisibility()
         setupWalletStrip()
+        walletStripAdapter?.setHideBalances(isBalanceHidden)
+        setMainBlockingLoading(true)
     }
 
     private fun setupWalletStrip() {
         rvWalletStrip.layoutManager =
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
-        walletStripAdapter = WalletStripAdapter(wallets, selectedCode) { picked ->
+        walletStripAdapter = WalletStripAdapter(wallets, selectedCode, isBalanceHidden) { picked ->
             selectedCode = picked.code
             prefs.edit().putString("selected_wallet", selectedCode).apply()
             applySelectedWallet(selectedCode)
             walletStripAdapter?.setSelected(selectedCode)
 
             // ✅ Important: reload balance + transactions for the newly selected currency
+            setMainBlockingLoading(true)
             fetchBalanceAndHistory()
         }
 
@@ -322,6 +367,7 @@ class MainActivity : AppCompatActivity() {
                 walletStripAdapter?.setSelected(selectedCode)
 
                 // ✅ reload for chosen currency
+                setMainBlockingLoading(true)
                 fetchBalanceAndHistory()
             }
         }
@@ -331,216 +377,23 @@ class MainActivity : AppCompatActivity() {
         btnToggleBalance.setOnClickListener {
             isBalanceHidden = !isBalanceHidden
             prefs.edit().putBoolean("hide_balance", isBalanceHidden).apply()
+
+            walletStripAdapter?.setHideBalances(isBalanceHidden)
             applyBalanceVisibility()
+
+            btnToggleBalance.animate()
+                .rotationBy(180f)
+                .setDuration(180)
+                .start()
         }
     }
 
     private fun setupActionButtons() {
         val btnSend = findViewById<View>(R.id.btnSend)
         btnSend.setOnClickListener {
-            startActivity(Intent(this, com.jeezpay.app.ui.send.SendMoneyActivity::class.java))
+            startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))
         }
     }
-
-
-
-//    private fun showSendSheet() {
-//        val dialog = BottomSheetDialog(this)
-//        val view = layoutInflater.inflate(R.layout.bottom_sheet_send, null)
-//
-//        val etPhone = view.findViewById<android.widget.EditText>(R.id.etSendPhone)
-//        val etAmount = view.findViewById<android.widget.EditText>(R.id.etSendAmount)
-//        val etDesc = view.findViewById<android.widget.EditText>(R.id.etSendDesc)
-//        val btn = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnSendNow)
-//
-//        val spCountry = view.findViewById<android.widget.Spinner>(R.id.spCountryCode)
-//        val tvHint = view.findViewById<TextView>(R.id.tvSendPhoneHint)
-//
-//        // ---- Country codes (you can add more later) ----
-//        val countryItems = listOf(
-//            "Sudan (+249)",
-//            "South Sudan (+211)",
-//            "Egypt (+20)",
-//            "Uganda (+256)"
-//        )
-//        val countryCodes = mapOf(
-//            "Sudan (+249)" to "+249",
-//            "South Sudan (+211)" to "+211",
-//            "Egypt (+20)" to "+20",
-//            "Uganda (+256)" to "+256"
-//        )
-//
-//        spCountry.adapter = android.widget.ArrayAdapter(
-//            this,
-//            android.R.layout.simple_spinner_dropdown_item,
-//            countryItems
-//        )
-//
-//        // Default to Sudan (+249)
-//        spCountry.setSelection(0)
-//
-//        val myPhone = getMyPhoneFromJwt() // uses SessionManager token
-//
-//        fun showHint(text: String, isError: Boolean = false) {
-//            tvHint.visibility = View.VISIBLE
-//            tvHint.text = text
-//            tvHint.setTextColor(
-//                if (isError) getColor(android.R.color.holo_red_dark)
-//                else getColor(R.color.text_tertiary)
-//            )
-//        }
-//
-//        fun hideHint() {
-//            tvHint.text = ""
-//            tvHint.visibility = View.GONE
-//        }
-//
-//        fun normalizeWithSelectedCountry(raw: String): String {
-//            val p = raw.trim()
-//            val digits = p.replace("\\D".toRegex(), "")
-//
-//            val selectedLabel = spCountry.selectedItem?.toString() ?: "Sudan (+249)"
-//            val cc = countryCodes[selectedLabel] ?: "+249"
-//
-//            // If already starts with +
-//            if (p.startsWith("+") && digits.isNotBlank()) return "+$digits"
-//
-//            // If starts with 00 (international)
-//            if (digits.startsWith("00") && digits.length > 2) return "+" + digits.substring(2)
-//
-//            // If user typed country code without plus (e.g. 249xxxxxxxxx)
-//            if (digits.startsWith(cc.replace("+", ""))) return cc + digits.removePrefix(cc.replace("+", ""))
-//
-//            // If user typed local starting 0 (0xxxxxxxxx) -> drop 0 then prefix cc
-//            if (digits.startsWith("0") && digits.length >= 10) return cc + digits.substring(1)
-//
-//            // If they typed just digits (no 0) -> prefix cc
-//            if (digits.length in 7..12) return cc + digits
-//
-//            // fallback
-//            return p
-//        }
-//
-//        fun isSendingToSelf(normalizedTarget: String): Boolean {
-//            if (myPhone.isNullOrBlank()) return false
-//            val mine = normalizeWithSelectedCountry(myPhone) // normalize mine too
-//            return mine == normalizedTarget
-//        }
-//
-//        fun validateLive() {
-//            val raw = etPhone.text.toString()
-//            if (raw.isBlank()) {
-//                hideHint()
-//                btn.isEnabled = true
-//                return
-//            }
-//
-//            val normalized = normalizeWithSelectedCountry(raw)
-//
-//            // Show a friendly preview
-//            showHint("Will send to: $normalized")
-//
-//            // Disable if sending to self
-//            if (isSendingToSelf(normalized)) {
-//                btn.isEnabled = false
-//                showHint("You can’t send money to your own number.", isError = true)
-//            } else {
-//                btn.isEnabled = true
-//            }
-//        }
-//
-//        // Re-check when typing or changing country
-//        etPhone.addTextChangedListener(object : android.text.TextWatcher {
-//            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-//            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-//                validateLive()
-//            }
-//            override fun afterTextChanged(s: android.text.Editable?) {}
-//        })
-//
-//        spCountry.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-//            override fun onItemSelected(
-//                parent: android.widget.AdapterView<*>?,
-//                view: View?,
-//                position: Int,
-//                id: Long
-//            ) {
-//                validateLive()
-//            }
-//
-//            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
-//        }
-//
-//        // Initial state
-//        validateLive()
-//
-//        btn.setOnClickListener {
-//            val phoneRaw = etPhone.text.toString().trim()
-//            val phone = normalizeWithSelectedCountry(phoneRaw)
-//
-//            val amount = etAmount.text.toString().trim().toDoubleOrNull()
-//            val desc = etDesc.text.toString().trim().ifEmpty { null }
-//
-//            if (phoneRaw.isBlank() || amount == null || amount <= 0) {
-//                Toast.makeText(this, "Enter valid phone + amount", Toast.LENGTH_SHORT).show()
-//                return@setOnClickListener
-//            }
-//
-//            // Final safety block
-//            if (isSendingToSelf(phone)) {
-//                btn.isEnabled = false
-//                showHint("You can’t send money to your own number.", isError = true)
-//                return@setOnClickListener
-//            }
-//
-//            // ✅ KYC GATE HERE (before transfer)
-//            CoroutineScope(Dispatchers.IO).launch {
-//                try {
-//                    val kyc = KycRepository().me().kyc
-//                    val status = kyc?.status?.lowercase()
-//
-//                    withContext(Dispatchers.Main) {
-//                        if (status != "approved") {
-//                            dialog.dismiss() // close sheet so user sees dialog clearly
-//                            if (status == "pending") showKycPendingDialog()
-//                            else showKycRequiredDialog()
-//                            return@withContext
-//                        }
-//
-//                        // ✅ Only approved reaches here -> do transfer
-//                        CoroutineScope(Dispatchers.IO).launch {
-//                            try {
-//                                val res = walletRepo.transfer(phone, selectedCode, amount, desc)
-//                                withContext(Dispatchers.Main) {
-//                                    Toast.makeText(this@MainActivity, res.message, Toast.LENGTH_SHORT).show()
-//                                    dialog.dismiss()
-//                                    fetchBalanceAndHistory()
-//                                }
-//                            } catch (e: Exception) {
-//                                withContext(Dispatchers.Main) {
-//                                    Toast.makeText(
-//                                        this@MainActivity,
-//                                        "Transfer failed: ${e.message}",
-//                                        Toast.LENGTH_LONG
-//                                    ).show()
-//                                }
-//                            }
-//                        }
-//                    }
-//
-//                } catch (e: Exception) {
-//                    withContext(Dispatchers.Main) {
-//                        Toast.makeText(this@MainActivity, "KYC check failed", Toast.LENGTH_SHORT).show()
-//                    }
-//                }
-//            }
-//        }
-//
-//
-//        dialog.setContentView(view)
-//        dialog.show()
-//    }
-
 
 
     private fun setupCustomBottomNav() {
@@ -589,10 +442,10 @@ class MainActivity : AppCompatActivity() {
         val w = wallets.firstOrNull { it.code == selectedCode } ?: wallets.first()
 
         if (isBalanceHidden) {
-            tvBalance.text = "••••••"
+            fadeBalanceText("••••••")
             btnToggleBalance.setImageResource(R.drawable.ic_eye_off)
         } else {
-            tvBalance.text = "${nf.format(w.amount)} ${w.code}"
+            fadeBalanceText("${nf.format(w.amount)} ${w.code}")
             btnToggleBalance.setImageResource(R.drawable.ic_eye)
         }
     }
@@ -639,58 +492,85 @@ class MainActivity : AppCompatActivity() {
 
     private fun fetchBalanceAndHistory() {
         txAdapter.setCurrency(selectedCode)
-
-        // start spinner only if view is ready
-        if (::swipeRefreshLayout.isInitialized) {
-            swipeRefreshLayout.isRefreshing = true
-        }
+        setRefreshing(true)
+        showInfoState("Refreshing wallet...")
 
         lifecycleScope.launch {
             try {
-                // 1) Fetch balances for ALL wallets
-                val balancesMap: Map<String, Double> = withContext(Dispatchers.IO) {
-                    try {
-                        val res = walletRepo.fetchBalances()
-                        res.balances.associate { it.currency to it.balance }
-                    } catch (_: Exception) {
-                        emptyMap()
+                val balancesMap = mutableMapOf<String, Double>()
+
+                for (w in wallets) {
+                    when (val result = withContext(Dispatchers.IO) {
+                        walletRepo.fetchBalanceSafe(w.code)
+                    }) {
+                        is ApiResult.Success -> {
+                            balancesMap[w.code] =
+                                result.data.balances.firstOrNull { it.currency == w.code }?.balance ?: 0.0
+                        }
+
+                        is ApiResult.Error -> {
+                            setRefreshing(false)
+                            handleMainError(result.error) {
+                                fetchBalanceAndHistory()
+                            }
+                            return@launch
+                        }
                     }
                 }
 
-                // apply balances to list
                 for (i in wallets.indices) {
                     val code = wallets[i].code
                     balancesMap[code]?.let { wallets[i].amount = it }
                 }
 
-                // 2) Fetch history ONLY for selected wallet
-                val hist = withContext(Dispatchers.IO) {
-                    walletRepo.fetchHistory(selectedCode)
+                when (val histResult = withContext(Dispatchers.IO) {
+                    walletRepo.fetchHistorySafe(selectedCode)
+                }) {
+                    is ApiResult.Success -> {
+                        applySelectedWallet(selectedCode)
+                        walletStripAdapter?.notifyDataSetChanged()
+
+                        val list = histResult.data.transactions ?: emptyList()
+                        txAdapter.submit(list.take(5))
+
+                        if (list.isEmpty()) {
+                            showInfoState("No transactions yet")
+                        } else {
+                            hideStatus()
+                        }
+                    }
+
+                    is ApiResult.Error -> {
+                        handleMainError(histResult.error) {
+                            fetchBalanceAndHistory()
+                        }
+                    }
                 }
-
-                // 3) Update UI
-                applySelectedWallet(selectedCode)              // updates pill + main balance text
-                walletStripAdapter?.notifyDataSetChanged()     // updates horizontal wallet strip
-
-                val list = hist.transactions ?: emptyList()
-                txAdapter.submit(list.take(5))                 // show 5 recent (as you want)
-
-                if (list.isEmpty()) showStatus("No transactions yet") else hideStatus()
-
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@MainActivity,
-                    "Failed to load wallet: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
             } finally {
-                if (::swipeRefreshLayout.isInitialized) {
-                    swipeRefreshLayout.isRefreshing = false
-                }
+                setRefreshing(false)
+                setMainBlockingLoading(false)
             }
         }
     }
 
+
+
+
+
+
+    private fun handleMainError(
+        error: AppError,
+        retryAction: () -> Unit = {}
+    ) {
+        handleCommonError(
+            error = error,
+            retryAction = retryAction,
+            onValidation = { showErrorState(it) },
+            onUnauthorized = {
+                doLogout()
+            }
+        )
+    }
 
     private fun showKycRequiredDialog() {
         AlertDialog.Builder(this)
@@ -716,6 +596,19 @@ class MainActivity : AppCompatActivity() {
 
 
 
+    private fun setMainBlockingLoading(loading: Boolean) {
+
+        if (loading) showBlockingLoader()
+        else hideBlockingLoader()
+
+        navHome.isEnabled = !loading
+        navCard.isEnabled = !loading
+        navSend.isEnabled = !loading
+        navHub.isEnabled = !loading
+
+        btnCurrency.isEnabled = !loading
+        btnToggleBalance.isEnabled = !loading
+    }
 }
 
 /**

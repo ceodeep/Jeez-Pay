@@ -8,14 +8,17 @@ import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
+@Suppress("DEPRECATION")
 class SessionManager(context: Context) {
 
     private val appContext = context.applicationContext
 
+    @Suppress("DEPRECATION")
     private val masterKey = MasterKey.Builder(appContext)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
 
+    @Suppress("DEPRECATION")
     private val prefs: SharedPreferences = EncryptedSharedPreferences.create(
         appContext,
         PREF_NAME,
@@ -24,6 +27,7 @@ class SessionManager(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
+    // ... rest of your code remains exactly the same ...
     fun saveToken(token: String) {
         prefs.edit().putString(KEY_TOKEN, token).apply()
     }
@@ -36,9 +40,6 @@ class SessionManager(context: Context) {
 
     fun getPhone(): String? = prefs.getString(KEY_PHONE, null)
 
-    /**
-     * Stores only a salted hash of the PIN, never the raw PIN itself.
-     */
     fun savePin(pin: String) {
         val salt = generateSalt()
         val hash = hashPin(pin, salt)
@@ -50,9 +51,6 @@ class SessionManager(context: Context) {
             .apply()
     }
 
-    /**
-     * Use this instead of getPin().
-     */
     fun verifyPin(inputPin: String): Boolean {
         val saltHex = prefs.getString(KEY_PIN_SALT, null) ?: return false
         val storedHashHex = prefs.getString(KEY_PIN_HASH, null) ?: return false
@@ -81,9 +79,6 @@ class SessionManager(context: Context) {
         prefs.edit().clear().commit()
     }
 
-    /**
-     * Lockout helpers
-     */
     fun getFailedPinAttempts(): Int = prefs.getInt(KEY_PIN_FAILED_ATTEMPTS, 0)
 
     fun incrementFailedPinAttempts(): Int {
@@ -110,7 +105,7 @@ class SessionManager(context: Context) {
         return if (remaining > 0) remaining else 0L
     }
 
-    fun isPinLocked(): Boolean = getPinLockRemainingMillis() > 0
+    fun isPinLocked(): Boolean = getPinLockRemainingMillis() > 0L
 
     private fun generateSalt(size: Int = 16): ByteArray {
         val salt = ByteArray(size)
@@ -146,21 +141,13 @@ class SessionManager(context: Context) {
 
     companion object {
         private const val PREF_NAME = "jeezpay_secure_session"
-
         private const val KEY_TOKEN = "token"
         private const val KEY_PHONE = "phone"
-
-        // New secure PIN storage
         private const val KEY_PIN_HASH = "pin_hash"
         private const val KEY_PIN_SALT = "pin_salt"
-
-        // Legacy cleanup only
         private const val KEY_LEGACY_PIN = "pin"
-
-        // Lockout state
         private const val KEY_PIN_FAILED_ATTEMPTS = "pin_failed_attempts"
         private const val KEY_PIN_LOCK_UNTIL = "pin_lock_until"
-
         private const val PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256"
         private const val PBKDF2_ITERATIONS = 120_000
         private const val KEY_LENGTH_BITS = 256

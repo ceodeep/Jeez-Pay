@@ -97,7 +97,7 @@ function AppShell({ onLogout }) {
   const [txTypeFilter, setTxTypeFilter] = useState("all");
 
   const [adjustForm, setAdjustForm] = useState({
-    userId: "",
+    identifier: "",
     currency: "USDT",
     amount: "",
     type: "credit",
@@ -227,20 +227,36 @@ function AppShell({ onLogout }) {
     }
   }
 
-  async function adjustWallet(e) {
+    async function adjustWallet(e) {
     e.preventDefault();
+
+    if (!adjustForm.identifier.trim()) {
+      setMessage("Account number, phone, or user ID is required");
+      return;
+    }
+
+    if (!adjustForm.amount || Number(adjustForm.amount) <= 0) {
+      setMessage("Enter a valid amount");
+      return;
+    }
+
+    if (!adjustForm.description.trim()) {
+      setMessage("Description is required");
+      return;
+    }
+
     try {
       await api.post("/admin/wallet/adjust", {
-        userId: adjustForm.userId,
+        identifier: adjustForm.identifier.trim(),
         currency: adjustForm.currency,
         amount: Number(adjustForm.amount),
         type: adjustForm.type,
-        description: adjustForm.description,
+        description: adjustForm.description.trim(),
       });
 
       setMessage("Wallet adjusted successfully");
       setAdjustForm({
-        userId: "",
+        identifier: "",
         currency: "USDT",
         amount: "",
         type: "credit",
@@ -858,90 +874,302 @@ function AppShell({ onLogout }) {
             </div>
           )}
 
-          {page === "wallet" && (
+                    {page === "wallet" && (
             <div
               style={{
-                background: "#fff",
-                padding: 20,
-                borderRadius: 16,
-                boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-                maxWidth: 600,
+                display: "grid",
+                gap: 16,
+                maxWidth: 760,
               }}
             >
-              <form onSubmit={adjustWallet} style={{ display: "grid", gap: 12 }}>
-                <input
-                  placeholder="User ID"
-                  value={adjustForm.userId}
-                  onChange={(e) =>
-                    setAdjustForm({
-                      ...adjustForm,
-                      userId: e.target.value,
-                    })
-                  }
-                  style={{ padding: 12 }}
-                />
-                <input
-                  placeholder="Currency"
-                  value={adjustForm.currency}
-                  onChange={(e) =>
-                    setAdjustForm({
-                      ...adjustForm,
-                      currency: e.target.value.toUpperCase(),
-                    })
-                  }
-                  style={{ padding: 12 }}
-                />
-                <input
-                  placeholder="Amount"
-                  value={adjustForm.amount}
-                  onChange={(e) =>
-                    setAdjustForm({
-                      ...adjustForm,
-                      amount: e.target.value,
-                    })
-                  }
-                  style={{ padding: 12 }}
-                />
-                <select
-                  value={adjustForm.type}
-                  onChange={(e) =>
-                    setAdjustForm({
-                      ...adjustForm,
-                      type: e.target.value,
-                    })
-                  }
-                  style={{ padding: 12 }}
-                >
-                  <option value="credit">credit</option>
-                  <option value="debit">debit</option>
-                </select>
-                <input
-                  placeholder="Description"
-                  value={adjustForm.description}
-                  onChange={(e) =>
-                    setAdjustForm({
-                      ...adjustForm,
-                      description: e.target.value,
-                    })
-                  }
-                  style={{ padding: 12 }}
-                />
-
-                <button
-                  type="submit"
+              <div
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                }}
+              >
+                <div
                   style={{
-                    padding: 14,
-                    borderRadius: 12,
-                    border: "none",
-                    background: "#0f172a",
-                    color: "#fff",
-                    cursor: "pointer",
+                    fontSize: 18,
                     fontWeight: 700,
+                    marginBottom: 8,
+                    color: "#0f172a",
                   }}
                 >
-                  Submit Adjustment
-                </button>
-              </form>
+                  Manual Wallet Adjustment
+                </div>
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: 14,
+                    marginBottom: 18,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Credit or debit a user wallet manually. Use the user ID from the Users page.
+                </div>
+
+                <form
+                  onSubmit={adjustWallet}
+                  style={{
+                    display: "grid",
+                    gap: 14,
+                  }}
+                >
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
+                    >
+                    Account Number / Phone / User ID
+                    </label>
+                    <input
+                      placeholder="Enter account number, phone, or user UUID"
+                      value={adjustForm.identifier}
+                      onChange={(e) =>
+                        setAdjustForm({
+                          ...adjustForm,
+                          identifier: e.target.value,
+                        })
+                      }
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid #dbe2ea",
+                        background: "#f8fafc",
+                        fontSize: 14,
+                      }}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 14,
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <label
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#334155",
+                        }}
+                      >
+                        Currency
+                      </label>
+                      <select
+                        value={adjustForm.currency}
+                        onChange={(e) =>
+                          setAdjustForm({
+                            ...adjustForm,
+                            currency: e.target.value.toUpperCase(),
+                          })
+                        }
+                        style={{
+                          padding: 12,
+                          borderRadius: 12,
+                          border: "1px solid #dbe2ea",
+                          background: "#f8fafc",
+                          fontSize: 14,
+                        }}
+                      >
+                        <option value="USDT">USDT</option>
+                        <option value="SSP">SSP</option>
+                        <option value="SDG">SDG</option>
+                        <option value="EGP">EGP</option>
+                        <option value="UGX">UGX</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <label
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#334155",
+                        }}
+                      >
+                        Type
+                      </label>
+                      <select
+                        value={adjustForm.type}
+                        onChange={(e) =>
+                          setAdjustForm({
+                            ...adjustForm,
+                            type: e.target.value,
+                          })
+                        }
+                        style={{
+                          padding: 12,
+                          borderRadius: 12,
+                          border: "1px solid #dbe2ea",
+                          background: "#f8fafc",
+                          fontSize: 14,
+                        }}
+                      >
+                        <option value="credit">Credit</option>
+                        <option value="debit">Debit</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
+                    >
+                      Amount
+                    </label>
+                    <input
+                      placeholder="Enter amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={adjustForm.amount}
+                      onChange={(e) =>
+                        setAdjustForm({
+                          ...adjustForm,
+                          amount: e.target.value,
+                        })
+                      }
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid #dbe2ea",
+                        background: "#f8fafc",
+                        fontSize: 14,
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <label
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#334155",
+                      }}
+                    >
+                      Reason / Description
+                    </label>
+                    <textarea
+                      placeholder="Why are you making this adjustment?"
+                      value={adjustForm.description}
+                      onChange={(e) =>
+                        setAdjustForm({
+                          ...adjustForm,
+                          description: e.target.value,
+                        })
+                      }
+                      rows={4}
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid #dbe2ea",
+                        background: "#f8fafc",
+                        fontSize: 14,
+                        resize: "vertical",
+                        fontFamily: "inherit",
+                      }}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "center",
+                      marginTop: 4,
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      style={{
+                        padding: "14px 18px",
+                        borderRadius: 12,
+                        border: "none",
+                        background:
+                          adjustForm.type === "credit" ? "#166534" : "#b91c1c",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        minWidth: 180,
+                      }}
+                    >
+                      {adjustForm.type === "credit"
+                        ? "Submit Credit"
+                        : "Submit Debit"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAdjustForm({
+                          identifier: "",
+                          currency: "USDT",
+                          amount: "",
+                          type: "credit",
+                          description: "",
+                        })
+                      }
+                      style={{
+                        padding: "14px 18px",
+                        borderRadius: 12,
+                        border: "1px solid #cbd5e1",
+                        background: "#fff",
+                        color: "#334155",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div
+                style={{
+                  background: "#fff",
+                  padding: 18,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 15,
+                    color: "#0f172a",
+                    marginBottom: 8,
+                  }}
+                >
+                  Notes
+                </div>
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                  }}
+                >
+                  <div>• Credit adds funds to the selected wallet.</div>
+                  <div>• Debit removes funds and will fail if balance is insufficient.</div>
+                  <div>• Always include a clear reason for audit purposes.</div>
+                </div>
+              </div>
             </div>
           )}
         </main>
