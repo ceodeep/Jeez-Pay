@@ -16,11 +16,12 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import com.facebook.shimmer.ShimmerFrameLayout
 
 class TransactionsAdapter(
-    private var displayCurrency: String = "USDT" // set from MainActivity when wallet changes
+    private var displayCurrency: String = "USDT",
+    private val onTransactionClick: ((TransactionDto) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
     private val nf = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
@@ -28,11 +29,19 @@ class TransactionsAdapter(
 
     // --- list rows: either Header or Tx ---
     private sealed class Row {
+        object Skeleton : Row()
+        object Empty : Row()
+        object LoadingMore : Row()
         data class Header(val title: String) : Row()
         data class Tx(val tx: TransactionDto) : Row()
     }
 
     private val rows = mutableListOf<Row>()
+
+    private var fullList: List<TransactionDto> = emptyList()
+    private var visibleCount = 0
+    private val pageSize = 10
+    private var hasMoreItems = false
 
     fun setCurrency(code: String) {
         displayCurrency = code
@@ -40,7 +49,33 @@ class TransactionsAdapter(
     }
 
     fun submit(list: List<TransactionDto>) {
+        fullList = list.sortedByDescending { it.created_at ?: "" }
+        visibleCount = minOf(pageSize, fullList.size)
+        rebuildRows()
+    }
+
+    fun loadNextPage() {
+        if (!hasMoreItems) return
+
+        val nextCount = minOf(visibleCount + pageSize, fullList.size)
+        if (nextCount == visibleCount) return
+
+        visibleCount = nextCount
+        rebuildRows()
+    }
+
+    fun canLoadMore(): Boolean = hasMoreItems
+
+    private fun rebuildRows() {
         rows.clear()
+
+        if (fullList.isEmpty()) {
+            rows.add(Row.Empty)
+            notifyDataSetChanged()
+            return
+        }
+
+        val visibleItems = fullList.take(visibleCount)
 
         val today = Calendar.getInstance()
         val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
@@ -52,10 +87,7 @@ class TransactionsAdapter(
         var addedYesterday = false
         var addedEarlier = false
 
-        // sort newest first (string works because ISO timestamps sort correctly)
-        val sorted = list.sortedByDescending { it.created_at ?: "" }
-
-        for (tx in sorted) {
+        for (tx in visibleItems) {
             val txDay = parseDayKey(tx.created_at)
 
             when (txDay) {
@@ -82,32 +114,70 @@ class TransactionsAdapter(
             rows.add(Row.Tx(tx))
         }
 
+        hasMoreItems = visibleCount < fullList.size
+        if (hasMoreItems) {
+            rows.add(Row.LoadingMore)
+        }
+
         notifyDataSetChanged()
     }
 
     override fun getItemViewType(position: Int): Int {
         return when (rows[position]) {
-            is Row.Header -> 0
-            is Row.Tx -> 1
+            is Row.Skeleton -> 0
+            is Row.Empty -> 1
+            is Row.LoadingMore -> 2
+            is Row.Header -> 3
+            is Row.Tx -> 4
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
-        return if (viewType == 0) {
-            val v = inflater.inflate(R.layout.item_tx_header, parent, false)
-            HeaderVH(v)
-        } else {
-            val v = inflater.inflate(R.layout.item_transaction, parent, false)
-            TxVH(v, nf)
+
+        return when (viewType) {
+            0 -> {
+                val v = inflater.inflate(R.layout.item_tx_skeleton, parent, false)
+                val shimmer = v as? ShimmerFrameLayout
+                shimmer?.startShimmer()
+                object : RecyclerView.ViewHolder(v) {}
+            }
+            1 -> {
+                val v = inflater.inflate(R.layout.item_tx_empty, parent, false)
+                object : RecyclerView.ViewHolder(v) {}
+            }
+            2 -> {
+                val v = inflater.inflate(R.layout.item_tx_loading_more, parent, false)
+                val shimmer = v as? ShimmerFrameLayout
+                shimmer?.startShimmer()
+                object : RecyclerView.ViewHolder(v) {}
+            }
+            3 -> {
+                val v = inflater.inflate(R.layout.item_tx_header, parent, false)
+                HeaderVH(v)
+            }
+            else -> {
+                val v = inflater.inflate(R.layout.item_transaction, parent, false)
+                TxVH(v, nf, onTransactionClick)
+            }
         }
     }
-
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (val row = rows[position]) {
             is Row.Header -> (holder as HeaderVH).bind(row.title)
             is Row.Tx -> (holder as TxVH).bind(row.tx, displayCurrency)
+            is Row.Skeleton,
+            is Row.LoadingMore -> {
+                val shimmer = holder.itemView as? ShimmerFrameLayout
+                shimmer?.startShimmer()
+            }
+            is Row.Empty -> Unit
         }
+    }
+    override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
+        val shimmer = holder.itemView as? ShimmerFrameLayout
+        shimmer?.stopShimmer()
+        super.onViewRecycled(holder)
     }
 
     override fun getItemCount(): Int = rows.size
@@ -121,7 +191,11 @@ class TransactionsAdapter(
         }
     }
 
-    private class TxVH(itemView: View, private val nf: NumberFormat) :
+     private class TxVH(
+         itemView: View,
+         private val nf: NumberFormat,
+         private val onTransactionClick: ((TransactionDto) -> Unit)?
+     ) :
         RecyclerView.ViewHolder(itemView) {
 
         // Locked IDs ✅ (DO NOT CHANGE)
@@ -196,6 +270,10 @@ class TransactionsAdapter(
                     tvAmount.setTextColor(primary)
                 }
             }
+
+            itemView.setOnClickListener {
+                onTransactionClick?.invoke(tx)
+            }
         }
 
         private fun safeIconRes(primaryRes: Int, fallbackRes: Int): Int {
@@ -269,5 +347,19 @@ class TransactionsAdapter(
     private fun dayKey(date: Date): String {
         val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         return fmt.format(date)
+    }
+
+    fun showSkeleton(count: Int = 6) {
+        rows.clear()
+        repeat(count) {
+            rows.add(Row.Skeleton)
+        }
+        notifyDataSetChanged()
+    }
+
+    fun showEmpty() {
+        rows.clear()
+        rows.add(Row.Empty)
+        notifyDataSetChanged()
     }
 }

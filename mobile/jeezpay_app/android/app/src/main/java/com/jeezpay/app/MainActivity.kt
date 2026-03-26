@@ -43,6 +43,7 @@ class MainActivity : BaseFintechActivity() {
 
     private lateinit var screenFlipper: android.widget.ViewFlipper
     private lateinit var loaderOverlay: LoaderOverlayController
+    private var isPagingTransactions = false
 
     // top/balance UI
     private lateinit var tvBalance: TextView
@@ -269,8 +270,35 @@ class MainActivity : BaseFintechActivity() {
 
         // Transactions recycler
         rvTransactions.layoutManager = LinearLayoutManager(this)
-        txAdapter = TransactionsAdapter(selectedCode)
+        txAdapter = TransactionsAdapter(selectedCode) { tx ->
+            TransactionDetailsBottomSheet(
+                tx = tx,
+                displayCurrency = selectedCode
+            ).show(supportFragmentManager, "TransactionDetailsBottomSheet")
+        }
         rvTransactions.adapter = txAdapter
+
+        rvTransactions.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+
+                if (dy <= 0) return
+                if (isPagingTransactions) return
+                if (!txAdapter.canLoadMore()) return
+
+                val layoutManager = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                val lastVisible = layoutManager.findLastVisibleItemPosition()
+                val total = txAdapter.itemCount
+
+                if (lastVisible >= total - 3) {
+                    isPagingTransactions = true
+                    recyclerView.post {
+                        txAdapter.loadNextPage()
+                        isPagingTransactions = false
+                    }
+                }
+            }
+        })
 
         // logout
 //        val tvLogout = findViewById<TextView>(R.id.tvLogout)
@@ -492,8 +520,10 @@ class MainActivity : BaseFintechActivity() {
 
     private fun fetchBalanceAndHistory() {
         txAdapter.setCurrency(selectedCode)
+        isPagingTransactions = false
         setRefreshing(true)
         showInfoState("Refreshing wallet...")
+        txAdapter.showSkeleton()
 
         lifecycleScope.launch {
             try {
@@ -531,7 +561,8 @@ class MainActivity : BaseFintechActivity() {
                         walletStripAdapter?.notifyDataSetChanged()
 
                         val list = histResult.data.transactions ?: emptyList()
-                        txAdapter.submit(list.take(5))
+                        txAdapter.submit(list)
+                        isPagingTransactions = false
 
                         if (list.isEmpty()) {
                             showInfoState("No transactions yet")

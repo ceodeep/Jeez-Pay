@@ -2,19 +2,16 @@ const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabase");
 const authMiddleware = require("../middlewares/auth.middleware");
+const { logAdminAction } = require("../utils/auditLogger");
+const { requireAdmin, requirePermission } = require("../middlewares/admin.middleware");
+const { getPermissionsForRole } = require("../config/adminPermissions");
 
 // ---------- helper: admin only ----------
-async function isAdmin(userId) {
-  const { data, error } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
 
-  if (error || !data) return false;
-  return data.role === "admin";
+
+function makeAdminAdjustmentReference() {
+  return `ADM-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
-
 // ---------- helper: normalize phone ----------
 function normalizePhone(raw) {
   const p = String(raw || "").trim();
@@ -92,14 +89,15 @@ async function getUserByAdminIdentifier(identifierRaw) {
 // List KYC submissions
 // Optional query: ?status=pending
 // =====================================
-router.get("/kyc/list", authMiddleware, async (req, res) => {
+router.get(
+  "/kyc/list",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("kyc.view"),
+  async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can view KYC submissions" });
-    }
 
     const status = String(req.query.status || "").trim().toLowerCase();
 
@@ -142,14 +140,15 @@ router.get("/kyc/list", authMiddleware, async (req, res) => {
 // POST /admin/kyc/approve
 // Body: { userId }
 // =====================================
-router.post("/kyc/approve", authMiddleware, async (req, res) => {
+router.post(
+  "/kyc/approve",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("kyc.approve"),
+  async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can approve KYC" });
-    }
 
     const userId = String(req.body.userId || "").trim();
 
@@ -187,6 +186,20 @@ router.post("/kyc/approve", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to approve KYC" });
     }
 
+    const adminInfo = req.adminUser;
+
+    await logAdminAction({
+      adminId,
+      adminPhone: adminInfo?.phone || null,
+      action: "KYC_APPROVED",
+      targetType: "kyc",
+      targetId: userId,
+      targetDisplay: userId,
+      oldValue: { status: existing.status },
+      newValue: { status: "approved" },
+      req,
+    });
+
     return res.json({
       message: "KYC approved successfully",
       kyc: data,
@@ -201,14 +214,15 @@ router.post("/kyc/approve", authMiddleware, async (req, res) => {
 // POST /admin/kyc/reject
 // Body: { userId }
 // =====================================
-router.post("/kyc/reject", authMiddleware, async (req, res) => {
+router.post(
+  "/kyc/reject",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("kyc.reject"),
+  async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can reject KYC" });
-    }
 
     const userId = String(req.body.userId || "").trim();
 
@@ -246,6 +260,20 @@ router.post("/kyc/reject", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to reject KYC" });
     }
 
+    const adminInfo = req.adminUser;
+
+    await logAdminAction({
+      adminId,
+      adminPhone: adminInfo?.phone || null,
+      action: "KYC_REJECTED",
+      targetType: "kyc",
+      targetId: userId,
+      targetDisplay: userId,
+      oldValue: { status: existing.status },
+      newValue: { status: "rejected" },
+      req,
+    });
+
     return res.json({
       message: "KYC rejected successfully",
       kyc: data,
@@ -260,15 +288,16 @@ router.post("/kyc/reject", authMiddleware, async (req, res) => {
 // GET /admin/users
 // Optional query: ?role=user
 // =====================================
-router.get("/users", authMiddleware, async (req, res) => {
+router.get(
+  "/users",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("users.view"),
+  async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can view users" });
-    }
-
+  
     const role = String(req.query.role || "").trim().toLowerCase();
 
     let query = supabase
@@ -312,14 +341,16 @@ router.get("/users", authMiddleware, async (req, res) => {
 // POST /admin/user/suspend
 // Body: { userId }
 // =====================================
-router.post("/user/suspend", authMiddleware, async (req, res) => {
+router.post(
+  "/user/suspend",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("users.suspend"),
+  async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can suspend users" });
-    }
+    
 
     const userId = String(req.body.userId || "").trim();
     if (!userId) {
@@ -357,6 +388,26 @@ router.post("/user/suspend", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to suspend user" });
     }
 
+    const adminInfo = req.adminUser;
+
+    await logAdminAction({
+      adminId,
+      adminPhone: adminInfo?.phone || null,
+      action: "USER_SUSPENDED",
+      targetType: "user",
+      targetId: userId,
+      targetDisplay: existing.phone,
+      oldValue: {
+        is_active: existing.is_active,
+        role: existing.role,
+      },
+      newValue: {
+        is_active: false,
+        role: existing.role,
+      },
+      req,
+    });
+
     return res.json({
       message: "User suspended successfully",
       user: data,
@@ -374,14 +425,15 @@ router.post("/user/suspend", authMiddleware, async (req, res) => {
 //   ?type=credit
 //   ?limit=100
 // =====================================
-router.get("/transactions", authMiddleware, async (req, res) => {
+router.get(
+  "/transactions",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("transactions.view"),
+  async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can view transactions" });
-    }
 
     const currency = String(req.query.currency || "").trim().toUpperCase();
     const type = String(req.query.type || "").trim().toLowerCase();
@@ -436,14 +488,15 @@ router.get("/transactions", authMiddleware, async (req, res) => {
 // POST /admin/user/activate
 // Body: { userId }
 // =====================================
-router.post("/user/activate", authMiddleware, async (req, res) => {
+router.post(
+  "/user/activate",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("users.activate"),
+  async (req, res) => {
   try {
     const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can activate users" });
-    }
 
     const userId = String(req.body.userId || "").trim();
     if (!userId) {
@@ -477,6 +530,26 @@ router.post("/user/activate", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to activate user" });
     }
 
+    const adminInfo = req.adminUser;
+
+    await logAdminAction({
+      adminId,
+      adminPhone: adminInfo?.phone || null,
+      action: "USER_ACTIVATED",
+      targetType: "user",
+      targetId: userId,
+      targetDisplay: existing.phone,
+      oldValue: {
+        is_active: existing.is_active,
+        role: existing.role,
+      },
+      newValue: {
+        is_active: true,
+        role: existing.role,
+      },
+      req,
+    });
+
     return res.json({
       message: "User activated successfully",
       user: data,
@@ -493,145 +566,470 @@ router.post("/user/activate", authMiddleware, async (req, res) => {
 // identifier can be wallet_account_number OR phone OR user UUID
 // type = "credit" | "debit"
 // =====================================
-router.post("/wallet/adjust", authMiddleware, async (req, res) => {
-  try {
-    const adminId = req.user.userId;
+router.post(
+  "/wallet/adjust",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.adjust"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
 
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can adjust balances" });
-    }
+      const identifier = String(req.body.identifier || "").trim();
+      const currency = String(req.body.currency || "").trim().toUpperCase();
+      const type = String(req.body.type || "").trim().toLowerCase();
+      const amount = Number(req.body.amount);
+      const description =
+        String(req.body.description || "").trim() || "Admin balance adjustment";
 
-    const identifier = String(req.body.identifier || "").trim();
-    const currency = String(req.body.currency || "").trim().toUpperCase();
-    const type = String(req.body.type || "").trim().toLowerCase();
-    const amount = Number(req.body.amount);
-    const description =
-      String(req.body.description || "").trim() || "Admin balance adjustment";
+      if (!identifier || !currency || !type || req.body.amount == null) {
+        return res.status(400).json({
+          message: "identifier, currency, amount and type are required",
+        });
+      }
 
-    if (!identifier || !currency || !type || req.body.amount == null) {
-      return res.status(400).json({
-        message: "identifier, currency, amount and type are required",
-      });
-    }
+      if (!["credit", "debit"].includes(type)) {
+        return res.status(400).json({ message: "type must be 'credit' or 'debit'" });
+      }
 
-    if (!["credit", "debit"].includes(type)) {
-      return res.status(400).json({ message: "type must be 'credit' or 'debit'" });
-    }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ message: "Amount must be a positive number" });
-    }
+      const user = await getUserByAdminIdentifier(identifier);
 
-    const user = await getUserByAdminIdentifier(identifier);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+      if (!user.is_active) {
+        return res.status(400).json({ message: "Cannot adjust wallet for suspended user" });
+      }
 
-    const userId = user.id;
+      if (user.role === "admin" || user.role === "super_admin") {
+        return res.status(403).json({ message: "Admin wallets cannot be adjusted from this endpoint" });
+      }
 
-    const { data: walletExisting, error: walletFetchErr } = await supabase
-      .from("wallets")
-      .select("id, balance, currency")
-      .eq("user_id", userId)
-      .eq("currency", currency)
-      .maybeSingle();
+      const userId = user.id;
 
-    if (walletFetchErr) {
-      console.error("admin/wallet/adjust wallet lookup error:", walletFetchErr);
-      return res.status(500).json({ message: "Wallet lookup failed" });
-    }
-
-    let wallet = walletExisting;
-
-    if (!wallet) {
-      const { data: createdWallet, error: createWalletErr } = await supabase
+      const { data: walletExisting, error: walletFetchErr } = await supabase
         .from("wallets")
-        .insert([{ user_id: userId, currency, balance: 0 }])
         .select("id, balance, currency")
+        .eq("user_id", userId)
+        .eq("currency", currency)
+        .maybeSingle();
+
+      if (walletFetchErr) {
+        console.error("admin/wallet/adjust wallet lookup error:", walletFetchErr);
+        return res.status(500).json({ message: "Wallet lookup failed" });
+      }
+
+      let wallet = walletExisting;
+      let walletCreatedNow = false;
+
+      if (!wallet) {
+        const { data: createdWallet, error: createWalletErr } = await supabase
+          .from("wallets")
+          .insert([{ user_id: userId, currency, balance: 0 }])
+          .select("id, balance, currency")
+          .single();
+
+        if (createWalletErr) {
+          console.error("admin/wallet/adjust wallet create error:", createWalletErr);
+          return res.status(500).json({ message: "Failed to create wallet" });
+        }
+
+        wallet = createdWallet;
+        walletCreatedNow = true;
+      }
+
+      const currentBalance = Number(wallet.balance || 0);
+      let newBalance = currentBalance;
+
+      if (type === "credit") {
+        newBalance = currentBalance + amount;
+      } else {
+        if (currentBalance < amount) {
+          return res.status(400).json({ message: "Insufficient balance for debit adjustment" });
+        }
+        newBalance = currentBalance - amount;
+      }
+
+      const { error: updateErr } = await supabase
+        .from("wallets")
+        .update({ balance: newBalance })
+        .eq("id", wallet.id);
+
+      if (updateErr) {
+        console.error("admin/wallet/adjust wallet update error:", updateErr);
+        return res.status(500).json({ message: "Failed to update wallet balance" });
+      }
+
+      const reference = makeAdminAdjustmentReference();
+
+      const { data: tx, error: txErr } = await supabase
+        .from("transactions")
+        .insert([
+          {
+            wallet_id: wallet.id,
+            type,
+            amount,
+            description,
+            reference,
+          },
+        ])
+        .select()
         .single();
 
-      if (createWalletErr) {
-        console.error("admin/wallet/adjust wallet create error:", createWalletErr);
-        return res.status(500).json({ message: "Failed to create wallet" });
+      if (txErr) {
+        console.error("admin/wallet/adjust transaction insert error:", txErr);
+
+        // rollback wallet balance
+        const { error: rollbackErr } = await supabase
+          .from("wallets")
+          .update({ balance: currentBalance })
+          .eq("id", wallet.id);
+
+        if (rollbackErr) {
+          console.error("admin/wallet/adjust rollback error:", rollbackErr);
+          return res.status(500).json({
+            message: "Transaction failed and wallet rollback also failed. Manual review required",
+          });
+        }
+
+        // optional cleanup: remove newly-created empty wallet
+        if (walletCreatedNow) {
+          await supabase
+            .from("wallets")
+            .delete()
+            .eq("id", wallet.id)
+            .eq("balance", currentBalance);
+        }
+
+        return res.status(500).json({
+          message: "Transaction failed, balance rolled back",
+        });
       }
 
-      wallet = createdWallet;
-    }
+      const adminInfo = req.adminUser;
 
-    const currentBalance = Number(wallet.balance || 0);
-    let newBalance = currentBalance;
-
-    if (type === "credit") {
-      newBalance = currentBalance + amount;
-    } else {
-      if (currentBalance < amount) {
-        return res.status(400).json({ message: "Insufficient balance for debit adjustment" });
-      }
-      newBalance = currentBalance - amount;
-    }
-
-    const { error: updateErr } = await supabase
-      .from("wallets")
-      .update({ balance: newBalance })
-      .eq("id", wallet.id);
-
-    if (updateErr) {
-      console.error("admin/wallet/adjust wallet update error:", updateErr);
-      return res.status(500).json({ message: "Failed to update wallet balance" });
-    }
-
-    const { data: tx, error: txErr } = await supabase
-      .from("transactions")
-      .insert([
-        {
-          wallet_id: wallet.id,
-          type,
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "WALLET_ADJUSTED",
+        targetType: "wallet",
+        targetId: wallet.id,
+        targetDisplay: user.phone || String(user.wallet_account_number || user.id),
+        oldValue: {
+          currency,
+          balance: currentBalance,
+        },
+        newValue: {
+          currency,
+          balance: newBalance,
+          adjustmentType: type,
           amount,
           description,
+          transactionId: tx.id,
+          reference,
         },
-      ])
-      .select()
-      .single();
+        req,
+      });
 
-    if (txErr) {
-      console.error("admin/wallet/adjust transaction insert error:", txErr);
-      return res.status(500).json({ message: "Balance changed but transaction record failed" });
+      return res.json({
+        message: `Wallet ${type} successful`,
+        user: {
+          id: user.id,
+          phone: user.phone,
+          wallet_account_number: user.wallet_account_number,
+        },
+        wallet: {
+          id: wallet.id,
+          currency,
+          previousBalance: currentBalance,
+          newBalance,
+        },
+        transaction: tx,
+      });
+    } catch (err) {
+      console.error("admin/wallet/adjust crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
     }
-
-    return res.json({
-      message: `Wallet ${type} successful`,
-      user: {
-        id: user.id,
-        phone: user.phone,
-        wallet_account_number: user.wallet_account_number,
-      },
-      wallet: {
-        id: wallet.id,
-        currency,
-        previousBalance: currentBalance,
-        newBalance,
-      },
-      transaction: tx,
-    });
-  } catch (err) {
-    console.error("admin/wallet/adjust crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
+
+// =====================================
+// GET /admin/wallets/view
+// Query: ?identifier=+249xxxx OR wallet_account_number OR user UUID
+// Returns all wallets for one user + summary
+// =====================================
+router.get(
+  "/wallets/view",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("users.view"),
+  async (req, res) => {
+    try {
+      const identifier = String(req.query.identifier || "").trim();
+
+      if (!identifier) {
+        return res.status(400).json({ message: "identifier is required" });
+      }
+
+      const user = await getUserByAdminIdentifier(identifier);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { data: wallets, error: walletsErr } = await supabase
+        .from("wallets")
+        .select(`
+          id,
+          user_id,
+          currency,
+          balance
+        `)
+        .eq("user_id", user.id)
+        .order("currency", { ascending: true });
+
+      if (walletsErr) {
+        console.error("admin/wallets/view wallets error:", walletsErr);
+        return res.status(500).json({ message: "Failed to fetch wallets" });
+      }
+
+      const safeWallets = (wallets || []).map((wallet) => ({
+        id: wallet.id,
+        user_id: wallet.user_id,
+        currency: wallet.currency,
+        current_balance: Number(wallet.balance || 0),
+        available_balance: Number(wallet.balance || 0),
+        frozen_balance: 0,
+        pending_withdrawals: 0,
+      }));
+
+      const summary = {
+        wallet_count: safeWallets.length,
+        total_current_balance: safeWallets.reduce(
+          (sum, wallet) => sum + Number(wallet.current_balance || 0),
+          0
+        ),
+        total_available_balance: safeWallets.reduce(
+          (sum, wallet) => sum + Number(wallet.available_balance || 0),
+          0
+        ),
+        total_frozen_balance: safeWallets.reduce(
+          (sum, wallet) => sum + Number(wallet.frozen_balance || 0),
+          0
+        ),
+        total_pending_withdrawals: safeWallets.reduce(
+          (sum, wallet) => sum + Number(wallet.pending_withdrawals || 0),
+          0
+        ),
+      };
+
+      return res.json({
+        user: {
+          id: user.id,
+          phone: user.phone,
+          role: user.role,
+          wallet_account_number: user.wallet_account_number,
+          is_active: user.is_active,
+        },
+        wallets: safeWallets,
+        summary,
+      });
+    } catch (err) {
+      console.error("admin/wallets/view crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// GET /admin/user/details
+// Query: ?identifier=+249xxxx OR wallet_account_number OR user UUID
+// Returns deep user profile for admin panel
+// =====================================
+router.get(
+  "/user/details",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("users.view"),
+  async (req, res) => {
+    try {
+      const identifier = String(req.query.identifier || "").trim();
+
+      if (!identifier) {
+        return res.status(400).json({ message: "identifier is required" });
+      }
+
+      const user = await getUserByAdminIdentifier(identifier);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const userId = user.id;
+
+      const [
+        userRes,
+        walletsRes,
+        kycRes,
+        txRes,
+      ] = await Promise.all([
+        supabase
+          .from("users")
+          .select(`
+            id,
+            phone,
+            role,
+            account_type,
+            phone_verified,
+            is_active,
+            created_at,
+            wallet_account_number
+          `)
+          .eq("id", userId)
+          .maybeSingle(),
+
+        supabase
+          .from("wallets")
+          .select(`
+            id,
+            user_id,
+            currency,
+            balance
+          `)
+          .eq("user_id", userId)
+          .order("currency", { ascending: true }),
+
+        supabase
+          .from("kyc_profiles")
+          .select(`
+            user_id,
+            full_name,
+            dob,
+            address,
+            id_path,
+            selfie_path,
+            status,
+            created_at,
+            updated_at
+          `)
+          .eq("user_id", userId)
+          .maybeSingle(),
+
+        supabase
+          .from("transactions")
+          .select(`
+            id,
+            wallet_id,
+            type,
+            amount,
+            description,
+            reference,
+            created_at,
+            wallets!inner (
+              user_id,
+              currency
+            )
+          `)
+          .eq("wallets.user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(20),
+      ]);
+
+      if (userRes.error) {
+        console.error("admin/user/details user error:", userRes.error);
+        return res.status(500).json({ message: "Failed to fetch user profile" });
+      }
+
+      if (walletsRes.error) {
+        console.error("admin/user/details wallets error:", walletsRes.error);
+        return res.status(500).json({ message: "Failed to fetch user wallets" });
+      }
+
+      if (kycRes.error) {
+        console.error("admin/user/details kyc error:", kycRes.error);
+        return res.status(500).json({ message: "Failed to fetch user KYC" });
+      }
+
+      if (txRes.error) {
+        console.error("admin/user/details transactions error:", txRes.error);
+        return res.status(500).json({ message: "Failed to fetch user transactions" });
+      }
+
+      const profile = userRes.data;
+      if (!profile) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const wallets = (walletsRes.data || []).map((wallet) => ({
+        id: wallet.id,
+        user_id: wallet.user_id,
+        currency: wallet.currency,
+        current_balance: Number(wallet.balance || 0),
+        available_balance: Number(wallet.balance || 0),
+        frozen_balance: 0,
+        pending_withdrawals: 0,
+      }));
+
+      const walletSummary = {
+        wallet_count: wallets.length,
+        total_current_balance: wallets.reduce(
+          (sum, wallet) => sum + Number(wallet.current_balance || 0),
+          0
+        ),
+        total_available_balance: wallets.reduce(
+          (sum, wallet) => sum + Number(wallet.available_balance || 0),
+          0
+        ),
+        total_frozen_balance: wallets.reduce(
+          (sum, wallet) => sum + Number(wallet.frozen_balance || 0),
+          0
+        ),
+        total_pending_withdrawals: wallets.reduce(
+          (sum, wallet) => sum + Number(wallet.pending_withdrawals || 0),
+          0
+        ),
+      };
+
+      const recentTransactions = (txRes.data || []).map((tx) => ({
+        id: tx.id,
+        wallet_id: tx.wallet_id,
+        type: tx.type,
+        amount: Number(tx.amount || 0),
+        description: tx.description,
+        reference: tx.reference,
+        created_at: tx.created_at,
+        currency: tx.wallets?.currency || null,
+      }));
+
+      return res.json({
+        user: profile,
+        wallets,
+        walletSummary,
+        kyc: kycRes.data || null,
+        recentTransactions,
+      });
+    } catch (err) {
+      console.error("admin/user/details crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
 
 // =====================================
 // GET /admin/dashboard/stats
 // =====================================
-router.get("/dashboard/stats", authMiddleware, async (req, res) => {
-  try {
+router.get(
+  "/dashboard/stats",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("dashboard.view"),
+  async (req, res) => {
     const adminId = req.user.userId;
-
-    const admin = await isAdmin(adminId);
-    if (!admin) {
-      return res.status(403).json({ message: "Only admin can view dashboard stats" });
-    }
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -714,5 +1112,214 @@ router.get("/dashboard/stats", authMiddleware, async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+// =====================================
+// GET /admin/audit-logs
+// Optional query params:
+//   ?action=KYC_APPROVED
+//   ?adminId=uuid
+//   ?targetType=user
+//   ?limit=100
+// =====================================
+router.get(
+  "/audit-logs",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("audit_logs.view"),
+  async (req, res) => {
+  try {
+    const adminId = req.user.userId;
+
+
+    const action = String(req.query.action || "").trim();
+    const targetType = String(req.query.targetType || "").trim();
+    const filterAdminId = String(req.query.adminId || "").trim();
+    const limitRaw = Number(req.query.limit || 100);
+    const limit = Number.isFinite(limitRaw)
+      ? Math.min(Math.max(limitRaw, 1), 200)
+      : 100;
+
+    let query = supabase
+      .from("audit_logs")
+      .select(`
+        id,
+        admin_id,
+        admin_phone,
+        action,
+        target_type,
+        target_id,
+        target_display,
+        old_value,
+        new_value,
+        ip_address,
+        user_agent,
+        created_at
+      `)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (action) query = query.eq("action", action);
+    if (targetType) query = query.eq("target_type", targetType);
+    if (filterAdminId) query = query.eq("admin_id", filterAdminId);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("admin/audit-logs error:", error);
+      return res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+
+    return res.json({
+      logs: data || [],
+    });
+  } catch (err) {
+    console.error("admin/audit-logs crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// =====================================
+// GET /admin/me/permissions
+// Returns current admin profile + role + permissions
+// =====================================
+router.get(
+  "/me/permissions",
+  authMiddleware,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const adminUser = req.adminUser;
+      const permissions = getPermissionsForRole(adminUser.role);
+
+      return res.json({
+        admin: {
+          id: adminUser.id,
+          phone: adminUser.phone,
+          role: adminUser.role,
+          is_active: adminUser.is_active,
+        },
+        permissions,
+        isSuperAdmin: permissions.includes("*"),
+      });
+    } catch (err) {
+      console.error("admin/me/permissions crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// POST /admin/user/set-role
+// Body: { userId, role }
+// =====================================
+router.post(
+  "/user/set-role",
+  authMiddleware,
+  requireAdmin,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const { userId, role } = req.body;
+
+      const allowedRoles = [
+        "admin",
+        "super_admin",
+        "finance_admin",
+        "kyc_officer",
+        "support_agent",
+        "auditor",
+        "user",
+      ];
+      
+
+      if (!userId || !role) {
+        return res.status(400).json({ message: "userId and role are required" });
+      }
+
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      // fetch current user
+      const { data: existing, error: fetchErr } = await supabase
+        .from("users")
+        .select("id, phone, role")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (fetchErr) {
+        console.error("set-role lookup error:", fetchErr);
+        return res.status(500).json({ message: "User lookup failed" });
+      }
+
+      if (!existing) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (existing && existing.role === role) {
+  return res.status(400).json({ message: "User already has this role" });
+}
+
+      // prevent self downgrade
+      if (userId === adminId) {
+        return res.status(400).json({ message: "Cannot change your own role" });
+      }
+
+      const { data, error } = await supabase
+        .from("users")
+        .update({ role })
+        .eq("id", userId)
+        .select("id, phone, role")
+        .single();
+
+      if (error) {
+        console.error("set-role update error:", error);
+        return res.status(500).json({ message: "Failed to update role" });
+      }
+
+      // audit log
+      const adminInfo = req.adminUser;
+
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "USER_ROLE_CHANGED",
+        targetType: "user",
+        targetId: userId,
+        targetDisplay: existing.phone,
+        oldValue: { role: existing.role },
+        newValue: { role },
+        req,
+      });
+
+      return res.json({
+        message: "Role updated successfully",
+        user: data,
+      });
+    } catch (err) {
+      console.error("set-role crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+function requireSuperAdmin(req, res, next) {
+  const adminUser = req.adminUser;
+
+  if (!adminUser) {
+    return res.status(403).json({ message: "Admin context missing" });
+  }
+
+  if (adminUser.role !== "super_admin") {
+    return res.status(403).json({
+      message: "Only super admin can perform this action",
+    });
+  }
+
+  next();
+}
+
+
 
 module.exports = router;
