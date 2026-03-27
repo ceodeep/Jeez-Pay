@@ -89,52 +89,91 @@ async function getUserByAdminIdentifier(identifierRaw) {
 // List KYC submissions
 // Optional query: ?status=pending
 // =====================================
+// =====================================
+// GET /admin/kyc/list
+// Optional query params:
+// ?status=pending
+// ?search=+249...
+// ?createdFrom=2026-01-01
+// ?createdTo=2026-01-31
+// ?limit=100
+// =====================================
 router.get(
   "/kyc/list",
   authMiddleware,
   requireAdmin,
   requirePermission("kyc.view"),
   async (req, res) => {
-  try {
-    const adminId = req.user.userId;
+    try {
+      const status = String(req.query.status || "").trim().toLowerCase();
+      const search = String(req.query.search || "").trim();
+      const createdFrom = String(req.query.createdFrom || "").trim();
+      const createdTo = String(req.query.createdTo || "").trim();
+      const limitRaw = Number(req.query.limit || 100);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(limitRaw, 1), 200)
+        : 100;
 
+      let userIdFilter = null;
 
-    const status = String(req.query.status || "").trim().toLowerCase();
+      if (search) {
+        const matchedUser = await getUserByAdminIdentifier(search);
+        if (!matchedUser) {
+          return res.json({ kycs: [] });
+        }
+        userIdFilter = matchedUser.id;
+      }
 
-    let query = supabase
-      .from("kyc_profiles")
-      .select(`
-        user_id,
-        full_name,
-        dob,
-        address,
-        id_path,
-        selfie_path,
-        status,
-        created_at,
-        updated_at
-      `)
-      .order("created_at", { ascending: false });
+      let query = supabase
+        .from("kyc_profiles")
+        .select(`
+          user_id,
+          full_name,
+          dob,
+          address,
+          id_path,
+          selfie_path,
+          status,
+          created_at,
+          updated_at
+        `)
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
-    if (status) {
-      query = query.eq("status", status);
+      if (status) {
+        query = query.eq("status", status);
+      }
+
+      if (userIdFilter) {
+        query = query.eq("user_id", userIdFilter);
+      }
+
+      if (createdFrom) {
+        query = query.gte("created_at", new Date(createdFrom).toISOString());
+      }
+
+      if (createdTo) {
+        const end = new Date(createdTo);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("admin/kyc/list error:", error);
+        return res.status(500).json({ message: "Failed to fetch KYC submissions" });
+      }
+
+      return res.json({
+        kycs: data || [],
+      });
+    } catch (err) {
+      console.error("admin/kyc/list crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
     }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("admin/kyc/list error:", error);
-      return res.status(500).json({ message: "Failed to fetch KYC submissions" });
-    }
-
-    return res.json({
-      kycs: data || [],
-    });
-  } catch (err) {
-    console.error("admin/kyc/list crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
 
 // =====================================
 // POST /admin/kyc/approve
@@ -288,54 +327,123 @@ router.post(
 // GET /admin/users
 // Optional query: ?role=user
 // =====================================
+// =====================================
+// GET /admin/users
+// Optional query params:
+// ?role=user
+// ?search=+249...
+// ?isActive=true
+// ?phoneVerified=true
+// ?accountType=personal
+// ?createdFrom=2026-01-01
+// ?createdTo=2026-01-31
+// ?limit=100
+// =====================================
 router.get(
   "/users",
   authMiddleware,
   requireAdmin,
   requirePermission("users.view"),
   async (req, res) => {
-  try {
-    const adminId = req.user.userId;
+    try {
+      const role = String(req.query.role || "").trim().toLowerCase();
+      const search = String(req.query.search || "").trim();
+      const isActive = String(req.query.isActive || "").trim().toLowerCase();
+      const phoneVerified = String(req.query.phoneVerified || "").trim().toLowerCase();
+      const accountType = String(req.query.accountType || "").trim().toLowerCase();
+      const createdFrom = String(req.query.createdFrom || "").trim();
+      const createdTo = String(req.query.createdTo || "").trim();
+      const limitRaw = Number(req.query.limit || 100);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(limitRaw, 1), 200)
+        : 100;
 
-  
-    const role = String(req.query.role || "").trim().toLowerCase();
+      let query = supabase
+        .from("users")
+        .select(`
+          id,
+          phone,
+          role,
+          account_type,
+          phone_verified,
+          is_active,
+          created_at,
+          wallet_account_number,
+          kyc_profiles (
+            status
+          )
+        `)
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
-    let query = supabase
-      .from("users")
-      .select(`
-        id,
-        phone,
-        role,
-        account_type,
-        phone_verified,
-        is_active,
-        created_at,
-        wallet_account_number,
-        kyc_profiles (
-          status
-        )
-      `)
-      .order("created_at", { ascending: false });
+      if (role) {
+        query = query.eq("role", role);
+      }
 
-    if (role) {
-      query = query.eq("role", role);
+      if (accountType) {
+        query = query.eq("account_type", accountType);
+      }
+
+      if (isActive === "true") {
+        query = query.eq("is_active", true);
+      } else if (isActive === "false") {
+        query = query.eq("is_active", false);
+      }
+
+      if (phoneVerified === "true") {
+        query = query.eq("phone_verified", true);
+      } else if (phoneVerified === "false") {
+        query = query.eq("phone_verified", false);
+      }
+
+      if (createdFrom) {
+        query = query.gte("created_at", new Date(createdFrom).toISOString());
+      }
+
+      if (createdTo) {
+        const end = new Date(createdTo);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
+      }
+
+      if (search) {
+        const normalized = normalizePhone(search);
+        const searchDigitsOnly = /^\d+$/.test(search);
+
+        if (searchDigitsOnly) {
+          const acc = Number(search);
+          if (Number.isSafeInteger(acc)) {
+            query = query.or(
+              `phone.ilike.%${search}%,phone.ilike.%${normalized}%,wallet_account_number.eq.${acc},id.eq.${search}`
+            );
+          } else {
+            query = query.or(
+              `phone.ilike.%${search}%,phone.ilike.%${normalized}%,id.eq.${search}`
+            );
+          }
+        } else {
+          query = query.or(
+            `phone.ilike.%${search}%,phone.ilike.%${normalized}%,id.eq.${search}`
+          );
+        }
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("admin/users error:", error);
+        return res.status(500).json({ message: "Failed to fetch users" });
+      }
+
+      return res.json({
+        users: data || [],
+      });
+    } catch (err) {
+      console.error("admin/users crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
     }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("admin/users error:", error);
-      return res.status(500).json({ message: "Failed to fetch users" });
-    }
-
-    return res.json({
-      users: data || [],
-    });
-  } catch (err) {
-    console.error("admin/users crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
 
 // =====================================
 // POST /admin/user/suspend
@@ -425,64 +533,116 @@ router.post(
 //   ?type=credit
 //   ?limit=100
 // =====================================
+// =====================================
+// GET /admin/transactions
+// Optional query params:
+// ?currency=USDT
+// ?type=credit
+// ?reference=ADM-...
+// ?search=+249...
+// ?createdFrom=2026-01-01
+// ?createdTo=2026-01-31
+// ?minAmount=10
+// ?maxAmount=500
+// ?limit=100
+// =====================================
 router.get(
   "/transactions",
   authMiddleware,
   requireAdmin,
   requirePermission("transactions.view"),
   async (req, res) => {
-  try {
-    const adminId = req.user.userId;
+    try {
+      const currency = String(req.query.currency || "").trim().toUpperCase();
+      const type = String(req.query.type || "").trim().toLowerCase();
+      const reference = String(req.query.reference || "").trim();
+      const search = String(req.query.search || "").trim();
+      const createdFrom = String(req.query.createdFrom || "").trim();
+      const createdTo = String(req.query.createdTo || "").trim();
+      const minAmount = Number(req.query.minAmount);
+      const maxAmount = Number(req.query.maxAmount);
+      const limitRaw = Number(req.query.limit || 100);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(limitRaw, 1), 200)
+        : 100;
 
+      let userIdFilter = null;
 
-    const currency = String(req.query.currency || "").trim().toUpperCase();
-    const type = String(req.query.type || "").trim().toLowerCase();
-    const limitRaw = Number(req.query.limit || 100);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(limitRaw, 1), 200)
-      : 100;
+      if (search) {
+        const matchedUser = await getUserByAdminIdentifier(search);
+        if (matchedUser) {
+          userIdFilter = matchedUser.id;
+        }
+      }
 
-    let query = supabase
-      .from("transactions")
-      .select(`
-        id,
-        wallet_id,
-        type,
-        amount,
-        description,
-        reference,
-        created_at,
-        wallets (
-          user_id,
-          currency
-        )
-      `)
-      .order("created_at", { ascending: false })
-      .limit(limit);
+      let query = supabase
+        .from("transactions")
+        .select(`
+          id,
+          wallet_id,
+          type,
+          amount,
+          description,
+          reference,
+          created_at,
+          wallets!inner (
+            user_id,
+            currency
+          )
+        `)
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
-    if (type) {
-      query = query.eq("type", type);
+      if (type) {
+        query = query.eq("type", type);
+      }
+
+      if (currency) {
+        query = query.eq("wallets.currency", currency);
+      }
+
+      if (reference) {
+        query = query.ilike("reference", `%${reference}%`);
+      }
+
+      if (createdFrom) {
+        query = query.gte("created_at", new Date(createdFrom).toISOString());
+      }
+
+      if (createdTo) {
+        const end = new Date(createdTo);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
+      }
+
+      if (Number.isFinite(minAmount)) {
+        query = query.gte("amount", minAmount);
+      }
+
+      if (Number.isFinite(maxAmount)) {
+        query = query.lte("amount", maxAmount);
+      }
+
+      if (userIdFilter) {
+        query = query.eq("wallets.user_id", userIdFilter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("admin/transactions error:", error);
+        return res.status(500).json({ message: "Failed to fetch transactions" });
+      }
+
+      return res.json({
+        transactions: data || [],
+      });
+    } catch (err) {
+      console.error("admin/transactions crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
     }
-
-    if (currency) {
-      query = query.eq("wallets.currency", currency);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error("admin/transactions error:", error);
-      return res.status(500).json({ message: "Failed to fetch transactions" });
-    }
-
-    return res.json({
-      transactions: data || [],
-    });
-  } catch (err) {
-    console.error("admin/transactions crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
 
 // =====================================
 // POST /admin/user/activate
@@ -1023,95 +1183,100 @@ router.get(
 // =====================================
 // GET /admin/dashboard/stats
 // =====================================
+// =====================================
+// GET /admin/dashboard/stats
+// =====================================
+
+
 router.get(
   "/dashboard/stats",
   authMiddleware,
   requireAdmin,
   requirePermission("dashboard.view"),
   async (req, res) => {
-    const adminId = req.user.userId;
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+      const [
+        usersRes,
+        pendingKycRes,
+        txRes,
+        suspendedRes,
+        agentsRes,
+        merchantsRes,
+      ] = await Promise.all([
+        supabase.from("users").select("id", { count: "exact", head: true }),
+        supabase
+          .from("kyc_profiles")
+          .select("user_id", { count: "exact", head: true })
+          .eq("status", "pending"),
+        supabase
+          .from("transactions")
+          .select("amount, created_at")
+          .gte("created_at", todayStart.toISOString()),
+        supabase
+          .from("users")
+          .select("id", { count: "exact", head: true })
+          .eq("is_active", false),
+        supabase
+          .from("users")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "agent"),
+        supabase
+          .from("users")
+          .select("id", { count: "exact", head: true })
+          .eq("role", "merchant"),
+      ]);
 
-    const [
-      usersRes,
-      pendingKycRes,
-      txRes,
-      suspendedRes,
-      agentsRes,
-      merchantsRes,
-    ] = await Promise.all([
-      supabase.from("users").select("id", { count: "exact", head: true }),
-      supabase
-        .from("kyc_profiles")
-        .select("user_id", { count: "exact", head: true })
-        .eq("status", "pending"),
-      supabase
-        .from("transactions")
-        .select("amount, created_at")
-        .gte("created_at", todayStart.toISOString()),
-      supabase
-        .from("users")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", false),
-      supabase
-        .from("users")
-        .select("id", { count: "exact", head: true })
-        .eq("role", "agent"),
-      supabase
-        .from("users")
-        .select("id", { count: "exact", head: true })
-        .eq("role", "merchant"),
-    ]);
+      if (usersRes.error) {
+        console.error("dashboard stats users error:", usersRes.error);
+        return res.status(500).json({ message: "Failed to load dashboard stats" });
+      }
+      if (pendingKycRes.error) {
+        console.error("dashboard stats pending KYC error:", pendingKycRes.error);
+        return res.status(500).json({ message: "Failed to load dashboard stats" });
+      }
+      if (txRes.error) {
+        console.error("dashboard stats transactions error:", txRes.error);
+        return res.status(500).json({ message: "Failed to load dashboard stats" });
+      }
+      if (suspendedRes.error) {
+        console.error("dashboard stats suspended users error:", suspendedRes.error);
+        return res.status(500).json({ message: "Failed to load dashboard stats" });
+      }
+      if (agentsRes.error) {
+        console.error("dashboard stats agents error:", agentsRes.error);
+        return res.status(500).json({ message: "Failed to load dashboard stats" });
+      }
+      if (merchantsRes.error) {
+        console.error("dashboard stats merchants error:", merchantsRes.error);
+        return res.status(500).json({ message: "Failed to load dashboard stats" });
+      }
 
-    if (usersRes.error) {
-      console.error("dashboard stats users error:", usersRes.error);
-      return res.status(500).json({ message: "Failed to load dashboard stats" });
-    }
-    if (pendingKycRes.error) {
-      console.error("dashboard stats pending KYC error:", pendingKycRes.error);
-      return res.status(500).json({ message: "Failed to load dashboard stats" });
-    }
-    if (txRes.error) {
-      console.error("dashboard stats transactions error:", txRes.error);
-      return res.status(500).json({ message: "Failed to load dashboard stats" });
-    }
-    if (suspendedRes.error) {
-      console.error("dashboard stats suspended users error:", suspendedRes.error);
-      return res.status(500).json({ message: "Failed to load dashboard stats" });
-    }
-    if (agentsRes.error) {
-      console.error("dashboard stats agents error:", agentsRes.error);
-      return res.status(500).json({ message: "Failed to load dashboard stats" });
-    }
-    if (merchantsRes.error) {
-      console.error("dashboard stats merchants error:", merchantsRes.error);
-      return res.status(500).json({ message: "Failed to load dashboard stats" });
-    }
+      const todayTransactions = txRes.data || [];
+      const totalVolumeToday = todayTransactions.reduce(
+        (sum, tx) => sum + Number(tx.amount || 0),
+        0
+      );
 
-    const todayTransactions = txRes.data || [];
-    const totalVolumeToday = todayTransactions.reduce(
-      (sum, tx) => sum + Number(tx.amount || 0),
-      0
-    );
-
-    return res.json({
-      stats: {
-        totalUsers: usersRes.count || 0,
-        pendingKyc: pendingKycRes.count || 0,
-        suspendedUsers: suspendedRes.count || 0,
-        totalTransactionsToday: todayTransactions.length,
-        totalVolumeToday,
-        totalAgents: agentsRes.count || 0,
-        totalMerchants: merchantsRes.count || 0,
-      },
-    });
-  } catch (err) {
-    console.error("admin/dashboard/stats crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
+      return res.json({
+        stats: {
+          totalUsers: usersRes.count || 0,
+          pendingKyc: pendingKycRes.count || 0,
+          suspendedUsers: suspendedRes.count || 0,
+          totalTransactionsToday: todayTransactions.length,
+          totalVolumeToday,
+          totalAgents: agentsRes.count || 0,
+          totalMerchants: merchantsRes.count || 0,
+        },
+      });
+    } catch (err) {
+      console.error("admin/dashboard/stats crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   }
-});
+);
 
 // =====================================
 // GET /admin/audit-logs
@@ -1121,62 +1286,93 @@ router.get(
 //   ?targetType=user
 //   ?limit=100
 // =====================================
+// =====================================
+// GET /admin/audit-logs
+// Optional query params:
+// ?action=KYC_APPROVED
+// ?adminId=uuid
+// ?targetType=user
+// ?targetId=uuid
+// ?search=+249...
+// ?createdFrom=2026-01-01
+// ?createdTo=2026-01-31
+// ?limit=100
+// =====================================
 router.get(
   "/audit-logs",
   authMiddleware,
   requireAdmin,
   requirePermission("audit_logs.view"),
   async (req, res) => {
-  try {
-    const adminId = req.user.userId;
+    try {
+      const action = String(req.query.action || "").trim();
+      const targetType = String(req.query.targetType || "").trim();
+      const filterAdminId = String(req.query.adminId || "").trim();
+      const targetId = String(req.query.targetId || "").trim();
+      const search = String(req.query.search || "").trim();
+      const createdFrom = String(req.query.createdFrom || "").trim();
+      const createdTo = String(req.query.createdTo || "").trim();
+      const limitRaw = Number(req.query.limit || 100);
+      const limit = Number.isFinite(limitRaw)
+        ? Math.min(Math.max(limitRaw, 1), 200)
+        : 100;
 
+      let query = supabase
+        .from("audit_logs")
+        .select(`
+          id,
+          admin_id,
+          admin_phone,
+          action,
+          target_type,
+          target_id,
+          target_display,
+          old_value,
+          new_value,
+          ip_address,
+          user_agent,
+          created_at
+        `)
+        .order("created_at", { ascending: false })
+        .limit(limit);
 
-    const action = String(req.query.action || "").trim();
-    const targetType = String(req.query.targetType || "").trim();
-    const filterAdminId = String(req.query.adminId || "").trim();
-    const limitRaw = Number(req.query.limit || 100);
-    const limit = Number.isFinite(limitRaw)
-      ? Math.min(Math.max(limitRaw, 1), 200)
-      : 100;
+      if (action) query = query.eq("action", action);
+      if (targetType) query = query.eq("target_type", targetType);
+      if (filterAdminId) query = query.eq("admin_id", filterAdminId);
+      if (targetId) query = query.eq("target_id", targetId);
 
-    let query = supabase
-      .from("audit_logs")
-      .select(`
-        id,
-        admin_id,
-        admin_phone,
-        action,
-        target_type,
-        target_id,
-        target_display,
-        old_value,
-        new_value,
-        ip_address,
-        user_agent,
-        created_at
-      `)
-      .order("created_at", { ascending: false })
-      .limit(limit);
+      if (createdFrom) {
+        query = query.gte("created_at", new Date(createdFrom).toISOString());
+      }
 
-    if (action) query = query.eq("action", action);
-    if (targetType) query = query.eq("target_type", targetType);
-    if (filterAdminId) query = query.eq("admin_id", filterAdminId);
+      if (createdTo) {
+        const end = new Date(createdTo);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte("created_at", end.toISOString());
+      }
 
-    const { data, error } = await query;
+      if (search) {
+        query = query.or(
+          `admin_phone.ilike.%${search}%,target_display.ilike.%${search}%,target_id.eq.${search}`
+        );
+      }
 
-    if (error) {
-      console.error("admin/audit-logs error:", error);
-      return res.status(500).json({ message: "Failed to fetch audit logs" });
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("admin/audit-logs error:", error);
+        return res.status(500).json({ message: "Failed to fetch audit logs" });
+      }
+
+      return res.json({
+        logs: data || [],
+      });
+    } catch (err) {
+      console.error("admin/audit-logs crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
     }
-
-    return res.json({
-      logs: data || [],
-    });
-  } catch (err) {
-    console.error("admin/audit-logs crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
 
 // =====================================
 // GET /admin/me/permissions

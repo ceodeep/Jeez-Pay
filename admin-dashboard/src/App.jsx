@@ -77,6 +77,7 @@ function Card({ title, value }) {
 function AppShell({ onLogout }) {
   const [page, setPage] = useState("dashboard");
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
   const [kycs, setKycs] = useState([]);
   const [users, setUsers] = useState([]);
@@ -94,6 +95,7 @@ function AppShell({ onLogout }) {
 
   const [kycStatusFilter, setKycStatusFilter] = useState("all");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [userSearch, setUserSearch] = useState("");
   const [txTypeFilter, setTxTypeFilter] = useState("all");
 
   const [adjustForm, setAdjustForm] = useState({
@@ -104,11 +106,10 @@ function AppShell({ onLogout }) {
     description: "",
   });
 
-  const [message, setMessage] = useState("");
-
   async function loadDashboardStats() {
     setLoading(true);
     setMessage("");
+
     try {
       const res = await api.get("/admin/dashboard/stats");
       setStats(
@@ -134,6 +135,7 @@ function AppShell({ onLogout }) {
   async function loadKycs() {
     setLoading(true);
     setMessage("");
+
     try {
       const url =
         kycStatusFilter === "all"
@@ -152,11 +154,22 @@ function AppShell({ onLogout }) {
   async function loadUsers() {
     setLoading(true);
     setMessage("");
+
     try {
-      const url =
-        userRoleFilter === "all"
-          ? "/admin/users"
-          : `/admin/users?role=${userRoleFilter}`;
+      let url = "/admin/users";
+      const params = [];
+
+      if (userRoleFilter !== "all") {
+        params.push(`role=${userRoleFilter}`);
+      }
+
+      if (userSearch.trim()) {
+        params.push(`search=${encodeURIComponent(userSearch.trim())}`);
+      }
+
+      if (params.length > 0) {
+        url += "?" + params.join("&");
+      }
 
       const res = await api.get(url);
       setUsers(res.data.users || []);
@@ -170,6 +183,7 @@ function AppShell({ onLogout }) {
   async function loadTransactions() {
     setLoading(true);
     setMessage("");
+
     try {
       const url =
         txTypeFilter === "all"
@@ -227,7 +241,7 @@ function AppShell({ onLogout }) {
     }
   }
 
-    async function adjustWallet(e) {
+  async function adjustWallet(e) {
     e.preventDefault();
 
     if (!adjustForm.identifier.trim()) {
@@ -268,10 +282,7 @@ function AppShell({ onLogout }) {
   }
 
   useEffect(() => {
-    if (page === "dashboard") {
-      loadDashboardStats();
-    }
-
+    if (page === "dashboard") loadDashboardStats();
     if (page === "kyc") loadKycs();
     if (page === "users") loadUsers();
     if (page === "transactions") loadTransactions();
@@ -285,22 +296,28 @@ function AppShell({ onLogout }) {
   };
 
   function formatDate(value) {
-  if (!value) return "-";
+    if (!value) return "-";
 
-  const d = new Date(value);
+    const d = new Date(value);
 
-  return d.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+    return d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
 
   function openFile(path) {
     if (!path) return;
     window.open(path, "_blank");
+  }
+
+  function clearUserSearch() {
+    setUserSearch("");
+    setUserRoleFilter("all");
+    setTimeout(() => loadUsers(), 0);
   }
 
   return (
@@ -625,8 +642,56 @@ function AppShell({ onLogout }) {
                   gap: 10,
                   marginBottom: 16,
                   flexWrap: "wrap",
+                  alignItems: "center",
                 }}
               >
+                <input
+                  placeholder="Search phone / account / user ID"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") loadUsers();
+                  }}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    fontSize: 14,
+                    minWidth: 260,
+                  }}
+                />
+
+                <button
+                  onClick={loadUsers}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: "#0f172a",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Search
+                </button>
+
+                <button
+                  onClick={clearUserSearch}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Clear
+                </button>
+
                 {["all", "user", "agent", "merchant", "admin"].map((role) => (
                   <button
                     key={role}
@@ -699,7 +764,8 @@ function AppShell({ onLogout }) {
                                 Role: {item.role} • {item.account_type || "-"}
                               </div>
                               <div>
-                                Phone verified: {item.phone_verified ? "yes" : "no"}
+                                Phone verified:{" "}
+                                {item.phone_verified ? "yes" : "no"}
                               </div>
                               <div>KYC: {kycStatus}</div>
                               <div>User ID: {item.id}</div>
@@ -714,7 +780,9 @@ function AppShell({ onLogout }) {
                               flexWrap: "wrap",
                             }}
                           >
-                            <StatusBadge value={isActive ? "active" : "suspended"} />
+                            <StatusBadge
+                              value={isActive ? "active" : "suspended"}
+                            />
                             <StatusBadge value={kycStatus} />
 
                             {isActive ? (
@@ -757,7 +825,7 @@ function AppShell({ onLogout }) {
             </div>
           )}
 
-                    {page === "transactions" && (
+          {page === "transactions" && (
             <div>
               <div
                 style={{
@@ -819,12 +887,18 @@ function AppShell({ onLogout }) {
                     >
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 16 }}>
-  {item.description || "No description"}
-</div>
+                          {item.description || "No description"}
+                        </div>
 
-<div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-  Ref #{item.reference}
-</div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "#94a3b8",
+                            marginTop: 4,
+                          }}
+                        >
+                          Ref #{item.reference}
+                        </div>
 
                         <div
                           style={{
@@ -836,12 +910,8 @@ function AppShell({ onLogout }) {
                         >
                           <div>Reference: {item.reference || "-"}</div>
                           <div>Date: {formatDate(item.created_at)}</div>
-                          <div>
-                            Currency: {item.wallets?.currency || "-"}
-                          </div>
-                          <div>
-                            User ID: {item.wallets?.user_id || "-"}
-                          </div>
+                          <div>Currency: {item.wallets?.currency || "-"}</div>
+                          <div>User ID: {item.wallets?.user_id || "-"}</div>
                           <div>Wallet ID: {item.wallet_id || "-"}</div>
                         </div>
                       </div>
@@ -864,7 +934,8 @@ function AppShell({ onLogout }) {
                           }}
                         >
                           {item.type === "credit" ? "+" : "-"}
-                          {item.amount}{item.wallets?.currency}
+                          {item.amount}
+                          {item.wallets?.currency}
                         </div>
                       </div>
                     </div>
@@ -874,7 +945,7 @@ function AppShell({ onLogout }) {
             </div>
           )}
 
-                    {page === "wallet" && (
+          {page === "wallet" && (
             <div
               style={{
                 display: "grid",
@@ -909,7 +980,8 @@ function AppShell({ onLogout }) {
                     lineHeight: 1.6,
                   }}
                 >
-                  Credit or debit a user wallet manually. Use the user ID from the Users page.
+                  Credit or debit a user wallet manually. Use the user ID from
+                  the Users page.
                 </div>
 
                 <form
@@ -927,7 +999,7 @@ function AppShell({ onLogout }) {
                         color: "#334155",
                       }}
                     >
-                    Account Number / Phone / User ID
+                      Account Number / Phone / User ID
                     </label>
                     <input
                       placeholder="Enter account number, phone, or user UUID"
@@ -1166,7 +1238,10 @@ function AppShell({ onLogout }) {
                   }}
                 >
                   <div>• Credit adds funds to the selected wallet.</div>
-                  <div>• Debit removes funds and will fail if balance is insufficient.</div>
+                  <div>
+                    • Debit removes funds and will fail if balance is
+                    insufficient.
+                  </div>
                   <div>• Always include a clear reason for audit purposes.</div>
                 </div>
               </div>
