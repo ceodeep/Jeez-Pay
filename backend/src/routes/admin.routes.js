@@ -1516,6 +1516,256 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
+// =====================================
+// GET /admin/settings
+// Returns current system settings
+// =====================================
+router.get(
+  "/settings",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("settings.view"),
+  async (req, res) => {
+    try {
+      let { data, error } = await supabase
+        .from("system_settings")
+        .select(`
+          id,
+          transfer_fee_percent,
+          daily_transfer_limit,
+          kyc_required,
+          maintenance_mode,
+          supported_currencies,
+          updated_at
+        `)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("admin/settings GET error:", error);
+        return res.status(500).json({ message: "Failed to fetch settings" });
+      }
+
+      if (!data) {
+        const seed = {
+          transfer_fee_percent: 0,
+          daily_transfer_limit: 0,
+          kyc_required: true,
+          maintenance_mode: false,
+          supported_currencies: ["USDT", "SSP", "SDG", "EGP", "UGX"],
+          updated_at: new Date().toISOString(),
+        };
+
+        const inserted = await supabase
+          .from("system_settings")
+          .insert([seed])
+          .select(`
+            id,
+            transfer_fee_percent,
+            daily_transfer_limit,
+            kyc_required,
+            maintenance_mode,
+            supported_currencies,
+            updated_at
+          `)
+          .single();
+
+        if (inserted.error) {
+          console.error("admin/settings seed error:", inserted.error);
+          return res.status(500).json({ message: "Failed to initialize settings" });
+        }
+
+        data = inserted.data;
+      }
+
+      return res.json({
+        settings: {
+          id: data.id,
+          transferFeePercent: Number(data.transfer_fee_percent || 0),
+          dailyTransferLimit: Number(data.daily_transfer_limit || 0),
+          kycRequired: Boolean(data.kyc_required),
+          maintenanceMode: Boolean(data.maintenance_mode),
+          supportedCurrencies: Array.isArray(data.supported_currencies)
+            ? data.supported_currencies
+            : [],
+          updatedAt: data.updated_at,
+        },
+      });
+    } catch (err) {
+      console.error("admin/settings GET crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// POST /admin/settings
+// Body: {
+//   transferFeePercent,
+//   dailyTransferLimit,
+//   kycRequired,
+//   maintenanceMode,
+//   supportedCurrencies
+// }
+// =====================================
+router.post(
+  "/settings",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("settings.update"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const adminInfo = req.adminUser;
+
+      const transferFeePercent = Number(req.body.transferFeePercent ?? 0);
+      const dailyTransferLimit = Number(req.body.dailyTransferLimit ?? 0);
+      const kycRequired = Boolean(req.body.kycRequired);
+      const maintenanceMode = Boolean(req.body.maintenanceMode);
+      const supportedCurrenciesRaw = Array.isArray(req.body.supportedCurrencies)
+        ? req.body.supportedCurrencies
+        : [];
+
+      const supportedCurrencies = supportedCurrenciesRaw
+        .map((x) => String(x || "").trim().toUpperCase())
+        .filter(Boolean);
+
+      if (!Number.isFinite(transferFeePercent) || transferFeePercent < 0) {
+        return res.status(400).json({ message: "transferFeePercent must be a valid non-negative number" });
+      }
+
+      if (!Number.isFinite(dailyTransferLimit) || dailyTransferLimit < 0) {
+        return res.status(400).json({ message: "dailyTransferLimit must be a valid non-negative number" });
+      }
+
+      if (supportedCurrencies.length === 0) {
+        return res.status(400).json({ message: "At least one supported currency is required" });
+      }
+
+      const currentRes = await supabase
+        .from("system_settings")
+        .select(`
+          id,
+          transfer_fee_percent,
+          daily_transfer_limit,
+          kyc_required,
+          maintenance_mode,
+          supported_currencies,
+          updated_at
+        `)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (currentRes.error) {
+        console.error("admin/settings current lookup error:", currentRes.error);
+        return res.status(500).json({ message: "Failed to load current settings" });
+      }
+
+      const oldSettings = currentRes.data
+        ? {
+            transferFeePercent: Number(currentRes.data.transfer_fee_percent || 0),
+            dailyTransferLimit: Number(currentRes.data.daily_transfer_limit || 0),
+            kycRequired: Boolean(currentRes.data.kyc_required),
+            maintenanceMode: Boolean(currentRes.data.maintenance_mode),
+            supportedCurrencies: Array.isArray(currentRes.data.supported_currencies)
+              ? currentRes.data.supported_currencies
+              : [],
+            updatedAt: currentRes.data.updated_at,
+          }
+        : null;
+
+      const payload = {
+        transfer_fee_percent: transferFeePercent,
+        daily_transfer_limit: dailyTransferLimit,
+        kyc_required: kycRequired,
+        maintenance_mode: maintenanceMode,
+        supported_currencies: supportedCurrencies,
+        updated_at: new Date().toISOString(),
+      };
+
+      let saved;
+
+      if (!currentRes.data) {
+        const insertRes = await supabase
+          .from("system_settings")
+          .insert([payload])
+          .select(`
+            id,
+            transfer_fee_percent,
+            daily_transfer_limit,
+            kyc_required,
+            maintenance_mode,
+            supported_currencies,
+            updated_at
+          `)
+          .single();
+
+        if (insertRes.error) {
+          console.error("admin/settings insert error:", insertRes.error);
+          return res.status(500).json({ message: "Failed to save settings" });
+        }
+
+        saved = insertRes.data;
+      } else {
+        const updateRes = await supabase
+          .from("system_settings")
+          .update(payload)
+          .eq("id", currentRes.data.id)
+          .select(`
+            id,
+            transfer_fee_percent,
+            daily_transfer_limit,
+            kyc_required,
+            maintenance_mode,
+            supported_currencies,
+            updated_at
+          `)
+          .single();
+
+        if (updateRes.error) {
+          console.error("admin/settings update error:", updateRes.error);
+          return res.status(500).json({ message: "Failed to update settings" });
+        }
+
+        saved = updateRes.data;
+      }
+
+      const newSettings = {
+        transferFeePercent: Number(saved.transfer_fee_percent || 0),
+        dailyTransferLimit: Number(saved.daily_transfer_limit || 0),
+        kycRequired: Boolean(saved.kyc_required),
+        maintenanceMode: Boolean(saved.maintenance_mode),
+        supportedCurrencies: Array.isArray(saved.supported_currencies)
+          ? saved.supported_currencies
+          : [],
+        updatedAt: saved.updated_at,
+      };
+
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "SYSTEM_SETTINGS_UPDATED",
+        targetType: "system_settings",
+        targetId: saved.id,
+        targetDisplay: "system_settings",
+        oldValue: oldSettings,
+        newValue: newSettings,
+        req,
+      });
+
+      return res.json({
+        message: "Settings updated successfully",
+        settings: newSettings,
+      });
+    } catch (err) {
+      console.error("admin/settings POST crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
 
 
 module.exports = router;
