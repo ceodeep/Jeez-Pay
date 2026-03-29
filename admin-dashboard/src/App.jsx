@@ -18,7 +18,8 @@ function StatusBadge({ value }) {
   if (
     normalized === "approved" ||
     normalized === "credit" ||
-    normalized === "active"
+    normalized === "active" ||
+    normalized === "enabled"
   ) {
     return (
       <span style={{ ...styles, background: "#e8f7ee", color: "#18794e" }}>
@@ -38,7 +39,8 @@ function StatusBadge({ value }) {
   if (
     normalized === "rejected" ||
     normalized === "debit" ||
-    normalized === "suspended"
+    normalized === "suspended" ||
+    normalized === "disabled"
   ) {
     return (
       <span style={{ ...styles, background: "#fdecec", color: "#c0392b" }}>
@@ -89,17 +91,27 @@ function AppShell({ onLogout }) {
   const [showUserDetails, setShowUserDetails] = useState(false);
 
   const [walletViewData, setWalletViewData] = useState(null);
-const [walletViewLoading, setWalletViewLoading] = useState(false);
-const [walletIdentifier, setWalletIdentifier] = useState("");
+  const [walletViewLoading, setWalletViewLoading] = useState(false);
+  const [walletIdentifier, setWalletIdentifier] = useState("");
 
-const [settingsLoading, setSettingsLoading] = useState(false);
-const [settingsForm, setSettingsForm] = useState({
-  transferFeePercent: "",
-  dailyTransferLimit: "",
-  kycRequired: true,
-  maintenanceMode: false,
-  supportedCurrencies: "USDT,SSP,SDG,EGP,UGX",
-});
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    dailyTransferLimit: "",
+    kycRequired: true,
+    maintenanceMode: false,
+    supportedCurrencies: "USDT,SSP,SDG,EGP,UGX",
+  });
+
+  const [currencySettingsLoading, setCurrencySettingsLoading] = useState(false);
+  const [currencySettings, setCurrencySettings] = useState([]);
+  const [selectedCurrency, setSelectedCurrency] = useState("");
+  const [currencyForm, setCurrencyForm] = useState({
+    feePercent: "",
+    flatFee: "",
+    minTransfer: "",
+    maxTransfer: "",
+    isEnabled: true,
+  });
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -370,83 +382,180 @@ const [settingsForm, setSettingsForm] = useState({
   }
 
   async function loadWalletView(identifierOverride) {
-  const identifier = String(identifierOverride || walletIdentifier).trim();
+    const identifier = String(identifierOverride || walletIdentifier).trim();
 
-  if (!identifier) {
-    setMessage("Enter phone, account number, or user ID");
-    return;
+    if (!identifier) {
+      setMessage("Enter phone, account number, or user ID");
+      return;
+    }
+
+    setWalletViewLoading(true);
+    setMessage("");
+
+    try {
+      const res = await api.get(
+        `/admin/wallets/view?identifier=${encodeURIComponent(identifier)}`
+      );
+      setWalletViewData(res.data || null);
+    } catch (err) {
+      setWalletViewData(null);
+      setMessage(err?.response?.data?.message || "Failed to load wallet view");
+    } finally {
+      setWalletViewLoading(false);
+    }
   }
 
-  setWalletViewLoading(true);
-  setMessage("");
-
-  try {
-    const res = await api.get(
-      `/admin/wallets/view?identifier=${encodeURIComponent(identifier)}`
-    );
-    setWalletViewData(res.data || null);
-  } catch (err) {
+  function clearWalletView() {
+    setWalletIdentifier("");
     setWalletViewData(null);
-    setMessage(err?.response?.data?.message || "Failed to load wallet view");
-  } finally {
-    setWalletViewLoading(false);
   }
-}
 
-function clearWalletView() {
-  setWalletIdentifier("");
-  setWalletViewData(null);
-}
+  async function loadSystemSettings() {
+    setSettingsLoading(true);
+    setMessage("");
 
-async function loadSystemSettings() {
-  setSettingsLoading(true);
-  setMessage("");
+    try {
+      const res = await api.get("/admin/settings");
+      const s = res.data?.settings || {};
 
-  try {
-    const res = await api.get("/admin/settings");
-    const s = res.data?.settings || {};
+      setSettingsForm({
+        dailyTransferLimit: String(s.dailyTransferLimit ?? ""),
+        kycRequired: Boolean(s.kycRequired),
+        maintenanceMode: Boolean(s.maintenanceMode),
+        supportedCurrencies: Array.isArray(s.supportedCurrencies)
+          ? s.supportedCurrencies.join(",")
+          : "USDT,SSP,SDG,EGP,UGX",
+      });
+    } catch (err) {
+      setMessage(err?.response?.data?.message || "Failed to load settings");
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
 
-    setSettingsForm({
-      transferFeePercent: String(s.transferFeePercent ?? ""),
-      dailyTransferLimit: String(s.dailyTransferLimit ?? ""),
-      kycRequired: Boolean(s.kycRequired),
-      maintenanceMode: Boolean(s.maintenanceMode),
-      supportedCurrencies: Array.isArray(s.supportedCurrencies)
-        ? s.supportedCurrencies.join(",")
-        : "USDT,SSP,SDG,EGP,UGX",
+  async function saveSystemSettings(e) {
+    e.preventDefault();
+    setSettingsLoading(true);
+    setMessage("");
+
+    try {
+      const payload = {
+        dailyTransferLimit: Number(settingsForm.dailyTransferLimit || 0),
+        kycRequired: Boolean(settingsForm.kycRequired),
+        maintenanceMode: Boolean(settingsForm.maintenanceMode),
+        supportedCurrencies: settingsForm.supportedCurrencies
+          .split(",")
+          .map((x) => x.trim().toUpperCase())
+          .filter(Boolean),
+      };
+
+      await api.post("/admin/settings", payload);
+      setMessage("Settings saved successfully");
+    } catch (err) {
+      setMessage(err?.response?.data?.message || "Failed to save settings");
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
+
+  async function loadCurrencySettings() {
+    setCurrencySettingsLoading(true);
+    setMessage("");
+
+    try {
+      const res = await api.get("/admin/settings/currencies");
+      const rows = res.data?.currencies || [];
+      setCurrencySettings(rows);
+
+      if (rows.length > 0) {
+        const first = rows[0];
+        setSelectedCurrency(first.currency);
+        setCurrencyForm({
+          feePercent: String(first.feePercent ?? ""),
+          flatFee: String(first.flatFee ?? ""),
+          minTransfer: String(first.minTransfer ?? ""),
+          maxTransfer: String(first.maxTransfer ?? ""),
+          isEnabled: Boolean(first.isEnabled),
+        });
+      } else {
+        setSelectedCurrency("");
+        setCurrencyForm({
+          feePercent: "",
+          flatFee: "",
+          minTransfer: "",
+          maxTransfer: "",
+          isEnabled: true,
+        });
+      }
+    } catch (err) {
+      setMessage(
+        err?.response?.data?.message || "Failed to load currency settings"
+      );
+    } finally {
+      setCurrencySettingsLoading(false);
+    }
+  }
+
+  function handleSelectCurrency(currency) {
+    const found = currencySettings.find((item) => item.currency === currency);
+    setSelectedCurrency(currency);
+
+    if (!found) {
+      setCurrencyForm({
+        feePercent: "",
+        flatFee: "",
+        minTransfer: "",
+        maxTransfer: "",
+        isEnabled: true,
+      });
+      return;
+    }
+
+    setCurrencyForm({
+      feePercent: String(found.feePercent ?? ""),
+      flatFee: String(found.flatFee ?? ""),
+      minTransfer: String(found.minTransfer ?? ""),
+      maxTransfer: String(found.maxTransfer ?? ""),
+      isEnabled: Boolean(found.isEnabled),
     });
-  } catch (err) {
-    setMessage(err?.response?.data?.message || "Failed to load settings");
-  } finally {
-    setSettingsLoading(false);
   }
-}
 
-async function saveSystemSettings(e) {
-  e.preventDefault();
-  setSettingsLoading(true);
-  setMessage("");
+  async function saveCurrencySettings(e) {
+    e.preventDefault();
 
-  try {
-    const payload = {
-      transferFeePercent: Number(settingsForm.transferFeePercent || 0),
-      dailyTransferLimit: Number(settingsForm.dailyTransferLimit || 0),
-      kycRequired: Boolean(settingsForm.kycRequired),
-      maintenanceMode: Boolean(settingsForm.maintenanceMode),
-      supportedCurrencies: settingsForm.supportedCurrencies
-        .split(",")
-        .map((x) => x.trim().toUpperCase())
-        .filter(Boolean),
-    };
+    if (!selectedCurrency) {
+      setMessage("Select a currency first");
+      return;
+    }
 
-    await api.post("/admin/settings", payload);
-    setMessage("Settings saved successfully");
-  } catch (err) {
-    setMessage(err?.response?.data?.message || "Failed to save settings");
-  } finally {
-    setSettingsLoading(false);
+    setCurrencySettingsLoading(true);
+    setMessage("");
+
+    try {
+      const payload = {
+        feePercent: Number(currencyForm.feePercent || 0),
+        flatFee: Number(currencyForm.flatFee || 0),
+        minTransfer: Number(currencyForm.minTransfer || 0),
+        maxTransfer: Number(currencyForm.maxTransfer || 0),
+        isEnabled: Boolean(currencyForm.isEnabled),
+      };
+
+      await api.post(
+        `/admin/settings/currencies/${encodeURIComponent(selectedCurrency)}`,
+        payload
+      );
+
+      setMessage(`${selectedCurrency} settings saved successfully`);
+      await loadCurrencySettings();
+      handleSelectCurrency(selectedCurrency);
+    } catch (err) {
+      setMessage(
+        err?.response?.data?.message || "Failed to save currency settings"
+      );
+    } finally {
+      setCurrencySettingsLoading(false);
+    }
   }
-}
 
   useEffect(() => {
     if (page === "dashboard") loadDashboardStats();
@@ -455,6 +564,7 @@ async function saveSystemSettings(e) {
     if (page === "transactions") loadTransactions();
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
+    if (page === "currencySettings") loadCurrencySettings();
   }, [page, kycStatusFilter, userRoleFilter, txTypeFilter]);
 
   const kycCounts = {
@@ -540,8 +650,10 @@ async function saveSystemSettings(e) {
               ["users", "Users"],
               ["transactions", "Transactions"],
               ["auditLogs", "Audit Logs"],
+              ["walletView", "Wallet View"],
               ["wallet", "Wallet Adjust"],
-              ["settings", "Settings"],
+              ["settings", "System Settings"],
+              ["currencySettings", "Currency Settings"],
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -599,9 +711,10 @@ async function saveSystemSettings(e) {
                 {page === "users" && "Users"}
                 {page === "transactions" && "Transactions"}
                 {page === "auditLogs" && "Audit Logs"}
-                {page === "wallet" && "Wallet Adjustment"}
                 {page === "walletView" && "Wallet View"}
+                {page === "wallet" && "Wallet Adjustment"}
                 {page === "settings" && "System Settings"}
+                {page === "currencySettings" && "Currency Settings"}
               </h1>
               <p style={{ margin: "6px 0 0", color: "#64748b" }}>
                 Admin operations panel for JeezPay.
@@ -1286,6 +1399,8 @@ async function saveSystemSettings(e) {
                   ["USER_ACTIVATED", "User Activated"],
                   ["WALLET_ADJUSTED", "Wallet Adjusted"],
                   ["USER_ROLE_CHANGED", "Role Changed"],
+                  ["SYSTEM_SETTINGS_UPDATED", "System Settings"],
+                  ["CURRENCY_SETTINGS_UPDATED", "Currency Settings"],
                 ].map(([action, label]) => (
                   <button
                     key={action}
@@ -1351,15 +1466,23 @@ async function saveSystemSettings(e) {
                         </div>
                       </div>
 
-                      <div style={{ color: "#475569", fontSize: 14, lineHeight: 1.7 }}>
+                      <div
+                        style={{
+                          color: "#475569",
+                          fontSize: 14,
+                          lineHeight: 1.7,
+                        }}
+                      >
                         <div>
-                          <strong>Admin:</strong> {item.admin_phone || item.admin_id || "-"}
+                          <strong>Admin:</strong>{" "}
+                          {item.admin_phone || item.admin_id || "-"}
                         </div>
                         <div>
                           <strong>Target Type:</strong> {item.target_type || "-"}
                         </div>
                         <div>
-                          <strong>Target:</strong> {item.target_display || item.target_id || "-"}
+                          <strong>Target:</strong>{" "}
+                          {item.target_display || item.target_id || "-"}
                         </div>
                         <div>
                           <strong>IP:</strong> {item.ip_address || "-"}
@@ -1445,444 +1568,807 @@ async function saveSystemSettings(e) {
           )}
 
           {page === "walletView" && (
-  <div style={{ display: "grid", gap: 16, maxWidth: 920 }}>
-    <div
-      style={{
-        background: "#fff",
-        padding: 20,
-        borderRadius: 16,
-        boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          marginBottom: 8,
-          color: "#0f172a",
-        }}
-      >
-        Wallet Balance View
-      </div>
-
-      <div
-        style={{
-          color: "#64748b",
-          fontSize: 14,
-          marginBottom: 18,
-          lineHeight: 1.6,
-        }}
-      >
-        View all wallets and balances for a user by phone, account number, or user ID.
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        <input
-          placeholder="Enter phone / account / user ID"
-          value={walletIdentifier}
-          onChange={(e) => setWalletIdentifier(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") loadWalletView();
-          }}
-          style={{
-            padding: 12,
-            borderRadius: 12,
-            border: "1px solid #dbe2ea",
-            background: "#f8fafc",
-            fontSize: 14,
-            minWidth: 300,
-          }}
-        />
-
-        <button
-          onClick={() => loadWalletView()}
-          style={{
-            padding: "12px 16px",
-            borderRadius: 12,
-            border: "none",
-            background: "#0f172a",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: 700,
-          }}
-        >
-          Search
-        </button>
-
-        <button
-          onClick={clearWalletView}
-          style={{
-            padding: "12px 16px",
-            borderRadius: 12,
-            border: "1px solid #cbd5e1",
-            background: "#fff",
-            color: "#334155",
-            cursor: "pointer",
-            fontWeight: 600,
-          }}
-        >
-          Clear
-        </button>
-      </div>
-    </div>
-
-    {walletViewLoading ? (
-      <div
-        style={{
-          background: "#fff",
-          padding: 20,
-          borderRadius: 16,
-          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-        }}
-      >
-        Loading wallet view...
-      </div>
-    ) : walletViewData ? (
-      <>
-        <div
-          style={{
-            background: "#fff",
-            padding: 20,
-            borderRadius: 16,
-            boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-          }}
-        >
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
-            User
-          </div>
-          <div style={{ color: "#475569", lineHeight: 1.8, fontSize: 14 }}>
-            <div><strong>Phone:</strong> {walletViewData.user?.phone || "-"}</div>
-            <div><strong>Role:</strong> {walletViewData.user?.role || "-"}</div>
-            <div><strong>Status:</strong> {walletViewData.user?.is_active ? "active" : "suspended"}</div>
-            <div><strong>Wallet Account:</strong> {walletViewData.user?.wallet_account_number || "-"}</div>
-            <div><strong>User ID:</strong> {walletViewData.user?.id || "-"}</div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-            gap: 16,
-          }}
-        >
-          <Card
-            title="Wallet Count"
-            value={String(walletViewData.summary?.wallet_count || 0)}
-          />
-          <Card
-            title="Total Current"
-            value={renderMoney(walletViewData.summary?.total_current_balance || 0)}
-          />
-          <Card
-            title="Total Available"
-            value={renderMoney(walletViewData.summary?.total_available_balance || 0)}
-          />
-          <Card
-            title="Total Frozen"
-            value={renderMoney(walletViewData.summary?.total_frozen_balance || 0)}
-          />
-        </div>
-
-        <div
-          style={{
-            background: "#fff",
-            padding: 20,
-            borderRadius: 16,
-            boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-          }}
-        >
-          <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
-            Wallets
-          </div>
-
-          {walletViewData.wallets?.length ? (
-            <div style={{ display: "grid", gap: 12 }}>
-              {walletViewData.wallets.map((wallet) => (
+            <div style={{ display: "grid", gap: 16, maxWidth: 920 }}>
+              <div
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                }}
+              >
                 <div
-                  key={wallet.id}
                   style={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 12,
-                    padding: 14,
-                    background: "#f8fafc",
+                    fontSize: 18,
+                    fontWeight: 700,
+                    marginBottom: 8,
+                    color: "#0f172a",
                   }}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                    {wallet.currency}
-                  </div>
-                  <div style={{ color: "#475569", lineHeight: 1.8, fontSize: 14 }}>
-                    <div>Current Balance: {renderMoney(wallet.current_balance)}</div>
-                    <div>Available Balance: {renderMoney(wallet.available_balance)}</div>
-                    <div>Frozen Balance: {renderMoney(wallet.frozen_balance)}</div>
-                    <div>Pending Withdrawals: {renderMoney(wallet.pending_withdrawals)}</div>
-                    <div>Wallet ID: {wallet.id}</div>
-                  </div>
+                  Wallet Balance View
                 </div>
-              ))}
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: 14,
+                    marginBottom: 18,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  View all wallets and balances for a user by phone, account
+                  number, or user ID.
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <input
+                    placeholder="Enter phone / account / user ID"
+                    value={walletIdentifier}
+                    onChange={(e) => setWalletIdentifier(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") loadWalletView();
+                    }}
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      border: "1px solid #dbe2ea",
+                      background: "#f8fafc",
+                      fontSize: 14,
+                      minWidth: 300,
+                    }}
+                  />
+
+                  <button
+                    onClick={() => loadWalletView()}
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: 12,
+                      border: "none",
+                      background: "#0f172a",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Search
+                  </button>
+
+                  <button
+                    onClick={clearWalletView}
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: 12,
+                      border: "1px solid #cbd5e1",
+                      background: "#fff",
+                      color: "#334155",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              {walletViewLoading ? (
+                <div
+                  style={{
+                    background: "#fff",
+                    padding: 20,
+                    borderRadius: 16,
+                    boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                  }}
+                >
+                  Loading wallet view...
+                </div>
+              ) : walletViewData ? (
+                <>
+                  <div
+                    style={{
+                      background: "#fff",
+                      padding: 20,
+                      borderRadius: 16,
+                      boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 700,
+                        marginBottom: 12,
+                      }}
+                    >
+                      User
+                    </div>
+                    <div
+                      style={{ color: "#475569", lineHeight: 1.8, fontSize: 14 }}
+                    >
+                      <div>
+                        <strong>Phone:</strong>{" "}
+                        {walletViewData.user?.phone || "-"}
+                      </div>
+                      <div>
+                        <strong>Role:</strong> {walletViewData.user?.role || "-"}
+                      </div>
+                      <div>
+                        <strong>Status:</strong>{" "}
+                        {walletViewData.user?.is_active ? "active" : "suspended"}
+                      </div>
+                      <div>
+                        <strong>Wallet Account:</strong>{" "}
+                        {walletViewData.user?.wallet_account_number || "-"}
+                      </div>
+                      <div>
+                        <strong>User ID:</strong> {walletViewData.user?.id || "-"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                      gap: 16,
+                    }}
+                  >
+                    <Card
+                      title="Wallet Count"
+                      value={String(walletViewData.summary?.wallet_count || 0)}
+                    />
+                    <Card
+                      title="Total Current"
+                      value={renderMoney(
+                        walletViewData.summary?.total_current_balance || 0
+                      )}
+                    />
+                    <Card
+                      title="Total Available"
+                      value={renderMoney(
+                        walletViewData.summary?.total_available_balance || 0
+                      )}
+                    />
+                    <Card
+                      title="Total Frozen"
+                      value={renderMoney(
+                        walletViewData.summary?.total_frozen_balance || 0
+                      )}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      background: "#fff",
+                      padding: 20,
+                      borderRadius: 16,
+                      boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 18,
+                        fontWeight: 700,
+                        marginBottom: 12,
+                      }}
+                    >
+                      Wallets
+                    </div>
+
+                    {walletViewData.wallets?.length ? (
+                      <div style={{ display: "grid", gap: 12 }}>
+                        {walletViewData.wallets.map((wallet) => (
+                          <div
+                            key={wallet.id}
+                            style={{
+                              border: "1px solid #e2e8f0",
+                              borderRadius: 12,
+                              padding: 14,
+                              background: "#f8fafc",
+                            }}
+                          >
+                            <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                              {wallet.currency}
+                            </div>
+                            <div
+                              style={{
+                                color: "#475569",
+                                lineHeight: 1.8,
+                                fontSize: 14,
+                              }}
+                            >
+                              <div>
+                                Current Balance:{" "}
+                                {renderMoney(wallet.current_balance)}
+                              </div>
+                              <div>
+                                Available Balance:{" "}
+                                {renderMoney(wallet.available_balance)}
+                              </div>
+                              <div>
+                                Frozen Balance:{" "}
+                                {renderMoney(wallet.frozen_balance)}
+                              </div>
+                              <div>
+                                Pending Withdrawals:{" "}
+                                {renderMoney(wallet.pending_withdrawals)}
+                              </div>
+                              <div>Wallet ID: {wallet.id}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ color: "#64748b" }}>No wallets found.</div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div
+                  style={{
+                    background: "#fff",
+                    padding: 20,
+                    borderRadius: 16,
+                    boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                    color: "#64748b",
+                  }}
+                >
+                  Search for a user to view wallet balances.
+                </div>
+              )}
             </div>
-          ) : (
-            <div style={{ color: "#64748b" }}>No wallets found.</div>
           )}
-        </div>
-      </>
-    ) : (
-      <div
-        style={{
-          background: "#fff",
-          padding: 20,
-          borderRadius: 16,
-          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-          color: "#64748b",
-        }}
-      >
-        Search for a user to view wallet balances.
-      </div>
-    )}
-  </div>
-)}  
 
-{page === "settings" && (
-  <div style={{ display: "grid", gap: 16, maxWidth: 760 }}>
-    <div
-      style={{
-        background: "#fff",
-        padding: 20,
-        borderRadius: 16,
-        boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          marginBottom: 8,
-          color: "#0f172a",
-        }}
-      >
-        System Settings
-      </div>
-
-      <div
-        style={{
-          color: "#64748b",
-          fontSize: 14,
-          marginBottom: 18,
-          lineHeight: 1.6,
-        }}
-      >
-        Configure fee, limits, KYC requirement, maintenance mode, and supported currencies.
-      </div>
-
-      {settingsLoading ? (
-        <p>Loading settings...</p>
-      ) : (
-        <form
-          onSubmit={saveSystemSettings}
-          style={{
-            display: "grid",
-            gap: 14,
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 14,
-            }}
-          >
-            <div style={{ display: "grid", gap: 8 }}>
-              <label
+          {page === "settings" && (
+            <div style={{ display: "grid", gap: 16, maxWidth: 760 }}>
+              <div
                 style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#334155",
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
                 }}
               >
-                Transfer Fee Percent
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={settingsForm.transferFeePercent}
-                onChange={(e) =>
-                  setSettingsForm({
-                    ...settingsForm,
-                    transferFeePercent: e.target.value,
-                  })
-                }
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid #dbe2ea",
-                  background: "#f8fafc",
-                  fontSize: 14,
-                }}
-              />
-            </div>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    marginBottom: 8,
+                    color: "#0f172a",
+                  }}
+                >
+                  Global System Settings
+                </div>
 
-            <div style={{ display: "grid", gap: 8 }}>
-              <label
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: 14,
+                    marginBottom: 18,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Configure global toggles and limits only. Currency fees are
+                  managed separately in Currency Settings.
+                </div>
+
+                {settingsLoading ? (
+                  <p>Loading settings...</p>
+                ) : (
+                  <form
+                    onSubmit={saveSystemSettings}
+                    style={{
+                      display: "grid",
+                      gap: 14,
+                    }}
+                  >
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <label
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#334155",
+                        }}
+                      >
+                        Daily Transfer Limit
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={settingsForm.dailyTransferLimit}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            dailyTransferLimit: e.target.value,
+                          })
+                        }
+                        style={{
+                          padding: 12,
+                          borderRadius: 12,
+                          border: "1px solid #dbe2ea",
+                          background: "#f8fafc",
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <label
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: "#334155",
+                        }}
+                      >
+                        Supported Currencies
+                      </label>
+                      <input
+                        value={settingsForm.supportedCurrencies}
+                        onChange={(e) =>
+                          setSettingsForm({
+                            ...settingsForm,
+                            supportedCurrencies: e.target.value,
+                          })
+                        }
+                        placeholder="USDT,SSP,SDG,EGP,UGX"
+                        style={{
+                          padding: 12,
+                          borderRadius: 12,
+                          border: "1px solid #dbe2ea",
+                          background: "#f8fafc",
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 20,
+                        flexWrap: "wrap",
+                        marginTop: 6,
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          fontWeight: 600,
+                          color: "#334155",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.kycRequired}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              kycRequired: e.target.checked,
+                            })
+                          }
+                        />
+                        KYC Required
+                      </label>
+
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          fontWeight: 600,
+                          color: "#334155",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.maintenanceMode}
+                          onChange={(e) =>
+                            setSettingsForm({
+                              ...settingsForm,
+                              maintenanceMode: e.target.checked,
+                            })
+                          }
+                        />
+                        Maintenance Mode
+                      </label>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                      <button
+                        type="submit"
+                        style={{
+                          padding: "14px 18px",
+                          borderRadius: 12,
+                          border: "none",
+                          background: "#0f172a",
+                          color: "#fff",
+                          cursor: "pointer",
+                          fontWeight: 700,
+                          minWidth: 160,
+                        }}
+                      >
+                        Save Settings
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={loadSystemSettings}
+                        style={{
+                          padding: "14px 18px",
+                          borderRadius: 12,
+                          border: "1px solid #cbd5e1",
+                          background: "#fff",
+                          color: "#334155",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Reload
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
+
+          {page === "currencySettings" && (
+            <div style={{ display: "grid", gap: 16 }}>
+              <div
                 style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#334155",
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
                 }}
               >
-                Daily Transfer Limit
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={settingsForm.dailyTransferLimit}
-                onChange={(e) =>
-                  setSettingsForm({
-                    ...settingsForm,
-                    dailyTransferLimit: e.target.value,
-                  })
-                }
-                style={{
-                  padding: 12,
-                  borderRadius: 12,
-                  border: "1px solid #dbe2ea",
-                  background: "#f8fafc",
-                  fontSize: 14,
-                }}
-              />
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    marginBottom: 8,
+                    color: "#0f172a",
+                  }}
+                >
+                  Currency Settings
+                </div>
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: 14,
+                    marginBottom: 18,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Configure fee percent, flat fee, transfer limits, and enabled
+                  status for each currency.
+                </div>
+
+                {currencySettingsLoading ? (
+                  <p>Loading currency settings...</p>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "340px 1fr",
+                      gap: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 10,
+                      }}
+                    >
+                      {currencySettings.length === 0 ? (
+                        <div
+                          style={{
+                            background: "#f8fafc",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: 12,
+                            padding: 16,
+                            color: "#64748b",
+                          }}
+                        >
+                          No currency settings found.
+                        </div>
+                      ) : (
+                        currencySettings.map((item) => (
+                          <button
+                            key={item.currency}
+                            onClick={() => handleSelectCurrency(item.currency)}
+                            style={{
+                              textAlign: "left",
+                              padding: 14,
+                              borderRadius: 12,
+                              border:
+                                selectedCurrency === item.currency
+                                  ? "2px solid #0f172a"
+                                  : "1px solid #e2e8f0",
+                              background:
+                                selectedCurrency === item.currency
+                                  ? "#f8fafc"
+                                  : "#fff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: 12,
+                              }}
+                            >
+                              <div style={{ fontWeight: 700, color: "#0f172a" }}>
+                                {item.currency}
+                              </div>
+                              <StatusBadge
+                                value={item.isEnabled ? "enabled" : "disabled"}
+                              />
+                            </div>
+
+                            <div
+                              style={{
+                                fontSize: 13,
+                                color: "#64748b",
+                                marginTop: 8,
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              <div>Fee %: {renderMoney(item.feePercent)}</div>
+                              <div>Flat Fee: {renderMoney(item.flatFee)}</div>
+                              <div>
+                                Min / Max: {renderMoney(item.minTransfer)} /{" "}
+                                {renderMoney(item.maxTransfer)}
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#fff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 16,
+                        padding: 20,
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 700,
+                          marginBottom: 12,
+                          color: "#0f172a",
+                        }}
+                      >
+                        {selectedCurrency
+                          ? `${selectedCurrency} Configuration`
+                          : "Select a Currency"}
+                      </div>
+
+                      {!selectedCurrency ? (
+                        <div style={{ color: "#64748b" }}>
+                          Choose a currency from the list to edit its settings.
+                        </div>
+                      ) : (
+                        <form
+                          onSubmit={saveCurrencySettings}
+                          style={{ display: "grid", gap: 14 }}
+                        >
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 14,
+                            }}
+                          >
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <label
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#334155",
+                                }}
+                              >
+                                Fee Percent
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={currencyForm.feePercent}
+                                onChange={(e) =>
+                                  setCurrencyForm({
+                                    ...currencyForm,
+                                    feePercent: e.target.value,
+                                  })
+                                }
+                                style={{
+                                  padding: 12,
+                                  borderRadius: 12,
+                                  border: "1px solid #dbe2ea",
+                                  background: "#f8fafc",
+                                  fontSize: 14,
+                                }}
+                              />
+                            </div>
+
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <label
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#334155",
+                                }}
+                              >
+                                Flat Fee
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={currencyForm.flatFee}
+                                onChange={(e) =>
+                                  setCurrencyForm({
+                                    ...currencyForm,
+                                    flatFee: e.target.value,
+                                  })
+                                }
+                                style={{
+                                  padding: 12,
+                                  borderRadius: 12,
+                                  border: "1px solid #dbe2ea",
+                                  background: "#f8fafc",
+                                  fontSize: 14,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr",
+                              gap: 14,
+                            }}
+                          >
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <label
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#334155",
+                                }}
+                              >
+                                Minimum Transfer
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={currencyForm.minTransfer}
+                                onChange={(e) =>
+                                  setCurrencyForm({
+                                    ...currencyForm,
+                                    minTransfer: e.target.value,
+                                  })
+                                }
+                                style={{
+                                  padding: 12,
+                                  borderRadius: 12,
+                                  border: "1px solid #dbe2ea",
+                                  background: "#f8fafc",
+                                  fontSize: 14,
+                                }}
+                              />
+                            </div>
+
+                            <div style={{ display: "grid", gap: 8 }}>
+                              <label
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: "#334155",
+                                }}
+                              >
+                                Maximum Transfer
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={currencyForm.maxTransfer}
+                                onChange={(e) =>
+                                  setCurrencyForm({
+                                    ...currencyForm,
+                                    maxTransfer: e.target.value,
+                                  })
+                                }
+                                style={{
+                                  padding: 12,
+                                  borderRadius: 12,
+                                  border: "1px solid #dbe2ea",
+                                  background: "#f8fafc",
+                                  fontSize: 14,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <label
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              fontWeight: 600,
+                              color: "#334155",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={currencyForm.isEnabled}
+                              onChange={(e) =>
+                                setCurrencyForm({
+                                  ...currencyForm,
+                                  isEnabled: e.target.checked,
+                                })
+                              }
+                            />
+                            Currency Enabled
+                          </label>
+
+                          <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                            <button
+                              type="submit"
+                              style={{
+                                padding: "14px 18px",
+                                borderRadius: 12,
+                                border: "none",
+                                background: "#0f172a",
+                                color: "#fff",
+                                cursor: "pointer",
+                                fontWeight: 700,
+                                minWidth: 160,
+                              }}
+                            >
+                              Save Currency
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={loadCurrencySettings}
+                              style={{
+                                padding: "14px 18px",
+                                borderRadius: 12,
+                                border: "1px solid #cbd5e1",
+                                background: "#fff",
+                                color: "#334155",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Reload List
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-
-          <div style={{ display: "grid", gap: 8 }}>
-            <label
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#334155",
-              }}
-            >
-              Supported Currencies
-            </label>
-            <input
-              value={settingsForm.supportedCurrencies}
-              onChange={(e) =>
-                setSettingsForm({
-                  ...settingsForm,
-                  supportedCurrencies: e.target.value,
-                })
-              }
-              placeholder="USDT,SSP,SDG,EGP,UGX"
-              style={{
-                padding: 12,
-                borderRadius: 12,
-                border: "1px solid #dbe2ea",
-                background: "#f8fafc",
-                fontSize: 14,
-              }}
-            />
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              gap: 20,
-              flexWrap: "wrap",
-              marginTop: 6,
-            }}
-          >
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                fontWeight: 600,
-                color: "#334155",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={settingsForm.kycRequired}
-                onChange={(e) =>
-                  setSettingsForm({
-                    ...settingsForm,
-                    kycRequired: e.target.checked,
-                  })
-                }
-              />
-              KYC Required
-            </label>
-
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                fontWeight: 600,
-                color: "#334155",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={settingsForm.maintenanceMode}
-                onChange={(e) =>
-                  setSettingsForm({
-                    ...settingsForm,
-                    maintenanceMode: e.target.checked,
-                  })
-                }
-              />
-              Maintenance Mode
-            </label>
-          </div>
-
-          <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-            <button
-              type="submit"
-              style={{
-                padding: "14px 18px",
-                borderRadius: 12,
-                border: "none",
-                background: "#0f172a",
-                color: "#fff",
-                cursor: "pointer",
-                fontWeight: 700,
-                minWidth: 160,
-              }}
-            >
-              Save Settings
-            </button>
-
-            <button
-              type="button"
-              onClick={loadSystemSettings}
-              style={{
-                padding: "14px 18px",
-                borderRadius: 12,
-                border: "1px solid #cbd5e1",
-                background: "#fff",
-                color: "#334155",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Reload
-            </button>
-          </div>
-        </form>
-      )}
-    </div>
-  </div>
-)}
-  
-
+          )}
 
           {page === "wallet" && (
             <div
@@ -2274,11 +2760,15 @@ async function saveSystemSettings(e) {
                     boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>
+                  <div
+                    style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}
+                  >
                     Profile
                   </div>
 
-                  <div style={{ color: "#475569", lineHeight: 1.8, fontSize: 14 }}>
+                  <div
+                    style={{ color: "#475569", lineHeight: 1.8, fontSize: 14 }}
+                  >
                     <div>
                       <strong>Phone:</strong>{" "}
                       {selectedUserDetails.user?.phone || "-"}
@@ -2297,7 +2787,9 @@ async function saveSystemSettings(e) {
                     </div>
                     <div>
                       <strong>Status:</strong>{" "}
-                      {selectedUserDetails.user?.is_active ? "active" : "suspended"}
+                      {selectedUserDetails.user?.is_active
+                        ? "active"
+                        : "suspended"}
                     </div>
                     <div>
                       <strong>Wallet Account:</strong>{" "}
@@ -2322,7 +2814,9 @@ async function saveSystemSettings(e) {
                     boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>
+                  <div
+                    style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}
+                  >
                     Wallets
                   </div>
 
@@ -2378,12 +2872,20 @@ async function saveSystemSettings(e) {
                     boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>
+                  <div
+                    style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}
+                  >
                     KYC
                   </div>
 
                   {selectedUserDetails.kyc ? (
-                    <div style={{ color: "#475569", lineHeight: 1.8, fontSize: 14 }}>
+                    <div
+                      style={{
+                        color: "#475569",
+                        lineHeight: 1.8,
+                        fontSize: 14,
+                      }}
+                    >
                       <div>
                         <strong>Full Name:</strong>{" "}
                         {selectedUserDetails.kyc.full_name || "-"}
@@ -2420,7 +2922,9 @@ async function saveSystemSettings(e) {
                         }}
                       >
                         <button
-                          onClick={() => openFile(selectedUserDetails.kyc.id_path)}
+                          onClick={() =>
+                            openFile(selectedUserDetails.kyc.id_path)
+                          }
                           disabled={!selectedUserDetails.kyc.id_path}
                           style={{
                             padding: "10px 12px",
@@ -2455,7 +2959,9 @@ async function saveSystemSettings(e) {
                       </div>
                     </div>
                   ) : (
-                    <div style={{ color: "#64748b" }}>No KYC profile found.</div>
+                    <div style={{ color: "#64748b" }}>
+                      No KYC profile found.
+                    </div>
                   )}
                 </div>
 
@@ -2467,7 +2973,9 @@ async function saveSystemSettings(e) {
                     boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}>
+                  <div
+                    style={{ fontWeight: 700, fontSize: 18, marginBottom: 12 }}
+                  >
                     Recent Transactions
                   </div>
 

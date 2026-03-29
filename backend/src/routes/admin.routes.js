@@ -1520,6 +1520,10 @@ function requireSuperAdmin(req, res, next) {
 // GET /admin/settings
 // Returns current system settings
 // =====================================
+// =====================================
+// GET /admin/settings
+// Returns global system settings only
+// =====================================
 router.get(
   "/settings",
   authMiddleware,
@@ -1531,7 +1535,6 @@ router.get(
         .from("system_settings")
         .select(`
           id,
-          transfer_fee_percent,
           daily_transfer_limit,
           kyc_required,
           maintenance_mode,
@@ -1549,7 +1552,6 @@ router.get(
 
       if (!data) {
         const seed = {
-          transfer_fee_percent: 0,
           daily_transfer_limit: 0,
           kyc_required: true,
           maintenance_mode: false,
@@ -1562,7 +1564,6 @@ router.get(
           .insert([seed])
           .select(`
             id,
-            transfer_fee_percent,
             daily_transfer_limit,
             kyc_required,
             maintenance_mode,
@@ -1582,7 +1583,6 @@ router.get(
       return res.json({
         settings: {
           id: data.id,
-          transferFeePercent: Number(data.transfer_fee_percent || 0),
           dailyTransferLimit: Number(data.daily_transfer_limit || 0),
           kycRequired: Boolean(data.kyc_required),
           maintenanceMode: Boolean(data.maintenance_mode),
@@ -1602,12 +1602,12 @@ router.get(
 // =====================================
 // POST /admin/settings
 // Body: {
-//   transferFeePercent,
 //   dailyTransferLimit,
 //   kycRequired,
 //   maintenanceMode,
 //   supportedCurrencies
 // }
+// Updates global system settings only
 // =====================================
 router.post(
   "/settings",
@@ -1619,7 +1619,6 @@ router.post(
       const adminId = req.user.userId;
       const adminInfo = req.adminUser;
 
-      const transferFeePercent = Number(req.body.transferFeePercent ?? 0);
       const dailyTransferLimit = Number(req.body.dailyTransferLimit ?? 0);
       const kycRequired = Boolean(req.body.kycRequired);
       const maintenanceMode = Boolean(req.body.maintenanceMode);
@@ -1631,23 +1630,22 @@ router.post(
         .map((x) => String(x || "").trim().toUpperCase())
         .filter(Boolean);
 
-      if (!Number.isFinite(transferFeePercent) || transferFeePercent < 0) {
-        return res.status(400).json({ message: "transferFeePercent must be a valid non-negative number" });
-      }
-
       if (!Number.isFinite(dailyTransferLimit) || dailyTransferLimit < 0) {
-        return res.status(400).json({ message: "dailyTransferLimit must be a valid non-negative number" });
+        return res.status(400).json({
+          message: "dailyTransferLimit must be a valid non-negative number",
+        });
       }
 
       if (supportedCurrencies.length === 0) {
-        return res.status(400).json({ message: "At least one supported currency is required" });
+        return res.status(400).json({
+          message: "At least one supported currency is required",
+        });
       }
 
       const currentRes = await supabase
         .from("system_settings")
         .select(`
           id,
-          transfer_fee_percent,
           daily_transfer_limit,
           kyc_required,
           maintenance_mode,
@@ -1665,7 +1663,6 @@ router.post(
 
       const oldSettings = currentRes.data
         ? {
-            transferFeePercent: Number(currentRes.data.transfer_fee_percent || 0),
             dailyTransferLimit: Number(currentRes.data.daily_transfer_limit || 0),
             kycRequired: Boolean(currentRes.data.kyc_required),
             maintenanceMode: Boolean(currentRes.data.maintenance_mode),
@@ -1677,7 +1674,6 @@ router.post(
         : null;
 
       const payload = {
-        transfer_fee_percent: transferFeePercent,
         daily_transfer_limit: dailyTransferLimit,
         kyc_required: kycRequired,
         maintenance_mode: maintenanceMode,
@@ -1693,7 +1689,6 @@ router.post(
           .insert([payload])
           .select(`
             id,
-            transfer_fee_percent,
             daily_transfer_limit,
             kyc_required,
             maintenance_mode,
@@ -1715,7 +1710,6 @@ router.post(
           .eq("id", currentRes.data.id)
           .select(`
             id,
-            transfer_fee_percent,
             daily_transfer_limit,
             kyc_required,
             maintenance_mode,
@@ -1733,7 +1727,6 @@ router.post(
       }
 
       const newSettings = {
-        transferFeePercent: Number(saved.transfer_fee_percent || 0),
         dailyTransferLimit: Number(saved.daily_transfer_limit || 0),
         kycRequired: Boolean(saved.kyc_required),
         maintenanceMode: Boolean(saved.maintenance_mode),
@@ -1761,6 +1754,230 @@ router.post(
       });
     } catch (err) {
       console.error("admin/settings POST crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// GET /admin/settings/currencies
+// Returns per-currency fee and transfer settings
+// =====================================
+router.get(
+  "/settings/currencies",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("currency_settings.view"),
+  async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from("currency_settings")
+        .select(`
+          id,
+          currency,
+          fee_percent,
+          flat_fee,
+          min_transfer,
+          max_transfer,
+          is_enabled,
+          updated_at
+        `)
+        .order("currency", { ascending: true });
+
+      if (error) {
+        console.error("admin/settings/currencies GET error:", error);
+        return res.status(500).json({ message: "Failed to fetch currency settings" });
+      }
+
+      return res.json({
+        currencies: (data || []).map((row) => ({
+          id: row.id,
+          currency: row.currency,
+          feePercent: Number(row.fee_percent || 0),
+          flatFee: Number(row.flat_fee || 0),
+          minTransfer: Number(row.min_transfer || 0),
+          maxTransfer: Number(row.max_transfer || 0),
+          isEnabled: Boolean(row.is_enabled),
+          updatedAt: row.updated_at,
+        })),
+      });
+    } catch (err) {
+      console.error("admin/settings/currencies GET crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// POST /admin/settings/currencies/:currency
+// Body: {
+//   feePercent,
+//   flatFee,
+//   minTransfer,
+//   maxTransfer,
+//   isEnabled
+// }
+// =====================================
+router.post(
+  "/settings/currencies/:currency",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("currency_settings.update"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const adminInfo = req.adminUser;
+      const currency = String(req.params.currency || "").trim().toUpperCase();
+
+      if (!currency) {
+        return res.status(400).json({ message: "currency is required" });
+      }
+
+      const feePercent = Number(req.body.feePercent ?? 0);
+      const flatFee = Number(req.body.flatFee ?? 0);
+      const minTransfer = Number(req.body.minTransfer ?? 0);
+      const maxTransfer = Number(req.body.maxTransfer ?? 0);
+      const isEnabled = Boolean(req.body.isEnabled);
+
+      if (!Number.isFinite(feePercent) || feePercent < 0) {
+        return res.status(400).json({ message: "feePercent must be a valid non-negative number" });
+      }
+
+      if (!Number.isFinite(flatFee) || flatFee < 0) {
+        return res.status(400).json({ message: "flatFee must be a valid non-negative number" });
+      }
+
+      if (!Number.isFinite(minTransfer) || minTransfer < 0) {
+        return res.status(400).json({ message: "minTransfer must be a valid non-negative number" });
+      }
+
+      if (!Number.isFinite(maxTransfer) || maxTransfer < 0) {
+        return res.status(400).json({ message: "maxTransfer must be a valid non-negative number" });
+      }
+
+      if (maxTransfer > 0 && minTransfer > maxTransfer) {
+        return res.status(400).json({ message: "minTransfer cannot be greater than maxTransfer" });
+      }
+
+      const currentRes = await supabase
+        .from("currency_settings")
+        .select(`
+          id,
+          currency,
+          fee_percent,
+          flat_fee,
+          min_transfer,
+          max_transfer,
+          is_enabled,
+          updated_at
+        `)
+        .eq("currency", currency)
+        .maybeSingle();
+
+      if (currentRes.error) {
+        console.error("admin/settings/currencies current lookup error:", currentRes.error);
+        return res.status(500).json({ message: "Failed to load current currency settings" });
+      }
+
+      const oldValue = currentRes.data
+        ? {
+            currency: currentRes.data.currency,
+            feePercent: Number(currentRes.data.fee_percent || 0),
+            flatFee: Number(currentRes.data.flat_fee || 0),
+            minTransfer: Number(currentRes.data.min_transfer || 0),
+            maxTransfer: Number(currentRes.data.max_transfer || 0),
+            isEnabled: Boolean(currentRes.data.is_enabled),
+            updatedAt: currentRes.data.updated_at,
+          }
+        : null;
+
+      const payload = {
+        currency,
+        fee_percent: feePercent,
+        flat_fee: flatFee,
+        min_transfer: minTransfer,
+        max_transfer: maxTransfer,
+        is_enabled: isEnabled,
+        updated_at: new Date().toISOString(),
+      };
+
+      let saved;
+
+      if (!currentRes.data) {
+        const insertRes = await supabase
+          .from("currency_settings")
+          .insert([payload])
+          .select(`
+            id,
+            currency,
+            fee_percent,
+            flat_fee,
+            min_transfer,
+            max_transfer,
+            is_enabled,
+            updated_at
+          `)
+          .single();
+
+        if (insertRes.error) {
+          console.error("admin/settings/currencies insert error:", insertRes.error);
+          return res.status(500).json({ message: "Failed to save currency settings" });
+        }
+
+        saved = insertRes.data;
+      } else {
+        const updateRes = await supabase
+          .from("currency_settings")
+          .update(payload)
+          .eq("id", currentRes.data.id)
+          .select(`
+            id,
+            currency,
+            fee_percent,
+            flat_fee,
+            min_transfer,
+            max_transfer,
+            is_enabled,
+            updated_at
+          `)
+          .single();
+
+        if (updateRes.error) {
+          console.error("admin/settings/currencies update error:", updateRes.error);
+          return res.status(500).json({ message: "Failed to update currency settings" });
+        }
+
+        saved = updateRes.data;
+      }
+
+      const newValue = {
+        currency: saved.currency,
+        feePercent: Number(saved.fee_percent || 0),
+        flatFee: Number(saved.flat_fee || 0),
+        minTransfer: Number(saved.min_transfer || 0),
+        maxTransfer: Number(saved.max_transfer || 0),
+        isEnabled: Boolean(saved.is_enabled),
+        updatedAt: saved.updated_at,
+      };
+
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "CURRENCY_SETTINGS_UPDATED",
+        targetType: "currency_settings",
+        targetId: saved.id,
+        targetDisplay: saved.currency,
+        oldValue,
+        newValue,
+        req,
+      });
+
+      return res.json({
+        message: "Currency settings updated successfully",
+        currency: newValue,
+      });
+    } catch (err) {
+      console.error("admin/settings/currencies POST crash:", err);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

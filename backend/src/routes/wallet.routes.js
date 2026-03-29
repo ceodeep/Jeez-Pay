@@ -183,6 +183,24 @@ async function resetPinFail(userId) {
   if (error) throw error;
 }
 
+async function getCurrencySettings(currency) {
+  const { data, error } = await supabase
+    .from("currency_settings")
+    .select(`
+      currency,
+      fee_percent,
+      flat_fee,
+      min_transfer,
+      max_transfer,
+      is_enabled
+    `)
+    .eq("currency", currency)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
 // ==============================================
 
 /**
@@ -416,10 +434,44 @@ if (!senderUser || senderUser.is_active === false) {
 
     const phoneNorm = normalizePhoneSudan(phoneRaw);
 
-    const amount = Number(amountRaw);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
-    }
+   const amount = Number(amountRaw);
+if (!Number.isFinite(amount) || amount <= 0) {
+  return res.status(400).json({ message: "Invalid amount" });
+}
+
+// ✅ GET CURRENCY SETTINGS
+const settings = await getCurrencySettings(currency);
+
+if (!settings) {
+  return res.status(400).json({ message: "Currency not supported" });
+}
+
+// ❌ Disabled currency
+if (!settings.is_enabled) {
+  return res.status(400).json({ message: "This currency is currently disabled" });
+}
+
+// ❌ Below minimum
+if (settings.min_transfer && amount < settings.min_transfer) {
+  return res.status(400).json({
+    message: `Minimum transfer is ${settings.min_transfer} ${currency}`,
+  });
+}
+
+// ❌ Above maximum
+if (settings.max_transfer && amount > settings.max_transfer) {
+  return res.status(400).json({
+    message: `Maximum transfer is ${settings.max_transfer} ${currency}`,
+  });
+}
+
+// ✅ CALCULATE FEE
+const percentFee = (amount * Number(settings.fee_percent || 0)) / 100;
+const flatFee = Number(settings.flat_fee || 0);
+const fee = percentFee + flatFee;
+
+// total sender pays
+const totalDebit = amount + fee;
 
     const receiverUser = await getUserByIdentifier(phoneRaw);
     if (!receiverUser) {
@@ -449,7 +501,7 @@ if (!receiverActive || receiverActive.is_active === false) {
       p_sender_user_id: senderId,
       p_receiver_phone: phoneRaw,
       p_currency: currency,
-      p_amount: amount,
+      p_amount: totalDebit,
       p_description: description || `Sent to ${phoneNorm}`,
     });
 
@@ -464,7 +516,9 @@ if (!receiverActive || receiverActive.is_active === false) {
     return res.json({
       message: payload.message || "Transfer successful",
       currency: payload.currency || currency,
-      amount: Number(payload.amount ?? amount),
+      amount: Number(amount),
+fee: Number(fee),
+totalDebited: Number(totalDebit),
       phone: payload.phone || phoneNorm,
       reference: payload.reference || null,
     });
