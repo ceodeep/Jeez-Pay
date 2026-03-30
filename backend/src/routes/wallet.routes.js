@@ -3,6 +3,7 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const authMiddleware = require("../middlewares/auth.middleware");
 const bcrypt = require("bcrypt");
+const { requireAdmin, requirePermission } = require("../middlewares/admin.middleware");
 
 // ---- helper: check admin ----
 async function isAdmin(userId) {
