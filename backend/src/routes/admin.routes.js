@@ -4,7 +4,12 @@ const supabase = require("../config/supabase");
 const authMiddleware = require("../middlewares/auth.middleware");
 const { logAdminAction } = require("../utils/auditLogger");
 const { requireAdmin, requirePermission } = require("../middlewares/admin.middleware");
-const { getPermissionsForRole } = require("../config/adminPermissions");
+const {
+  ROLE_PERMISSIONS,
+  ALL_PERMISSIONS,
+  MANAGEABLE_ROLES,
+  getPermissionsForRole,
+} = require("../config/adminPermissions");
 
 // ---------- helper: admin only ----------
 
@@ -1405,6 +1410,28 @@ router.get(
 );
 
 // =====================================
+// GET /admin/roles/permissions
+// Returns role permission matrix
+// =====================================
+router.get(
+  "/roles/permissions",
+  authMiddleware,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      return res.json({
+        roles: ROLE_PERMISSIONS,
+        allPermissions: ALL_PERMISSIONS,
+        manageableRoles: MANAGEABLE_ROLES,
+      });
+    } catch (err) {
+      console.error("admin/roles/permissions crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
 // POST /admin/user/set-role
 // Body: { userId, role }
 // =====================================
@@ -1412,21 +1439,14 @@ router.post(
   "/user/set-role",
   authMiddleware,
   requireAdmin,
+  requirePermission("users.role.update"),
   requireSuperAdmin,
   async (req, res) => {
     try {
       const adminId = req.user.userId;
       const { userId, role } = req.body;
 
-      const allowedRoles = [
-        "admin",
-        "super_admin",
-        "finance_admin",
-        "kyc_officer",
-        "support_agent",
-        "auditor",
-        "user",
-      ];
+      const allowedRoles = MANAGEABLE_ROLES;
       
 
       if (!userId || !role) {

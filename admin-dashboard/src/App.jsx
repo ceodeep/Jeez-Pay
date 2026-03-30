@@ -81,6 +81,14 @@ function AppShell({ onLogout }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [adminProfile, setAdminProfile] = useState(null);
+  const [adminPermissions, setAdminPermissions] = useState([]);
+  const [roleMatrix, setRoleMatrix] = useState({});
+  const [allPermissions, setAllPermissions] = useState([]);
+  const [manageableRoles, setManageableRoles] = useState([]);
+  const [roleUpdateLoadingUserId, setRoleUpdateLoadingUserId] = useState("");
+  const [userRoleDrafts, setUserRoleDrafts] = useState({});
+
   const [kycs, setKycs] = useState([]);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -142,6 +150,57 @@ function AppShell({ onLogout }) {
     type: "credit",
     description: "",
   });
+
+    function hasPermission(permission) {
+    return (
+      adminPermissions.includes("*") || adminPermissions.includes(permission)
+    );
+  }
+
+  function canAccessPage(key) {
+    if (hasPermission("*")) return true;
+
+    const pagePermissions = {
+      dashboard: "dashboard.view",
+      kyc: "kyc.view",
+      users: "users.view",
+      transactions: "transactions.view",
+      auditLogs: "audit_logs.view",
+      walletView: "wallets.view",
+      wallet: "wallets.adjust",
+      settings: "settings.view",
+      currencySettings: "currency_settings.view",
+      roles: "users.role.update",
+    };
+
+    const required = pagePermissions[key];
+    return required ? hasPermission(required) : false;
+  }
+
+    async function loadMyPermissions() {
+    try {
+      const res = await api.get("/admin/me/permissions");
+      setAdminProfile(res.data?.admin || null);
+      setAdminPermissions(res.data?.permissions || []);
+    } catch (err) {
+      setMessage(
+        err?.response?.data?.message || "Failed to load admin permissions"
+      );
+    }
+  }
+
+  async function loadRoleMatrix() {
+    try {
+      const res = await api.get("/admin/roles/permissions");
+      setRoleMatrix(res.data?.roles || {});
+      setAllPermissions(res.data?.allPermissions || []);
+      setManageableRoles(res.data?.manageableRoles || []);
+    } catch (err) {
+      setMessage(
+        err?.response?.data?.message || "Failed to load role permissions"
+      );
+    }
+  }
 
   async function loadDashboardStats() {
     setLoading(true);
@@ -338,6 +397,22 @@ function AppShell({ onLogout }) {
       loadUsers();
     } catch (err) {
       setMessage(err?.response?.data?.message || "Failed to activate user");
+    }
+  }
+
+    async function updateUserRole(userId, role) {
+    if (!userId || !role) return;
+
+    try {
+      setRoleUpdateLoadingUserId(userId);
+      await api.post("/admin/user/set-role", { userId, role });
+      setMessage("User role updated successfully");
+      await loadUsers();
+      await loadAuditLogs();
+    } catch (err) {
+      setMessage(err?.response?.data?.message || "Failed to update user role");
+    } finally {
+      setRoleUpdateLoadingUserId("");
     }
   }
 
@@ -635,6 +710,35 @@ function AppShell({ onLogout }) {
     downloadCsv(url, `kyc-export-${Date.now()}.csv`);
   }
 
+    useEffect(() => {
+    loadMyPermissions();
+    loadRoleMatrix();
+  }, []);
+
+  useEffect(() => {
+    const sidebarOrder = [
+      "dashboard",
+      "kyc",
+      "users",
+      "transactions",
+      "auditLogs",
+      "walletView",
+      "wallet",
+      "settings",
+      "currencySettings",
+      "roles",
+    ];
+
+    if (adminPermissions.length === 0) return;
+
+    if (!canAccessPage(page)) {
+      const firstAllowed = sidebarOrder.find((item) => canAccessPage(item));
+      if (firstAllowed) {
+        setPage(firstAllowed);
+      }
+    }
+  }, [adminPermissions]);
+
   useEffect(() => {
     if (page === "dashboard") loadDashboardStats();
     if (page === "kyc") loadKycs();
@@ -698,6 +802,14 @@ function AppShell({ onLogout }) {
     loadAuditLogs();
   }
 
+    function handlePageChange(nextPage) {
+    if (!canAccessPage(nextPage)) {
+      setMessage("You do not have permission to access this page");
+      return;
+    }
+    setPage(nextPage);
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
       <div
@@ -721,7 +833,7 @@ function AppShell({ onLogout }) {
             JeezPay Admin
           </div>
 
-          <div style={{ display: "grid", gap: 10 }}>
+                    <div style={{ display: "grid", gap: 10 }}>
             {[
               ["dashboard", "Dashboard"],
               ["kyc", "KYC Review"],
@@ -732,25 +844,28 @@ function AppShell({ onLogout }) {
               ["wallet", "Wallet Adjust"],
               ["settings", "System Settings"],
               ["currencySettings", "Currency Settings"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setPage(key)}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "12px 14px",
-                  borderRadius: 12,
-                  border: "none",
-                  cursor: "pointer",
-                  background: page === key ? "#0f172a" : "#f1f5f9",
-                  color: page === key ? "#fff" : "#0f172a",
-                  fontWeight: 600,
-                }}
-              >
-                {label}
-              </button>
-            ))}
+              ["roles", "Roles & Permissions"],
+            ]
+              .filter(([key]) => canAccessPage(key))
+              .map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => handlePageChange(key)}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    border: "none",
+                    cursor: "pointer",
+                    background: page === key ? "#0f172a" : "#f1f5f9",
+                    color: page === key ? "#fff" : "#0f172a",
+                    fontWeight: 600,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
           </div>
 
           <div style={{ flex: 1 }} />
@@ -783,7 +898,7 @@ function AppShell({ onLogout }) {
             }}
           >
             <div>
-              <h1 style={{ margin: 0, fontSize: 28 }}>
+                            <h1 style={{ margin: 0, fontSize: 28 }}>
                 {page === "dashboard" && "Dashboard"}
                 {page === "kyc" && "KYC Review"}
                 {page === "users" && "Users"}
@@ -793,10 +908,17 @@ function AppShell({ onLogout }) {
                 {page === "wallet" && "Wallet Adjustment"}
                 {page === "settings" && "System Settings"}
                 {page === "currencySettings" && "Currency Settings"}
+                {page === "roles" && "Roles & Permissions"}
               </h1>
               <p style={{ margin: "6px 0 0", color: "#64748b" }}>
                 Admin operations panel for JeezPay.
               </p>
+                            {adminProfile ? (
+                <p style={{ margin: "8px 0 0", color: "#0f172a", fontSize: 13 }}>
+                  Signed in as {adminProfile.phone || adminProfile.id} • Role:{" "}
+                  {adminProfile.role}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -994,38 +1116,45 @@ function AppShell({ onLogout }) {
                         >
                           <StatusBadge value={item.status} />
 
-                          {isPending && (
-                            <>
-                              <button
-                                onClick={() => approveKyc(item.user_id)}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: 10,
-                                  border: "none",
-                                  background: "#dcfce7",
-                                  color: "#166534",
-                                  cursor: "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => rejectKyc(item.user_id)}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: 10,
-                                  border: "none",
-                                  background: "#fee2e2",
-                                  color: "#b91c1c",
-                                  cursor: "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
+                                                    {isPending &&
+                            (hasPermission("kyc.approve") ||
+                              hasPermission("kyc.reject")) && (
+                              <>
+                                {hasPermission("kyc.approve") && (
+                                  <button
+                                    onClick={() => approveKyc(item.user_id)}
+                                    style={{
+                                      padding: "10px 12px",
+                                      borderRadius: 10,
+                                      border: "none",
+                                      background: "#dcfce7",
+                                      color: "#166534",
+                                      cursor: "pointer",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Approve
+                                  </button>
+                                )}
+
+                                {hasPermission("kyc.reject") && (
+                                  <button
+                                    onClick={() => rejectKyc(item.user_id)}
+                                    style={{
+                                      padding: "10px 12px",
+                                      borderRadius: 10,
+                                      border: "none",
+                                      background: "#fee2e2",
+                                      color: "#b91c1c",
+                                      cursor: "pointer",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Reject
+                                  </button>
+                                )}
+                              </>
+                            )}
                         </div>
                       </div>
                     );
@@ -1036,227 +1165,302 @@ function AppShell({ onLogout }) {
           )}
 
           {page === "users" && (
-            <div>
+  <div>
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        marginBottom: 16,
+        flexWrap: "wrap",
+        alignItems: "center",
+      }}
+    >
+      <input
+        placeholder="Search phone / account / user ID"
+        value={userSearch}
+        onChange={(e) => setUserSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") loadUsers();
+        }}
+        style={{
+          padding: "10px 12px",
+          borderRadius: 10,
+          border: "1px solid #cbd5e1",
+          background: "#fff",
+          fontSize: 14,
+          minWidth: 260,
+        }}
+      />
+
+      <button
+        onClick={loadUsers}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: "none",
+          background: "#0f172a",
+          color: "#fff",
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Search
+      </button>
+
+      <button
+        onClick={clearUserSearch}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: "1px solid #cbd5e1",
+          background: "#fff",
+          color: "#0f172a",
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Clear
+      </button>
+
+      <button
+        onClick={exportUsersCsv}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: "1px solid #cbd5e1",
+          background: "#fff",
+          color: "#0f172a",
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Export CSV
+      </button>
+
+      {[
+        "all",
+        "user",
+        "agent",
+        "merchant",
+        "admin",
+        "super_admin",
+        "finance_admin",
+        "kyc_officer",
+        "support_agent",
+        "auditor",
+      ].map((role) => (
+        <button
+          key={role}
+          onClick={() => setUserRoleFilter(role)}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "none",
+            cursor: "pointer",
+            background: userRoleFilter === role ? "#0f172a" : "#e2e8f0",
+            color: userRoleFilter === role ? "#fff" : "#0f172a",
+            fontWeight: 600,
+          }}
+        >
+          {role}
+        </button>
+      ))}
+    </div>
+
+    {loading ? (
+      <p>Loading...</p>
+    ) : users.length === 0 ? (
+      <div
+        style={{
+          background: "#fff",
+          padding: 24,
+          borderRadius: 16,
+          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+          color: "#64748b",
+        }}
+      >
+        No users found.
+      </div>
+    ) : (
+      <div style={{ display: "grid", gap: 12 }}>
+        {users
+          .filter((item) => item.phone !== "COMPANY")
+          .map((item) => {
+            const isActive = item.is_active !== false;
+            const kycStatus = item.kyc_profiles?.[0]?.status || "none";
+
+            return (
               <div
+                key={item.id}
                 style={{
+                  background: "#fff",
+                  padding: 18,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
                   display: "flex",
-                  gap: 10,
-                  marginBottom: 16,
-                  flexWrap: "wrap",
+                  justifyContent: "space-between",
                   alignItems: "center",
+                  gap: 16,
                 }}
               >
-                <input
-                  placeholder="Search phone / account / user ID"
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") loadUsers();
-                  }}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #cbd5e1",
-                    background: "#fff",
-                    fontSize: 14,
-                    minWidth: 260,
-                  }}
-                />
-
-                <button
-                  onClick={loadUsers}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "#0f172a",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Search
-                </button>
-
-                <button
-                  onClick={clearUserSearch}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "1px solid #cbd5e1",
-                    background: "#fff",
-                    color: "#0f172a",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Clear
-                </button>
-
-                <button
-                  onClick={exportUsersCsv}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "1px solid #cbd5e1",
-                    background: "#fff",
-                    color: "#0f172a",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Export CSV
-                </button>
-
-                {["all", "user", "agent", "merchant", "admin"].map((role) => (
-                  <button
-                    key={role}
-                    onClick={() => setUserRoleFilter(role)}
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>
+                    {item.phone}
+                  </div>
+                  <div
                     style={{
-                      padding: "10px 14px",
+                      color: "#64748b",
+                      marginTop: 6,
+                      lineHeight: 1.6,
+                      fontSize: 14,
+                    }}
+                  >
+                    <div>
+                      Role: {item.role} • {item.account_type || "-"}
+                    </div>
+                    <div>
+                      Phone verified: {item.phone_verified ? "yes" : "no"}
+                    </div>
+                    <div>KYC: {kycStatus}</div>
+                    <div>User ID: {item.id}</div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <StatusBadge value={isActive ? "active" : "suspended"} />
+                  <StatusBadge value={kycStatus} />
+
+                  <button
+                    onClick={() => loadUserDetails(item.phone || item.id)}
+                    style={{
+                      padding: "10px 12px",
                       borderRadius: 10,
-                      border: "none",
+                      border: "1px solid #cbd5e1",
+                      background: "#fff",
+                      color: "#0f172a",
                       cursor: "pointer",
-                      background:
-                        userRoleFilter === role ? "#0f172a" : "#e2e8f0",
-                      color: userRoleFilter === role ? "#fff" : "#0f172a",
                       fontWeight: 600,
                     }}
                   >
-                    {role}
+                    View Details
                   </button>
-                ))}
+
+                  {isActive && hasPermission("users.suspend") ? (
+                    <button
+                      onClick={() => suspendUser(item.id)}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "none",
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Suspend
+                    </button>
+                  ) : null}
+
+                  {!isActive && hasPermission("users.activate") ? (
+                    <button
+                      onClick={() => activateUser(item.id)}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "none",
+                        background: "#dcfce7",
+                        color: "#166534",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Activate
+                    </button>
+                  ) : null}
+
+                  {hasPermission("users.role.update") && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <select
+                        value={userRoleDrafts[item.id] ?? item.role}
+                        onChange={(e) =>
+                          setUserRoleDrafts((prev) => ({
+                            ...prev,
+                            [item.id]: e.target.value,
+                          }))
+                        }
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: "1px solid #cbd5e1",
+                          background: "#fff",
+                          fontSize: 14,
+                        }}
+                      >
+                        {manageableRoles.map((role) => (
+                          <option key={role} value={role}>
+                            {role}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={() =>
+                          updateUserRole(
+                            item.id,
+                            userRoleDrafts[item.id] ?? item.role
+                          )
+                        }
+                        disabled={
+                          roleUpdateLoadingUserId === item.id ||
+                          (userRoleDrafts[item.id] ?? item.role) === item.role
+                        }
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: "none",
+                          background: "#0f172a",
+                          color: "#fff",
+                          cursor:
+                            roleUpdateLoadingUserId === item.id
+                              ? "not-allowed"
+                              : "pointer",
+                          fontWeight: 600,
+                          opacity:
+                            (userRoleDrafts[item.id] ?? item.role) === item.role
+                              ? 0.6
+                              : 1,
+                        }}
+                      >
+                        {roleUpdateLoadingUserId === item.id
+                          ? "Saving..."
+                          : "Update Role"}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-
-              {loading ? (
-                <p>Loading...</p>
-              ) : users.length === 0 ? (
-                <div
-                  style={{
-                    background: "#fff",
-                    padding: 24,
-                    borderRadius: 16,
-                    boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-                    color: "#64748b",
-                  }}
-                >
-                  No users found.
-                </div>
-              ) : (
-                <div style={{ display: "grid", gap: 12 }}>
-                  {users
-                    .filter((item) => item.phone !== "COMPANY")
-                    .map((item) => {
-                      const isActive = item.is_active !== false;
-                      const kycStatus = item.kyc_profiles?.[0]?.status || "none";
-
-                      return (
-                        <div
-                          key={item.id}
-                          style={{
-                            background: "#fff",
-                            padding: 18,
-                            borderRadius: 16,
-                            boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: 16,
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 16 }}>
-                              {item.phone}
-                            </div>
-                            <div
-                              style={{
-                                color: "#64748b",
-                                marginTop: 6,
-                                lineHeight: 1.6,
-                                fontSize: 14,
-                              }}
-                            >
-                              <div>
-                                Role: {item.role} • {item.account_type || "-"}
-                              </div>
-                              <div>
-                                Phone verified:{" "}
-                                {item.phone_verified ? "yes" : "no"}
-                              </div>
-                              <div>KYC: {kycStatus}</div>
-                              <div>User ID: {item.id}</div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <StatusBadge
-                              value={isActive ? "active" : "suspended"}
-                            />
-                            <StatusBadge value={kycStatus} />
-
-                            <button
-                              onClick={() =>
-                                loadUserDetails(item.phone || item.id)
-                              }
-                              style={{
-                                padding: "10px 12px",
-                                borderRadius: 10,
-                                border: "1px solid #cbd5e1",
-                                background: "#fff",
-                                color: "#0f172a",
-                                cursor: "pointer",
-                                fontWeight: 600,
-                              }}
-                            >
-                              View Details
-                            </button>
-
-                            {isActive ? (
-                              <button
-                                onClick={() => suspendUser(item.id)}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: 10,
-                                  border: "none",
-                                  background: "#fee2e2",
-                                  color: "#b91c1c",
-                                  cursor: "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Suspend
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => activateUser(item.id)}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: 10,
-                                  border: "none",
-                                  background: "#dcfce7",
-                                  color: "#166534",
-                                  cursor: "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Activate
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
-          )}
+            );
+          })}
+      </div>
+    )}
+  </div>
+)}
 
           {page === "transactions" && (
             <div>
@@ -2491,6 +2695,228 @@ function AppShell({ onLogout }) {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+                    {page === "roles" && (
+            <div style={{ display: "grid", gap: 16 }}>
+              <div
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    marginBottom: 8,
+                    color: "#0f172a",
+                  }}
+                >
+                  Role Management
+                </div>
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    fontSize: 14,
+                    marginBottom: 18,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  Assign roles from the Users page. This page shows the current
+                  permission matrix used by the admin dashboard.
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 12,
+                  }}
+                >
+                  {Object.keys(roleMatrix).length === 0 ? (
+                    <div style={{ color: "#64748b" }}>
+                      No role permissions loaded.
+                    </div>
+                  ) : (
+                    Object.entries(roleMatrix).map(([role, permissions]) => (
+                      <div
+                        key={role}
+                        style={{
+                          border: "1px solid #e2e8f0",
+                          borderRadius: 12,
+                          padding: 14,
+                          background: "#f8fafc",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 12,
+                            flexWrap: "wrap",
+                            marginBottom: 10,
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, color: "#0f172a" }}>
+                            {role}
+                          </div>
+                          <div style={{ color: "#64748b", fontSize: 13 }}>
+                            {permissions.includes("*")
+                              ? "Full access"
+                              : `${permissions.length} permissions`}
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          {permissions.includes("*") ? (
+                            <span
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 999,
+                                background: "#dbeafe",
+                                color: "#1d4ed8",
+                                fontSize: 12,
+                                fontWeight: 700,
+                              }}
+                            >
+                              *
+                            </span>
+                          ) : permissions.length === 0 ? (
+                            <span style={{ color: "#64748b", fontSize: 13 }}>
+                              No permissions
+                            </span>
+                          ) : (
+                            permissions.map((permission) => (
+                              <span
+                                key={permission}
+                                style={{
+                                  padding: "6px 10px",
+                                  borderRadius: 999,
+                                  background: "#e2e8f0",
+                                  color: "#334155",
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {permission}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  background: "#fff",
+                  padding: 20,
+                  borderRadius: 16,
+                  boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                  overflowX: "auto",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    marginBottom: 14,
+                    color: "#0f172a",
+                  }}
+                >
+                  Permission Matrix
+                </div>
+
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    minWidth: 900,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th
+                        style={{
+                          textAlign: "left",
+                          padding: 12,
+                          borderBottom: "1px solid #e2e8f0",
+                          color: "#334155",
+                          fontSize: 13,
+                        }}
+                      >
+                        Permission
+                      </th>
+                      {Object.keys(roleMatrix).map((role) => (
+                        <th
+                          key={role}
+                          style={{
+                            textAlign: "center",
+                            padding: 12,
+                            borderBottom: "1px solid #e2e8f0",
+                            color: "#334155",
+                            fontSize: 13,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {role}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allPermissions.map((permission) => (
+                      <tr key={permission}>
+                        <td
+                          style={{
+                            padding: 12,
+                            borderBottom: "1px solid #f1f5f9",
+                            fontWeight: 600,
+                            color: "#0f172a",
+                          }}
+                        >
+                          {permission}
+                        </td>
+
+                        {Object.keys(roleMatrix).map((role) => {
+                          const rolePermissions = roleMatrix[role] || [];
+                          const allowed =
+                            rolePermissions.includes("*") ||
+                            rolePermissions.includes(permission);
+
+                          return (
+                            <td
+                              key={`${permission}-${role}`}
+                              style={{
+                                padding: 12,
+                                textAlign: "center",
+                                borderBottom: "1px solid #f1f5f9",
+                                color: allowed ? "#166534" : "#94a3b8",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {allowed ? "✓" : "—"}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

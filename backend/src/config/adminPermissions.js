@@ -4,13 +4,16 @@ const ROLE_PERMISSIONS = {
   super_admin: ["*"],
 
   finance_admin: [
-  "dashboard.view",
-  "users.view",
-  "wallets.view",
-  "transactions.view",
-  "wallets.adjust",
-  "audit_logs.view",
-],
+    "dashboard.view",
+    "users.view",
+    "wallets.view",
+    "transactions.view",
+    "wallets.adjust",
+    "audit_logs.view",
+    "settings.view",
+    "currency_settings.view",
+    "currency_settings.update",
+  ],
 
   kyc_officer: [
     "dashboard.view",
@@ -21,24 +24,57 @@ const ROLE_PERMISSIONS = {
   ],
 
   support_agent: [
-  "dashboard.view",
-  "users.view",
-  "wallets.view",
-  "users.activate",
-  "users.suspend",
-  "transactions.view",
-  "audit_logs.view",
-],
+    "dashboard.view",
+    "users.view",
+    "wallets.view",
+    "users.activate",
+    "users.suspend",
+    "transactions.view",
+    "audit_logs.view",
+  ],
 
   auditor: [
+    "dashboard.view",
+    "users.view",
+    "wallets.view",
+    "transactions.view",
+    "kyc.view",
+    "audit_logs.view",
+    "settings.view",
+    "currency_settings.view",
+  ],
+
+  user: [],
+};
+
+const ALL_PERMISSIONS = [
   "dashboard.view",
   "users.view",
+  "users.activate",
+  "users.suspend",
+  "users.role.update",
   "wallets.view",
+  "wallets.adjust",
   "transactions.view",
   "kyc.view",
+  "kyc.approve",
+  "kyc.reject",
   "audit_logs.view",
-],
-};
+  "settings.view",
+  "settings.update",
+  "currency_settings.view",
+  "currency_settings.update",
+];
+
+const MANAGEABLE_ROLES = [
+  "user",
+  "auditor",
+  "support_agent",
+  "kyc_officer",
+  "finance_admin",
+  "super_admin",
+  "admin",
+];
 
 function getPermissionsForRole(role) {
   return ROLE_PERMISSIONS[role] || [];
@@ -51,6 +87,8 @@ function hasPermission(role, permission) {
 
 module.exports = {
   ROLE_PERMISSIONS,
+  ALL_PERMISSIONS,
+  MANAGEABLE_ROLES,
   getPermissionsForRole,
   hasPermission,
 };
