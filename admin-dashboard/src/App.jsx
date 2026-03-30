@@ -557,6 +557,84 @@ function AppShell({ onLogout }) {
     }
   }
 
+  async function downloadCsv(url, filename) {
+    try {
+      setMessage("");
+      const res = await api.get(url, { responseType: "blob" });
+
+      const blob = new Blob([res.data], { type: "text/csv;charset=utf-8;" });
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      setMessage(err?.response?.data?.message || "Failed to export CSV");
+    }
+  }
+
+  function exportUsersCsv() {
+    const params = [];
+
+    if (userRoleFilter !== "all") {
+      params.push(`role=${encodeURIComponent(userRoleFilter)}`);
+    }
+
+    if (userSearch.trim()) {
+      params.push(`search=${encodeURIComponent(userSearch.trim())}`);
+    }
+
+    const url =
+      params.length > 0
+        ? `/admin/export/users.csv?${params.join("&")}`
+        : "/admin/export/users.csv";
+
+    downloadCsv(url, `users-export-${Date.now()}.csv`);
+  }
+
+  function exportTransactionsCsv() {
+    const params = [];
+
+    if (txTypeFilter !== "all") {
+      params.push(`type=${encodeURIComponent(txTypeFilter)}`);
+    }
+
+    if (txSearch.trim()) {
+      params.push(`search=${encodeURIComponent(txSearch.trim())}`);
+    }
+
+    if (txReference.trim()) {
+      params.push(`reference=${encodeURIComponent(txReference.trim())}`);
+    }
+
+    const url =
+      params.length > 0
+        ? `/admin/export/transactions.csv?${params.join("&")}`
+        : "/admin/export/transactions.csv";
+
+    downloadCsv(url, `transactions-export-${Date.now()}.csv`);
+  }
+
+  function exportKycCsv() {
+    const params = [];
+
+    if (kycStatusFilter !== "all") {
+      params.push(`status=${encodeURIComponent(kycStatusFilter)}`);
+    }
+
+    const url =
+      params.length > 0
+        ? `/admin/export/kyc.csv?${params.join("&")}`
+        : "/admin/export/kyc.csv";
+
+    downloadCsv(url, `kyc-export-${Date.now()}.csv`);
+  }
+
   useEffect(() => {
     if (page === "dashboard") loadDashboardStats();
     if (page === "kyc") loadKycs();
@@ -790,6 +868,21 @@ function AppShell({ onLogout }) {
                     {label}
                   </button>
                 ))}
+
+                <button
+                  onClick={exportKycCsv}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Export CSV
+                </button>
               </div>
 
               {loading ? (
@@ -1000,6 +1093,21 @@ function AppShell({ onLogout }) {
                   Clear
                 </button>
 
+                <button
+                  onClick={exportUsersCsv}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Export CSV
+                </button>
+
                 {["all", "user", "agent", "merchant", "admin"].map((role) => (
                   <button
                     key={role}
@@ -1094,7 +1202,9 @@ function AppShell({ onLogout }) {
                             <StatusBadge value={kycStatus} />
 
                             <button
-                              onClick={() => loadUserDetails(item.phone || item.id)}
+                              onClick={() =>
+                                loadUserDetails(item.phone || item.id)
+                              }
                               style={{
                                 padding: "10px 12px",
                                 borderRadius: 10,
@@ -1221,6 +1331,21 @@ function AppShell({ onLogout }) {
                   }}
                 >
                   Clear
+                </button>
+
+                <button
+                  onClick={exportTransactionsCsv}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Export CSV
                 </button>
 
                 {["all", "credit", "debit"].map((type) => (
