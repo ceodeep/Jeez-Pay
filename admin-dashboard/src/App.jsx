@@ -94,6 +94,12 @@ function AppShell({ onLogout }) {
   const [transactions, setTransactions] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
 
+    const [withdrawals, setWithdrawals] = useState([]);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
+  const [withdrawStatusFilter, setWithdrawStatusFilter] = useState("all");
+  const [withdrawSearch, setWithdrawSearch] = useState("");
+  const [withdrawActionLoadingId, setWithdrawActionLoadingId] = useState("");
+
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
   const [userDetailsLoading, setUserDetailsLoading] = useState(false);
   const [showUserDetails, setShowUserDetails] = useState(false);
@@ -160,11 +166,12 @@ function AppShell({ onLogout }) {
   function canAccessPage(key) {
     if (hasPermission("*")) return true;
 
-    const pagePermissions = {
+        const pagePermissions = {
       dashboard: "dashboard.view",
       kyc: "kyc.view",
       users: "users.view",
       transactions: "transactions.view",
+      withdrawals: "transactions.view",
       auditLogs: "audit_logs.view",
       walletView: "wallets.view",
       wallet: "wallets.adjust",
@@ -357,6 +364,71 @@ function AppShell({ onLogout }) {
       setMessage(err?.response?.data?.message || "Failed to load audit logs");
     } finally {
       setLoading(false);
+    }
+  }
+
+    async function loadWithdrawals() {
+    setWithdrawalsLoading(true);
+    setMessage("");
+
+    try {
+      const params = [];
+
+      if (withdrawStatusFilter !== "all") {
+        params.push(`status=${encodeURIComponent(withdrawStatusFilter)}`);
+      }
+
+      if (withdrawSearch.trim()) {
+        params.push(`search=${encodeURIComponent(withdrawSearch.trim())}`);
+      }
+
+      const url =
+        params.length > 0
+          ? `/admin/withdrawals?${params.join("&")}`
+          : "/admin/withdrawals";
+
+      const res = await api.get(url);
+      setWithdrawals(res.data?.withdrawals || []);
+    } catch (err) {
+      setMessage(err?.response?.data?.message || "Failed to load withdrawals");
+    } finally {
+      setWithdrawalsLoading(false);
+    }
+  }
+
+  async function approveWithdrawal(withdrawalId) {
+    if (!withdrawalId) return;
+
+    try {
+      setWithdrawActionLoadingId(withdrawalId);
+      await api.post(`/admin/withdrawals/${withdrawalId}/approve`);
+      setMessage("Withdrawal approved successfully");
+      await loadWithdrawals();
+      await loadAuditLogs();
+    } catch (err) {
+      setMessage(
+        err?.response?.data?.message || "Failed to approve withdrawal"
+      );
+    } finally {
+      setWithdrawActionLoadingId("");
+    }
+  }
+
+  async function rejectWithdrawal(withdrawalId) {
+    if (!withdrawalId) return;
+
+    try {
+      setWithdrawActionLoadingId(withdrawalId);
+      await api.post(`/admin/withdrawals/${withdrawalId}/reject`);
+      setMessage("Withdrawal rejected successfully");
+      await loadWithdrawals();
+      await loadAuditLogs();
+    } catch (err) {
+      setMessage(
+        err?.response?.data?.message || "Failed to reject withdrawal"
+      );
+    } finally {
+      setWithdrawActionLoadingId("");
     }
   }
 
@@ -716,11 +788,12 @@ function AppShell({ onLogout }) {
   }, []);
 
   useEffect(() => {
-    const sidebarOrder = [
+        const sidebarOrder = [
       "dashboard",
       "kyc",
       "users",
       "transactions",
+      "withdrawals",
       "auditLogs",
       "walletView",
       "wallet",
@@ -739,16 +812,16 @@ function AppShell({ onLogout }) {
     }
   }, [adminPermissions]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (page === "dashboard") loadDashboardStats();
     if (page === "kyc") loadKycs();
     if (page === "users") loadUsers();
     if (page === "transactions") loadTransactions();
+    if (page === "withdrawals") loadWithdrawals();
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
     if (page === "currencySettings") loadCurrencySettings();
-  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter]);
-
+  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter, withdrawStatusFilter]);
   const kycCounts = {
     all: kycs.length,
     pending: kycs.filter((k) => k.status === "pending").length,
@@ -779,9 +852,17 @@ function AppShell({ onLogout }) {
   }
 
   function openFile(path) {
-    if (!path) return;
-    window.open(path, "_blank");
+  if (!path) return;
+
+  const value = String(path).trim();
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    window.open(value, "_blank", "noopener,noreferrer");
+    return;
   }
+
+  setMessage("File URL is invalid. Backend must return a signed file URL.");
+}
 
   function clearUserSearch() {
     setUserSearch("");
@@ -800,6 +881,12 @@ function AppShell({ onLogout }) {
     setAuditSearch("");
     setAuditActionFilter("all");
     loadAuditLogs();
+  }
+
+    function clearWithdrawSearch() {
+    setWithdrawSearch("");
+    setWithdrawStatusFilter("all");
+    loadWithdrawals();
   }
 
     function handlePageChange(nextPage) {
@@ -839,6 +926,7 @@ function AppShell({ onLogout }) {
               ["kyc", "KYC Review"],
               ["users", "Users"],
               ["transactions", "Transactions"],
+              ["withdrawals", "Withdrawals"],
               ["auditLogs", "Audit Logs"],
               ["walletView", "Wallet View"],
               ["wallet", "Wallet Adjust"],
@@ -903,6 +991,7 @@ function AppShell({ onLogout }) {
                 {page === "kyc" && "KYC Review"}
                 {page === "users" && "Users"}
                 {page === "transactions" && "Transactions"}
+                {page === "withdrawals" && "Withdrawals"}
                 {page === "auditLogs" && "Audit Logs"}
                 {page === "walletView" && "Wallet View"}
                 {page === "wallet" && "Wallet Adjustment"}
@@ -1891,6 +1980,210 @@ function AppShell({ onLogout }) {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+                    {page === "withdrawals" && (
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  marginBottom: 16,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  placeholder="Search user ID / wallet ID / destination"
+                  value={withdrawSearch}
+                  onChange={(e) => setWithdrawSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") loadWithdrawals();
+                  }}
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    fontSize: 14,
+                    minWidth: 280,
+                  }}
+                />
+
+                <button
+                  onClick={loadWithdrawals}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: "#0f172a",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Search
+                </button>
+
+                <button
+                  onClick={clearWithdrawSearch}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Clear
+                </button>
+
+                {["all", "pending", "approved", "rejected"].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setWithdrawStatusFilter(status)}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: "none",
+                      cursor: "pointer",
+                      background:
+                        withdrawStatusFilter === status ? "#0f172a" : "#e2e8f0",
+                      color:
+                        withdrawStatusFilter === status ? "#fff" : "#0f172a",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+
+              {withdrawalsLoading ? (
+                <p>Loading...</p>
+              ) : withdrawals.length === 0 ? (
+                <div
+                  style={{
+                    background: "#fff",
+                    padding: 24,
+                    borderRadius: 16,
+                    boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                    color: "#64748b",
+                  }}
+                >
+                  No withdrawal requests found.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 12 }}>
+                  {withdrawals.map((item) => {
+                    const isPending =
+                      String(item.status || "").toLowerCase() === "pending";
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          background: "#fff",
+                          padding: 18,
+                          borderRadius: 16,
+                          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 16,
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 16 }}>
+                            {renderMoney(item.amount)} {item.currency}
+                          </div>
+
+                          <div
+                            style={{
+                              color: "#64748b",
+                              marginTop: 6,
+                              lineHeight: 1.7,
+                              fontSize: 14,
+                            }}
+                          >
+                            <div>User ID: {item.user_id || "-"}</div>
+                            <div>Wallet ID: {item.wallet_id || "-"}</div>
+                            <div>Method: {item.method || "-"}</div>
+                            <div>Destination: {item.destination || "-"}</div>
+                            <div>TX Hash: {item.tx_hash || "-"}</div>
+                            <div>Admin ID: {item.admin_id || "-"}</div>
+                            <div>Created: {formatDate(item.created_at)}</div>
+                            <div>
+                              Processed: {formatDate(item.processed_at)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            flexWrap: "wrap",
+                            justifyContent: "flex-end",
+                          }}
+                        >
+                          <StatusBadge value={item.status} />
+
+                          {isPending && hasPermission("wallets.adjust") && (
+                            <>
+                              <button
+                                onClick={() => approveWithdrawal(item.id)}
+                                disabled={withdrawActionLoadingId === item.id}
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: 10,
+                                  border: "none",
+                                  background: "#dcfce7",
+                                  color: "#166534",
+                                  cursor:
+                                    withdrawActionLoadingId === item.id
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {withdrawActionLoadingId === item.id
+                                  ? "Processing..."
+                                  : "Approve"}
+                              </button>
+
+                              <button
+                                onClick={() => rejectWithdrawal(item.id)}
+                                disabled={withdrawActionLoadingId === item.id}
+                                style={{
+                                  padding: "10px 12px",
+                                  borderRadius: 10,
+                                  border: "none",
+                                  background: "#fee2e2",
+                                  color: "#b91c1c",
+                                  cursor:
+                                    withdrawActionLoadingId === item.id
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {withdrawActionLoadingId === item.id
+                                  ? "Processing..."
+                                  : "Reject"}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -3324,6 +3617,9 @@ function AppShell({ onLogout }) {
                       <strong>Phone:</strong>{" "}
                       {selectedUserDetails.user?.phone || "-"}
                     </div>
+                    <div>
+  <strong>Full Name:</strong> {selectedUserDetails.user?.full_name || "-"}
+</div>
                     <div>
                       <strong>Role:</strong>{" "}
                       {selectedUserDetails.user?.role || "-"}

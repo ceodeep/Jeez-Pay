@@ -53,22 +53,23 @@ async function seedWalletsForUser(userId) {
 router.post("/signup/request-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
-    const password = String(req.body.password || "");
-    const accountType = String(req.body.accountType || "").trim();
-    const countryCode = String(req.body.countryCode || "").trim();
-    const termsAccepted = !!req.body.termsAccepted;
+const fullName = String(req.body.fullName || "").trim();
+const password = String(req.body.password || "");
+const accountType = String(req.body.accountType || "").trim();
+const countryCode = String(req.body.countryCode || "").trim();
+const termsAccepted = !!req.body.termsAccepted;
 
     if (!phone || !password || !accountType || !countryCode) {
       return res.status(400).json({
-        message: "phone, password, accountType and countryCode are required",
+        message: "phone, fullName, password, accountType and countryCode are required",
       });
     }
 
-    if (password.length < 4) {
-      return res.status(400).json({
-        message: "Password must be at least 4 characters",
-      });
-    }
+    if (password.length < 8) {
+  return res.status(400).json({
+    message: "Password must be at least 8 characters",
+  });
+}
 
     if (!termsAccepted) {
       return res.status(400).json({
@@ -110,15 +111,16 @@ router.post("/signup/request-otp", async (req, res) => {
 router.post("/signup/verify-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
-    const otp = String(req.body.otp || "").trim();
-    const password = String(req.body.password || "");
-    const accountType = String(req.body.accountType || "").trim();
-    const countryCode = String(req.body.countryCode || "").trim();
-    const termsAccepted = !!req.body.termsAccepted;
+const fullName = String(req.body.fullName || "").trim();
+const otp = String(req.body.otp || "").trim();
+const password = String(req.body.password || "");
+const accountType = String(req.body.accountType || "").trim();
+const countryCode = String(req.body.countryCode || "").trim();
+const termsAccepted = !!req.body.termsAccepted;
 
     if (!phone || !otp || !password || !accountType || !countryCode) {
       return res.status(400).json({
-        message: "phone, otp, password, accountType and countryCode are required",
+        message: "phone, fullName, otp, password, accountType and countryCode are required",
       });
     }
 
@@ -166,6 +168,7 @@ router.post("/signup/verify-otp", async (req, res) => {
         .from("users")
         .insert([{
           phone,
+          fullName: fullName,
           password_hash: passwordHash,
           phone_verified: true,
           account_type: accountType,
@@ -193,6 +196,7 @@ router.post("/signup/verify-otp", async (req, res) => {
       const { data: updatedUser, error: updateErr } = await supabase
         .from("users")
         .update({
+          fullName: fullName,
           password_hash: passwordHash,
           phone_verified: true,
           account_type: accountType,
@@ -326,6 +330,17 @@ router.post("/set-pin", authMiddleware, async (req, res) => {
     if (!/^\d{4}$/.test(pin)) {
       return res.status(400).json({ message: "PIN must be exactly 4 digits" });
     }
+    if (
+  pin === "0000" ||
+  pin === "1111" ||
+  pin === "1234" ||
+  pin === "4321" ||
+  /^(\d)\1{3}$/.test(pin)
+) {
+  return res.status(400).json({
+    message: "Choose a stronger PIN",
+  });
+}
 
     const pinHash = await bcrypt.hash(pin, 10);
 
@@ -460,7 +475,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone, role, account_type, country_code, phone_verified, terms_accepted")
+      .select("id, phone, full_name, role, account_type, country_code, phone_verified, terms_accepted")
       .eq("id", userId)
       .maybeSingle();
 
@@ -524,9 +539,9 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
       });
     }
 
-    if (newPassword.length < 4) {
+    if (newPassword.length < 8) {
       return res.status(400).json({
-        message: "Password must be at least 4 characters",
+        message: "Password must be at least 8 characters",
       });
     }
 

@@ -765,120 +765,7 @@ router.get("/agent/operations", authMiddleware, async (req, res) => {
 // ?createdFrom=2026-01-01
 // ?createdTo=2026-01-31
 // =====================================
-router.get(
-  "/export/users.csv",
-  authMiddleware,
-  requireAdmin,
-  requirePermission("users.view"),
-  async (req, res) => {
-    try {
-      const role = String(req.query.role || "").trim().toLowerCase();
-      const search = String(req.query.search || "").trim();
-      const isActive = String(req.query.isActive || "").trim().toLowerCase();
-      const phoneVerified = String(req.query.phoneVerified || "").trim().toLowerCase();
-      const accountType = String(req.query.accountType || "").trim().toLowerCase();
-      const createdFrom = String(req.query.createdFrom || "").trim();
-      const createdTo = String(req.query.createdTo || "").trim();
 
-      let query = supabase
-        .from("users")
-        .select(`
-          id,
-          phone,
-          role,
-          account_type,
-          phone_verified,
-          is_active,
-          created_at,
-          wallet_account_number
-        `)
-        .order("created_at", { ascending: false });
-
-      if (role) query = query.eq("role", role);
-      if (accountType) query = query.eq("account_type", accountType);
-
-      if (isActive === "true") query = query.eq("is_active", true);
-      if (isActive === "false") query = query.eq("is_active", false);
-
-      if (phoneVerified === "true") query = query.eq("phone_verified", true);
-      if (phoneVerified === "false") query = query.eq("phone_verified", false);
-
-      if (createdFrom) {
-        query = query.gte("created_at", new Date(createdFrom).toISOString());
-      }
-
-      if (createdTo) {
-        const end = new Date(createdTo);
-        end.setHours(23, 59, 59, 999);
-        query = query.lte("created_at", end.toISOString());
-      }
-
-      if (search) {
-        const normalized = normalizePhone(search);
-        const searchDigitsOnly = /^\d+$/.test(search);
-
-        if (searchDigitsOnly) {
-          const acc = Number(search);
-          if (Number.isSafeInteger(acc)) {
-            query = query.or(
-              `phone.ilike.%${search}%,phone.ilike.%${normalized}%,wallet_account_number.eq.${acc},id.eq.${search}`
-            );
-          } else {
-            query = query.or(
-              `phone.ilike.%${search}%,phone.ilike.%${normalized}%,id.eq.${search}`
-            );
-          }
-        } else {
-          query = query.or(
-            `phone.ilike.%${search}%,phone.ilike.%${normalized}%,id.eq.${search}`
-          );
-        }
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("admin/export/users.csv error:", error);
-        return res.status(500).json({ message: "Failed to export users" });
-      }
-
-      const rows = (data || []).map((item) => ({
-        id: item.id,
-        phone: item.phone,
-        role: item.role,
-        account_type: item.account_type,
-        phone_verified: item.phone_verified,
-        is_active: item.is_active,
-        wallet_account_number: item.wallet_account_number,
-        created_at: item.created_at,
-      }));
-
-      const headers = [
-        "id",
-        "phone",
-        "role",
-        "account_type",
-        "phone_verified",
-        "is_active",
-        "wallet_account_number",
-        "created_at",
-      ];
-
-      const csv = toCsv(headers, rows);
-
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="users-export-${Date.now()}.csv"`
-      );
-
-      return res.status(200).send(csv);
-    } catch (err) {
-      console.error("admin/export/users.csv crash:", err);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  }
-);
 
 // =====================================
 // GET /admin/export/transactions.csv
@@ -892,111 +779,7 @@ router.get(
 // ?minAmount=10
 // ?maxAmount=500
 // =====================================
-router.get(
-  "/export/transactions.csv",
-  authMiddleware,
-  requireAdmin,
-  requirePermission("transactions.view"),
-  async (req, res) => {
-    try {
-      const currency = String(req.query.currency || "").trim().toUpperCase();
-      const type = String(req.query.type || "").trim().toLowerCase();
-      const reference = String(req.query.reference || "").trim();
-      const search = String(req.query.search || "").trim();
-      const createdFrom = String(req.query.createdFrom || "").trim();
-      const createdTo = String(req.query.createdTo || "").trim();
-      const minAmount = Number(req.query.minAmount);
-      const maxAmount = Number(req.query.maxAmount);
 
-      let userIdFilter = null;
-      if (search) {
-        const matchedUser = await getUserByAdminIdentifier(search);
-        if (matchedUser) {
-          userIdFilter = matchedUser.id;
-        }
-      }
-
-      let query = supabase
-        .from("transactions")
-        .select(`
-          id,
-          wallet_id,
-          type,
-          amount,
-          description,
-          reference,
-          created_at,
-          wallets!inner (
-            user_id,
-            currency
-          )
-        `)
-        .order("created_at", { ascending: false });
-
-      if (type) query = query.eq("type", type);
-      if (currency) query = query.eq("wallets.currency", currency);
-      if (reference) query = query.ilike("reference", `%${reference}%`);
-
-      if (createdFrom) {
-        query = query.gte("created_at", new Date(createdFrom).toISOString());
-      }
-
-      if (createdTo) {
-        const end = new Date(createdTo);
-        end.setHours(23, 59, 59, 999);
-        query = query.lte("created_at", end.toISOString());
-      }
-
-      if (Number.isFinite(minAmount)) query = query.gte("amount", minAmount);
-      if (Number.isFinite(maxAmount)) query = query.lte("amount", maxAmount);
-      if (userIdFilter) query = query.eq("wallets.user_id", userIdFilter);
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("admin/export/transactions.csv error:", error);
-        return res.status(500).json({ message: "Failed to export transactions" });
-      }
-
-      const rows = (data || []).map((item) => ({
-        id: item.id,
-        wallet_id: item.wallet_id,
-        user_id: item.wallets?.user_id || "",
-        currency: item.wallets?.currency || "",
-        type: item.type,
-        amount: item.amount,
-        description: item.description,
-        reference: item.reference,
-        created_at: item.created_at,
-      }));
-
-      const headers = [
-        "id",
-        "wallet_id",
-        "user_id",
-        "currency",
-        "type",
-        "amount",
-        "description",
-        "reference",
-        "created_at",
-      ];
-
-      const csv = toCsv(headers, rows);
-
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="transactions-export-${Date.now()}.csv"`
-      );
-
-      return res.status(200).send(csv);
-    } catch (err) {
-      console.error("admin/export/transactions.csv crash:", err);
-      return res.status(500).json({ message: "Internal server error" });
-    }
-  }
-);
 
 // =====================================
 // GET /admin/export/kyc.csv
@@ -1006,121 +789,53 @@ router.get(
 // ?createdFrom=2026-01-01
 // ?createdTo=2026-01-31
 // =====================================
-router.get(
-  "/export/kyc.csv",
-  authMiddleware,
-  requireAdmin,
-  requirePermission("kyc.view"),
-  async (req, res) => {
-    try {
-      const status = String(req.query.status || "").trim().toLowerCase();
-      const search = String(req.query.search || "").trim();
-      const createdFrom = String(req.query.createdFrom || "").trim();
-      const createdTo = String(req.query.createdTo || "").trim();
 
-      let userIdFilter = null;
 
-      if (search) {
-        const matchedUser = await getUserByAdminIdentifier(search);
-        if (!matchedUser) {
-          const csv = toCsv(
-            [
-              "user_id",
-              "full_name",
-              "dob",
-              "address",
-              "status",
-              "id_path",
-              "selfie_path",
-              "created_at",
-              "updated_at",
-            ],
-            []
-          );
+/**
+ * POST /wallet/withdraw
+ * User creates withdrawal request
+ */
+router.post("/withdraw", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { amount, currency, method, destination } = req.body;
 
-          res.setHeader("Content-Type", "text/csv; charset=utf-8");
-          res.setHeader(
-            "Content-Disposition",
-            `attachment; filename="kyc-export-${Date.now()}.csv"`
-          );
-          return res.status(200).send(csv);
-        }
-        userIdFilter = matchedUser.id;
-      }
-
-      let query = supabase
-        .from("kyc_profiles")
-        .select(`
-          user_id,
-          full_name,
-          dob,
-          address,
-          id_path,
-          selfie_path,
-          status,
-          created_at,
-          updated_at
-        `)
-        .order("created_at", { ascending: false });
-
-      if (status) query = query.eq("status", status);
-      if (userIdFilter) query = query.eq("user_id", userIdFilter);
-
-      if (createdFrom) {
-        query = query.gte("created_at", new Date(createdFrom).toISOString());
-      }
-
-      if (createdTo) {
-        const end = new Date(createdTo);
-        end.setHours(23, 59, 59, 999);
-        query = query.lte("created_at", end.toISOString());
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("admin/export/kyc.csv error:", error);
-        return res.status(500).json({ message: "Failed to export KYC records" });
-      }
-
-      const rows = (data || []).map((item) => ({
-        user_id: item.user_id,
-        full_name: item.full_name,
-        dob: item.dob,
-        address: item.address,
-        status: item.status,
-        id_path: item.id_path,
-        selfie_path: item.selfie_path,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-      }));
-
-      const headers = [
-        "user_id",
-        "full_name",
-        "dob",
-        "address",
-        "status",
-        "id_path",
-        "selfie_path",
-        "created_at",
-        "updated_at",
-      ];
-
-      const csv = toCsv(headers, rows);
-
-      res.setHeader("Content-Type", "text/csv; charset=utf-8");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="kyc-export-${Date.now()}.csv"`
-      );
-
-      return res.status(200).send(csv);
-    } catch (err) {
-      console.error("admin/export/kyc.csv crash:", err);
-      return res.status(500).json({ message: "Internal server error" });
+    if (!amount || !currency || !destination) {
+      return res.status(400).json({ message: "Missing fields" });
     }
+
+    const numericAmount = Number(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ message: "Invalid amount" });
+    }
+
+    const { wallet } = await ensureWallet(userId, currency);
+
+    if (!wallet || wallet.balance < numericAmount) {
+      return res.status(400).json({ message: "Insufficient balance" });
+    }
+
+    // ❗ DO NOT deduct yet (admin will approve)
+    const { error } = await supabase.from("withdraw_requests").insert({
+      user_id: userId,
+      wallet_id: wallet.id,
+      amount: numericAmount,
+      currency,
+      method,
+      destination,
+      status: "pending",
+    });
+
+    if (error) {
+      console.error("withdraw create error:", error);
+      return res.status(500).json({ message: "Failed to create request" });
+    }
+
+    return res.json({ message: "Withdrawal request submitted" });
+  } catch (err) {
+    console.error("withdraw crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
   }
-);
+});
 
 module.exports = router;

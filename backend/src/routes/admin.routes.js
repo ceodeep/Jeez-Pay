@@ -28,6 +28,29 @@ function normalizePhone(raw) {
   return "+" + digits;
 }
 
+async function toKycSignedUrl(path) {
+  if (!path) return null;
+
+  const raw = String(path).trim();
+
+  if (!raw) return null;
+
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    return raw;
+  }
+
+  const { data, error } = await supabase.storage
+    .from("kyc-documents")
+    .createSignedUrl(raw, 60 * 10); // 10 minutes
+
+  if (error) {
+    console.error("kyc signed url error:", error);
+    return null;
+  }
+
+  return data?.signedUrl || null;
+}
+
 // ---------- helper: find user by admin identifier ----------
 // identifier can be:
 // - phone
@@ -163,15 +186,23 @@ router.get(
         query = query.lte("created_at", end.toISOString());
       }
 
-      const { data, error } = await query;
+            const { data, error } = await query;
 
       if (error) {
         console.error("admin/kyc/list error:", error);
         return res.status(500).json({ message: "Failed to fetch KYC submissions" });
       }
 
+      const kycsWithUrls = await Promise.all(
+        (data || []).map(async (item) => ({
+          ...item,
+          id_path: await toKycSignedUrl(item.id_path),
+          selfie_path: await toKycSignedUrl(item.selfie_path),
+        }))
+      );
+
       return res.json({
-        kycs: data || [],
+        kycs: kycsWithUrls,
       });
     } catch (err) {
       console.error("admin/kyc/list crash:", err);
@@ -1048,6 +1079,7 @@ router.get(
           .select(`
             id,
             phone,
+            full_name,
             role,
             account_type,
             phone_verified,
@@ -1160,7 +1192,7 @@ router.get(
         ),
       };
 
-      const recentTransactions = (txRes.data || []).map((tx) => ({
+            const recentTransactions = (txRes.data || []).map((tx) => ({
         id: tx.id,
         wallet_id: tx.wallet_id,
         type: tx.type,
@@ -1171,11 +1203,19 @@ router.get(
         currency: tx.wallets?.currency || null,
       }));
 
+      const kycData = kycRes.data
+        ? {
+            ...kycRes.data,
+            id_path: await toKycSignedUrl(kycRes.data.id_path),
+            selfie_path: await toKycSignedUrl(kycRes.data.selfie_path),
+          }
+        : null;
+
       return res.json({
         user: profile,
         wallets,
         walletSummary,
-        kyc: kycRes.data || null,
+        kyc: kycData,
         recentTransactions,
       });
     } catch (err) {
@@ -2003,6 +2043,436 @@ router.post(
   }
 );
 
+
+// =====================================
+// GET /admin/export/users.csv
+// =====================================
+router.get(
+  "/export/users.csv",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("users.view"),
+  async (req, res) => {
+    try {
+      const role = String(req.query.role || "").trim().toLowerCase();
+      const search = String(req.query.search || "").trim();
+
+      let query = supabase
+        .from("users")
+        .select(`
+          id,
+          phone,
+          role,
+          account_type,
+          phone_verified,
+          is_active,
+          created_at,
+          wallet_account_number
+        `)
+        .order("created_at", { ascending: false });
+
+      if (role) {
+        query = query.eq("role", role);
+      }
+
+      if (search) {
+        const normalized = normalizePhone(search);
+        const searchDigitsOnly = /^\d+$/.test(search);
+
+        if (searchDigitsOnly) {
+          const acc = Number(search);
+          if (Number.isSafeInteger(acc)) {
+            query = query.or(
+              `phone.ilike.%${search}%,phone.ilike.%${normalized}%,wallet_account_number.eq.${acc},id.eq.${search}`
+            );
+          } else {
+            query = query.or(
+              `phone.ilike.%${search}%,phone.ilike.%${normalized}%,id.eq.${search}`
+            );
+          }
+        } else {
+          query = query.or(
+            `phone.ilike.%${search}%,phone.ilike.%${normalized}%,id.eq.${search}`
+          );
+        }
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("export users csv error:", error);
+        return res.status(500).json({ message: "Failed to export users CSV" });
+      }
+
+      const rows = data || [];
+
+      const header = [
+        "id",
+        "phone",
+        "role",
+        "account_type",
+        "phone_verified",
+        "is_active",
+        "wallet_account_number",
+        "created_at",
+      ];
+
+      const escapeCsv = (value) => {
+        const str = String(value ?? "");
+        if (str.includes('"') || str.includes(",") || str.includes("\n")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const csv = [
+        header.join(","),
+        ...rows.map((item) =>
+          [
+            item.id,
+            item.phone,
+            item.role,
+            item.account_type,
+            item.phone_verified,
+            item.is_active,
+            item.wallet_account_number,
+            item.created_at,
+          ]
+            .map(escapeCsv)
+            .join(",")
+        ),
+      ].join("\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="users.csv"');
+      return res.status(200).send(csv);
+    } catch (err) {
+      console.error("export users csv crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// GET /admin/export/transactions.csv
+// =====================================
+router.get(
+  "/export/transactions.csv",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("transactions.view"),
+  async (req, res) => {
+    try {
+      const type = String(req.query.type || "").trim().toLowerCase();
+      const reference = String(req.query.reference || "").trim();
+      const search = String(req.query.search || "").trim();
+
+      let userIdFilter = null;
+
+      if (search) {
+        const matchedUser = await getUserByAdminIdentifier(search);
+        if (matchedUser) {
+          userIdFilter = matchedUser.id;
+        }
+      }
+
+      let query = supabase
+        .from("transactions")
+        .select(`
+          id,
+          wallet_id,
+          type,
+          amount,
+          description,
+          reference,
+          created_at,
+          wallets!inner (
+            user_id,
+            currency
+          )
+        `)
+        .order("created_at", { ascending: false });
+
+      if (type) {
+        query = query.eq("type", type);
+      }
+
+      if (reference) {
+        query = query.ilike("reference", `%${reference}%`);
+      }
+
+      if (userIdFilter) {
+        query = query.eq("wallets.user_id", userIdFilter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("export transactions csv error:", error);
+        return res
+          .status(500)
+          .json({ message: "Failed to export transactions CSV" });
+      }
+
+      const rows = data || [];
+
+      const header = [
+        "id",
+        "wallet_id",
+        "user_id",
+        "currency",
+        "type",
+        "amount",
+        "description",
+        "reference",
+        "created_at",
+      ];
+
+      const escapeCsv = (value) => {
+        const str = String(value ?? "");
+        if (str.includes('"') || str.includes(",") || str.includes("\n")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const csv = [
+        header.join(","),
+        ...rows.map((item) =>
+          [
+            item.id,
+            item.wallet_id,
+            item.wallets?.user_id || "",
+            item.wallets?.currency || "",
+            item.type,
+            item.amount,
+            item.description,
+            item.reference,
+            item.created_at,
+          ]
+            .map(escapeCsv)
+            .join(",")
+        ),
+      ].join("\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="transactions.csv"'
+      );
+      return res.status(200).send(csv);
+    } catch (err) {
+      console.error("export transactions csv crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// GET /admin/export/kyc.csv
+// =====================================
+router.get(
+  "/export/kyc.csv",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("kyc.view"),
+  async (req, res) => {
+    try {
+      const status = String(req.query.status || "").trim().toLowerCase();
+
+      let query = supabase
+        .from("kyc_profiles")
+        .select(`
+          user_id,
+          full_name,
+          dob,
+          address,
+          status,
+          created_at,
+          updated_at
+        `)
+        .order("created_at", { ascending: false });
+
+      if (status) {
+        query = query.eq("status", status);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("export kyc csv error:", error);
+        return res.status(500).json({ message: "Failed to export KYC CSV" });
+      }
+
+      const rows = data || [];
+
+      const header = [
+        "user_id",
+        "full_name",
+        "dob",
+        "address",
+        "status",
+        "created_at",
+        "updated_at",
+      ];
+
+      const escapeCsv = (value) => {
+        const str = String(value ?? "");
+        if (str.includes('"') || str.includes(",") || str.includes("\n")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const csv = [
+        header.join(","),
+        ...rows.map((item) =>
+          [
+            item.user_id,
+            item.full_name,
+            item.dob,
+            item.address,
+            item.status,
+            item.created_at,
+            item.updated_at,
+          ]
+            .map(escapeCsv)
+            .join(",")
+        ),
+      ].join("\n");
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="kyc.csv"');
+      return res.status(200).send(csv);
+    } catch (err) {
+      console.error("export kyc csv crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// GET /admin/withdrawals
+// =====================================
+router.get(
+  "/withdrawals",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("transactions.view"),
+  async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from("withdraw_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("fetch withdrawals error:", error);
+        return res.status(500).json({ message: "Failed to fetch withdrawals" });
+      }
+
+      return res.json({ withdrawals: data || [] });
+    } catch (err) {
+      console.error("withdrawals crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// POST /admin/withdrawals/:id/approve
+// =====================================
+router.post(
+  "/withdrawals/:id/approve",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.adjust"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const id = req.params.id;
+
+      const { data: reqData } = await supabase
+        .from("withdraw_requests")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (!reqData || reqData.status !== "pending") {
+        return res.status(400).json({ message: "Invalid request" });
+      }
+
+      // deduct balance
+      const { data: wallet } = await supabase
+        .from("wallets")
+        .select("*")
+        .eq("id", reqData.wallet_id)
+        .single();
+
+      if (wallet.balance < reqData.amount) {
+        return res.status(400).json({ message: "Insufficient balance" });
+      }
+
+      const newBalance = wallet.balance - reqData.amount;
+
+      await supabase
+        .from("wallets")
+        .update({ balance: newBalance })
+        .eq("id", wallet.id);
+
+      await supabase.from("transactions").insert({
+        wallet_id: wallet.id,
+        type: "debit",
+        amount: reqData.amount,
+        description: "Withdrawal approved",
+      });
+
+      await supabase
+        .from("withdraw_requests")
+        .update({
+          status: "approved",
+          admin_id: adminId,
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      return res.json({ message: "Withdrawal approved" });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Approval failed" });
+    }
+  }
+);
+
+// =====================================
+// POST /admin/withdrawals/:id/reject
+// =====================================
+router.post(
+  "/withdrawals/:id/reject",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.adjust"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const id = req.params.id;
+
+      await supabase
+        .from("withdraw_requests")
+        .update({
+          status: "rejected",
+          admin_id: adminId,
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      return res.json({ message: "Withdrawal rejected" });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Reject failed" });
+    }
+  }
+);
 
 
 module.exports = router;
