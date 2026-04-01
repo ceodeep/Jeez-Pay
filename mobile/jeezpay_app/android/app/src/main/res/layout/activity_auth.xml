@@ -254,7 +254,6 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!-- KEEP THE REST EXACTLY AS YOU HAD THEM -->
         <!-- =====================
           SCREEN 2: OTP
           ===================== -->
@@ -263,7 +262,6 @@
             android:layout_height="match_parent"
             android:background="#FFFFFF">
 
-            <!-- Back -->
             <TextView
                 android:id="@+id/btnBackOtp"
                 android:layout_width="wrap_content"
@@ -277,7 +275,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- OTP info container -->
             <LinearLayout
                 android:id="@+id/otpInfoContainer"
                 android:layout_width="0dp"
@@ -312,7 +309,6 @@
                     android:fontFamily="sans-serif" />
             </LinearLayout>
 
-            <!-- OTP visible boxes -->
             <LinearLayout
                 android:id="@+id/otpBoxesRow"
                 android:layout_width="wrap_content"
@@ -395,7 +391,6 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
-            <!-- Hidden real input -->
             <EditText
                 android:id="@+id/etOtp"
                 android:layout_width="1dp"
@@ -410,7 +405,6 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"/>
 
-            <!-- Resend text -->
             <TextView
                 android:id="@+id/tvResendOtp"
                 android:layout_width="wrap_content"
@@ -424,7 +418,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Verify button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVerify"
                 android:layout_width="0dp"
@@ -454,7 +447,6 @@
             android:layout_height="match_parent"
             android:background="#FFFFFF">
 
-            <!-- Back -->
             <TextView
                 android:id="@+id/btnBackPin"
                 android:layout_width="wrap_content"
@@ -468,7 +460,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- Header -->
             <TextView
                 android:id="@+id/tvSetPinHeader"
                 android:layout_width="wrap_content"
@@ -482,7 +473,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Icon box -->
             <LinearLayout
                 android:id="@+id/setPinIconBox"
                 android:layout_width="96dp"
@@ -503,7 +493,6 @@
                     app:tint="#FFFFFF" />
             </LinearLayout>
 
-            <!-- Title -->
             <TextView
                 android:id="@+id/tvSetPinTitle"
                 android:layout_width="wrap_content"
@@ -517,7 +506,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Instruction -->
             <TextView
                 android:id="@+id/tvSetPinInstruction"
                 android:layout_width="wrap_content"
@@ -530,7 +518,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Dots -->
             <LinearLayout
                 android:id="@+id/setPinDots"
                 android:layout_width="wrap_content"
@@ -569,7 +556,6 @@
                     android:src="@drawable/ic_pin_dot_empty" />
             </LinearLayout>
 
-            <!-- Hidden real input: KEEP SAME ID -->
             <EditText
                 android:id="@+id/etPin"
                 android:layout_width="1dp"
@@ -583,7 +569,6 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent" />
 
-            <!-- Keypad -->
             <androidx.gridlayout.widget.GridLayout
                 android:id="@+id/setPinKeypad"
                 android:layout_width="0dp"
@@ -700,7 +685,6 @@
                     app:tint="#000000" />
             </androidx.gridlayout.widget.GridLayout>
 
-            <!-- Confirm button: KEEP SAME ID -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnSetPin"
                 android:layout_width="0dp"
@@ -730,7 +714,6 @@
             android:layout_height="match_parent"
             android:background="#FFFFFF">
 
-            <!-- Header -->
             <TextView
                 android:id="@+id/tvUnlockHeader"
                 android:layout_width="wrap_content"
@@ -744,7 +727,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Icon box -->
             <LinearLayout
                 android:id="@+id/unlockIconBox"
                 android:layout_width="96dp"
@@ -765,7 +747,6 @@
                     app:tint="#FFFFFF" />
             </LinearLayout>
 
-            <!-- Title -->
             <TextView
                 android:id="@+id/tvUnlockTitle"
                 android:layout_width="wrap_content"
@@ -779,7 +760,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Instruction -->
             <TextView
                 android:id="@+id/tvUnlockInstruction"
                 android:layout_width="wrap_content"
@@ -792,7 +772,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Dots -->
             <LinearLayout
                 android:id="@+id/unlockDots"
                 android:layout_width="wrap_content"
@@ -831,7 +810,6 @@
                     android:src="@drawable/ic_pin_dot_empty" />
             </LinearLayout>
 
-            <!-- Hidden real input: KEEP SAME ID -->
             <EditText
                 android:id="@+id/etUnlockPin"
                 android:layout_width="1dp"
@@ -845,7 +823,6 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent" />
 
-            <!-- Keypad -->
             <androidx.gridlayout.widget.GridLayout
                 android:id="@+id/unlockKeypad"
                 android:layout_width="0dp"
@@ -962,7 +939,6 @@
                     app:tint="#000000" />
             </androidx.gridlayout.widget.GridLayout>
 
-            <!-- Keep existing button ID -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnUnlock"
                 android:layout_width="0dp"
@@ -981,6 +957,7 @@
                 app:layout_constraintBottom_toTopOf="@id/btnUseAnotherAccount"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
+
             <TextView
                 android:id="@+id/tvForgotPin"
                 android:layout_width="wrap_content"
@@ -988,12 +965,10 @@
                 android:text="Forgot PIN?"
                 android:textColor="@color/paypal_blue"
                 android:textSize="14sp"
-
                 app:layout_constraintTop_toBottomOf="@id/btnUnlock"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"/>
 
-            <!-- Keep existing ID -->
             <TextView
                 android:id="@+id/btnUseAnotherAccount"
                 android:layout_width="wrap_content"
@@ -1016,7 +991,6 @@
             android:layout_height="match_parent"
             android:background="#FFFFFF">
 
-            <!-- Top icon -->
             <ImageView
                 android:id="@+id/ivSignupProfile"
                 android:layout_width="80dp"
@@ -1028,7 +1002,6 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:tint="#2A82EE" />
 
-            <!-- Header -->
             <TextView
                 android:id="@+id/tvSignupTitle"
                 android:layout_width="wrap_content"
@@ -1056,7 +1029,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/tvSignupTitle" />
 
-            <!-- Form -->
             <LinearLayout
                 android:id="@+id/signupForm"
                 android:layout_width="0dp"
@@ -1103,6 +1075,22 @@
                         android:textColor="#20130B"
                         android:textSize="16sp" />
                 </LinearLayout>
+
+                <!-- Full name -->
+                <EditText
+                    android:id="@+id/etSignupFullName"
+                    android:layout_width="match_parent"
+                    android:layout_height="62dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_auth_input_box"
+                    android:hint="Full Name"
+                    android:inputType="textPersonName"
+                    android:maxLines="1"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="18dp"
+                    android:textColor="#000000"
+                    android:textColorHint="#80000000"
+                    android:textSize="16sp" />
 
                 <!-- Phone row -->
                 <LinearLayout
@@ -1269,9 +1257,8 @@
                         android:fontFamily="sans-serif" />
                 </LinearLayout>
 
-                <!-- Create account button -->
-
             </LinearLayout>
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnCreateAccount"
                 android:layout_width="0dp"
@@ -1291,7 +1278,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Bottom login row -->
             <LinearLayout
                 android:id="@+id/loginInsteadRow"
                 android:layout_width="wrap_content"
@@ -1330,7 +1316,6 @@
             android:layout_height="match_parent"
             android:background="#FFFFFF">
 
-            <!-- Success icon -->
             <ImageView
                 android:id="@+id/ivAccountCreated"
                 android:layout_width="90dp"
@@ -1341,7 +1326,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Title -->
             <TextView
                 android:id="@+id/tvAccountCreatedTitle"
                 android:layout_width="0dp"
@@ -1359,7 +1343,6 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Description -->
             <TextView
                 android:id="@+id/tvAccountCreatedDesc"
                 android:layout_width="0dp"
@@ -1378,7 +1361,6 @@ successfully.  JEEZPAY! YOUR MONEY, YOUR WAY."
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- Continue button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAccountCreatedContinue"
                 android:layout_width="0dp"
@@ -1398,8 +1380,6 @@ successfully.  JEEZPAY! YOUR MONEY, YOUR WAY."
                 app:layout_constraintEnd_toEndOf="parent" />
 
         </androidx.constraintlayout.widget.ConstraintLayout>
-
-
 
     </ViewFlipper>
 

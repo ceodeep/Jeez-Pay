@@ -26,7 +26,6 @@ class AuthRepository {
 
     private val api = ApiClient.authApi
 
-    // Existing direct methods
     suspend fun login(phone: String, password: String): LoginResponse {
         return api.login(
             LoginRequest(
@@ -37,6 +36,7 @@ class AuthRepository {
     }
 
     suspend fun signupRequestOtp(
+        fullName: String,
         phone: String,
         password: String,
         accountType: String,
@@ -45,6 +45,7 @@ class AuthRepository {
     ): SignupRequestOtpResponse {
         return api.signupRequestOtp(
             SignupRequestOtpRequest(
+                fullName = fullName,
                 phone = phone,
                 password = password,
                 accountType = accountType,
@@ -55,6 +56,7 @@ class AuthRepository {
     }
 
     suspend fun signupVerifyOtp(
+        fullName: String,
         phone: String,
         otp: String,
         password: String,
@@ -64,6 +66,7 @@ class AuthRepository {
     ): SignupVerifyOtpResponse {
         return api.signupVerifyOtp(
             SignupVerifyOtpRequest(
+                fullName = fullName,
                 phone = phone,
                 otp = otp,
                 password = password,
@@ -120,7 +123,6 @@ class AuthRepository {
         )
     }
 
-    // Safe methods
     suspend fun loginSafe(phone: String, password: String): ApiResult<LoginResponse> {
         return safeApiCall {
             api.login(LoginRequest(phone = phone, password = password))
@@ -128,6 +130,7 @@ class AuthRepository {
     }
 
     suspend fun signupRequestOtpSafe(
+        fullName: String,
         phone: String,
         password: String,
         accountType: String,
@@ -137,6 +140,7 @@ class AuthRepository {
         return safeApiCall {
             api.signupRequestOtp(
                 SignupRequestOtpRequest(
+                    fullName = fullName,
                     phone = phone,
                     password = password,
                     accountType = accountType,
@@ -148,6 +152,7 @@ class AuthRepository {
     }
 
     suspend fun signupVerifyOtpSafe(
+        fullName: String,
         phone: String,
         otp: String,
         password: String,
@@ -158,6 +163,7 @@ class AuthRepository {
         return safeApiCall {
             api.signupVerifyOtp(
                 SignupVerifyOtpRequest(
+                    fullName = fullName,
                     phone = phone,
                     otp = otp,
                     password = password,

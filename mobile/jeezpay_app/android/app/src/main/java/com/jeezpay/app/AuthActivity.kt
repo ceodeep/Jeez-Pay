@@ -78,6 +78,7 @@ class AuthActivity : BaseFintechActivity() {
     // Create account
     private lateinit var actAccountType: AutoCompleteTextView
     private lateinit var actSignupCountryCode: AutoCompleteTextView
+    private lateinit var etSignupFullName: EditText
     private lateinit var etSignupPhone: EditText
     private lateinit var etSignupPassword: EditText
     private lateinit var etSignupConfirmPassword: EditText
@@ -109,6 +110,7 @@ class AuthActivity : BaseFintechActivity() {
 
 
     private data class PendingSignup(
+        val fullName: String,
         val phone: String,
         val password: String,
         val accountType: String,
@@ -157,6 +159,7 @@ class AuthActivity : BaseFintechActivity() {
         flipper = findViewById(R.id.authFlipper)
 
         etPhone = findViewById(R.id.etPhone)
+        etSignupFullName = findViewById(R.id.etSignupFullName)
         btnContinue = findViewById(R.id.btnContinue)
         actCountryCode = findViewById(R.id.actCountryCode)
         createAccountRow = findViewById(R.id.createAccountRow)
@@ -417,6 +420,7 @@ class AuthActivity : BaseFintechActivity() {
                     }
 
                     signupVerifyOtp(
+                        fullName = signup.fullName,
                         phone = signup.phone,
                         otp = otp,
                         password = signup.password,
@@ -589,7 +593,7 @@ class AuthActivity : BaseFintechActivity() {
                 Toast.makeText(this, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-
+            android.util.Log.d("AuthActivity", "SET_PIN value=[$pin], length=${pin.length}")
             setPinOnBackend(pin)
         }
 
@@ -753,6 +757,7 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun signupRequestOtp(
+        fullName: String,
         phone: String,
         password: String,
         accountType: String,
@@ -765,6 +770,7 @@ class AuthActivity : BaseFintechActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             when (
                 val result = repo.signupRequestOtpSafe(
+                    fullName = fullName,
                     phone = phone,
                     password = password,
                     accountType = accountType,
@@ -785,7 +791,15 @@ class AuthActivity : BaseFintechActivity() {
                     withContext(Dispatchers.Main) {
                         setMaterialButtonLoading(btnCreateAccount, false, "Create account")
                         handleAuthError(result.error) {
-                            signupRequestOtp(phone, password, accountType, countryCode, termsAccepted, onSuccess)
+                            signupRequestOtp(
+                                fullName,
+                                phone,
+                                password,
+                                accountType,
+                                countryCode,
+                                termsAccepted,
+                                onSuccess
+                            )
                         }
                     }
                 }
@@ -793,6 +807,7 @@ class AuthActivity : BaseFintechActivity() {
         }
     }
     private fun signupVerifyOtp(
+        fullName: String,
         phone: String,
         otp: String,
         password: String,
@@ -806,6 +821,7 @@ class AuthActivity : BaseFintechActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             when (
                 val result = repo.signupVerifyOtpSafe(
+                    fullName = fullName,
                     phone = phone,
                     otp = otp,
                     password = password,
@@ -827,7 +843,16 @@ class AuthActivity : BaseFintechActivity() {
                     withContext(Dispatchers.Main) {
                         setFullScreenLoading(false)
                         handleAuthError(result.error) {
-                            signupVerifyOtp(phone, otp, password, accountType, countryCode, termsAccepted, onSuccess)
+                            signupVerifyOtp(
+                                fullName,
+                                phone,
+                                otp,
+                                password,
+                                accountType,
+                                countryCode,
+                                termsAccepted,
+                                onSuccess
+                            )
                         }
                     }
                 }
@@ -960,14 +985,15 @@ class AuthActivity : BaseFintechActivity() {
         actSignupCountryCode.dropDownWidth = 300
 
         fun validateSignup() {
+            val nameOk = etSignupFullName.text.toString().trim().isNotEmpty()
             val phoneOk = etSignupPhone.text.toString().trim().length >= 6
             val pass = etSignupPassword.text.toString().trim()
             val confirm = etSignupConfirmPassword.text.toString().trim()
             val passOk = pass.length >= 4
             val confirmOk = pass == confirm
-            btnCreateAccount.isEnabled = phoneOk && passOk && confirmOk && cbTerms.isChecked
+            btnCreateAccount.isEnabled = nameOk && phoneOk && passOk && confirmOk && cbTerms.isChecked
         }
-
+        etSignupFullName.addTextChangedListener(SimpleTextWatcher { validateSignup() })
         etSignupPhone.addTextChangedListener(SimpleTextWatcher { validateSignup() })
         etSignupPassword.addTextChangedListener(SimpleTextWatcher { validateSignup() })
         etSignupConfirmPassword.addTextChangedListener(SimpleTextWatcher { validateSignup() })
@@ -1002,12 +1028,18 @@ class AuthActivity : BaseFintechActivity() {
         }
 
         btnCreateAccount.setOnClickListener {
+            val fullName = etSignupFullName.text.toString().trim()
             val phone = buildSignupFullPhone()
             val password = etSignupPassword.text.toString().trim()
             val confirm = etSignupConfirmPassword.text.toString().trim()
             val accountType = actAccountType.text.toString().trim()
             val countryCode = actSignupCountryCode.text.toString().trim()
             val termsAccepted = cbTerms.isChecked
+
+            if (fullName.isBlank()) {
+                Toast.makeText(this, "Enter your full name", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
             if (password != confirm) {
                 Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show()
@@ -1016,6 +1048,7 @@ class AuthActivity : BaseFintechActivity() {
             otpFlowMode = OtpFlowMode.SIGNUP
 
             pendingSignup = PendingSignup(
+                fullName = fullName,
                 phone = phone,
                 password = password,
                 accountType = accountType,
@@ -1024,6 +1057,7 @@ class AuthActivity : BaseFintechActivity() {
             )
 
             signupRequestOtp(
+                fullName = fullName,
                 phone = phone,
                 password = password,
                 accountType = accountType,

@@ -17,6 +17,7 @@ data class LoginResponse(
 // -------- SIGNUP OTP --------
 
 data class SignupRequestOtpRequest(
+    val fullName: String,
     val phone: String,
     val password: String,
     val accountType: String,
@@ -29,6 +30,7 @@ data class SignupRequestOtpResponse(
 )
 
 data class SignupVerifyOtpRequest(
+    val fullName: String,
     val phone: String,
     val otp: String,
     val password: String,
