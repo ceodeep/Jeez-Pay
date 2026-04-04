@@ -475,7 +475,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone, full_name, role, account_type, country_code, phone_verified, terms_accepted")
+      .select("id, phone, fullName, role, account_type, country_code, phone_verified, terms_accepted")
       .eq("id", userId)
       .maybeSingle();
 

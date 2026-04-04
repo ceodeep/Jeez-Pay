@@ -156,7 +156,7 @@ router.get(
         .from("kyc_profiles")
         .select(`
           user_id,
-          full_name,
+          fullName,
           dob,
           address,
           id_path,
@@ -1079,7 +1079,7 @@ router.get(
           .select(`
             id,
             phone,
-            full_name,
+            fullName,
             role,
             account_type,
             phone_verified,
@@ -1105,7 +1105,7 @@ router.get(
           .from("kyc_profiles")
           .select(`
             user_id,
-            full_name,
+            fullName,
             dob,
             address,
             id_path,
@@ -2284,7 +2284,7 @@ router.get(
         .from("kyc_profiles")
         .select(`
           user_id,
-          full_name,
+          fullName,
           dob,
           address,
           status,
@@ -2308,7 +2308,7 @@ router.get(
 
       const header = [
         "user_id",
-        "full_name",
+        "fullName",
         "dob",
         "address",
         "status",
@@ -2329,7 +2329,7 @@ router.get(
         ...rows.map((item) =>
           [
             item.user_id,
-            item.full_name,
+            item.fulName,
             item.dob,
             item.address,
             item.status,
