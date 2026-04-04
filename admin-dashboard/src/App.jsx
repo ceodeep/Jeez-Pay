@@ -1132,7 +1132,7 @@ function AppShell({ onLogout }) {
                       >
                         <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 700, fontSize: 16 }}>
-                            {item.full_name || "-"}
+                            {item.fullName || "-"}
                           </div>
 
                           <div
@@ -3618,7 +3618,7 @@ function AppShell({ onLogout }) {
                       {selectedUserDetails.user?.phone || "-"}
                     </div>
                     <div>
-  <strong>Full Name:</strong> {selectedUserDetails.user?.full_name || "-"}
+  <strong>Full Name:</strong> {selectedUserDetails.user?.fullName || "-"}
 </div>
                     <div>
                       <strong>Role:</strong>{" "}
@@ -3735,7 +3735,7 @@ function AppShell({ onLogout }) {
                     >
                       <div>
                         <strong>Full Name:</strong>{" "}
-                        {selectedUserDetails.kyc.full_name || "-"}
+                        {selectedUserDetails.kyc.fullName || "-"}
                       </div>
                       <div>
                         <strong>Status:</strong>{" "}

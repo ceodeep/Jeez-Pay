@@ -80,7 +80,7 @@ class KycActivity : AppCompatActivity() {
                 is ApiResult.Success -> {
                     val kyc = result.data.kyc ?: return@launch
 
-                    binding.etFullName.setText(kyc.full_name ?: "")
+                    binding.etFullName.setText(kyc.fullName ?: "")
                     binding.etDob.setText(kyc.dob ?: "")
                     binding.etAddress.setText(kyc.address ?: "")
 

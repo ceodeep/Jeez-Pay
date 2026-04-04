@@ -47,7 +47,7 @@ class ProfileActivity : AppCompatActivity() {
                         approvedKyc = kyc
 
                         val i = Intent(this@ProfileActivity, ProfileDetailsActivity::class.java).apply {
-                            putExtra("full_name", kyc.full_name ?: "")
+                            putExtra("fullName", kyc.fullName ?: "")
                             putExtra("dob", kyc.dob ?: "")
                             putExtra("address", kyc.address ?: "")
                             putExtra("status", kyc.status ?: "")

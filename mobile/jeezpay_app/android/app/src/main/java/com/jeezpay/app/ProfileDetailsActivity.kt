@@ -10,7 +10,7 @@ class ProfileDetailsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_simple_page)
 
-        val fullName = intent.getStringExtra("full_name").orEmpty()
+        val fullName = intent.getStringExtra("fullName").orEmpty()
         val dob = intent.getStringExtra("dob").orEmpty()
         val address = intent.getStringExtra("address").orEmpty()
 

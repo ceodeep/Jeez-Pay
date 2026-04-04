@@ -5,7 +5,7 @@ data class KycMeResponse(
 )
 
 data class KycProfile(
-    val full_name: String?,
+    val fullName: String?,
     val dob: String?,
     val address: String?,
     val id_path: String?,
@@ -40,7 +40,7 @@ data class KycSubmitResponse(
 
 data class SubmittedKyc(
     val user_id: String?,
-    val full_name: String?,
+    val fullName: String?,
     val dob: String?,
     val address: String?,
     val id_path: String?,
