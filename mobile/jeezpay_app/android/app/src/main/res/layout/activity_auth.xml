@@ -656,12 +656,10 @@
                     android:focusable="true"
                     app:layout_columnWeight="1" />
 
-                <TextView
-                    android:id="@+id/setPinKeyBlank"
-                    style="@style/PinKeyStyle"
-                    android:text=""
-                    android:enabled="false"
-                    app:layout_columnWeight="1" />
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    app:layout_columnWeight="1"/>
 
                 <TextView
                     android:id="@+id/setPinKey0"
@@ -671,20 +669,19 @@
                     android:focusable="true"
                     app:layout_columnWeight="1" />
 
-                <ImageView
+                <TextView
                     android:id="@+id/setPinBackspace"
-                    android:layout_width="0dp"
-                    android:layout_height="64dp"
-                    android:padding="18dp"
-                    android:src="@drawable/ic_backspace"
+                    style="@style/PinKeyStyle"
+                    android:text="⌫"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="#1E232C"
+                    android:gravity="center"
                     android:clickable="true"
                     android:focusable="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Delete PIN digit"
-                    app:layout_columnWeight="1"
-                    app:layout_gravity="center"
-                    app:layout_rowWeight="1"
-                    app:tint="#1E232C" />
+                    android:contentDescription="Delete"
+                    app:layout_columnWeight="1" />
             </androidx.gridlayout.widget.GridLayout>
 
             <com.google.android.material.button.MaterialButton
@@ -912,12 +909,10 @@
                     android:focusable="true"
                     app:layout_columnWeight="1" />
 
-                <TextView
-                    android:id="@+id/unlockKeyBlank"
-                    style="@style/PinKeyStyle"
-                    android:text=""
-                    android:enabled="false"
-                    app:layout_columnWeight="1" />
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    app:layout_columnWeight="1"/>
 
                 <TextView
                     android:id="@+id/unlockKey0"
@@ -927,20 +922,19 @@
                     android:focusable="true"
                     app:layout_columnWeight="1" />
 
-                <ImageView
+                <TextView
                     android:id="@+id/unlockBackspace"
-                    android:layout_width="0dp"
-                    android:layout_height="64dp"
-                    android:padding="18dp"
-                    android:src="@drawable/ic_backspace"
+                    style="@style/PinKeyStyle"
+                    android:text="⌫"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="#1E232C"
+                    android:gravity="center"
                     android:clickable="true"
                     android:focusable="true"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Delete PIN digit"
-                    app:layout_columnWeight="1"
-                    app:layout_gravity="center"
-                    app:layout_rowWeight="1"
-                    app:tint="#1E232C" />
+                    android:contentDescription="Delete"
+                    app:layout_columnWeight="1" />
             </androidx.gridlayout.widget.GridLayout>
 
             <com.google.android.material.button.MaterialButton

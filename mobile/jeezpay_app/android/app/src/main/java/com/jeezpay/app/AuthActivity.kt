@@ -528,7 +528,7 @@ class AuthActivity : BaseFintechActivity() {
         val key8 = findViewById<TextView>(R.id.setPinKey8)
         val key9 = findViewById<TextView>(R.id.setPinKey9)
         val key0 = findViewById<TextView>(R.id.setPinKey0)
-        val backspace = findViewById<android.widget.ImageView>(R.id.setPinBackspace)
+        val backspace = findViewById<TextView>(R.id.setPinBackspace)
 
         fun renderSetPinDots(pin: String) {
             setPinDot1.setImageResource(
@@ -612,7 +612,7 @@ class AuthActivity : BaseFintechActivity() {
         val key8 = findViewById<TextView>(R.id.unlockKey8)
         val key9 = findViewById<TextView>(R.id.unlockKey9)
         val key0 = findViewById<TextView>(R.id.unlockKey0)
-        val backspace = findViewById<android.widget.ImageView>(R.id.unlockBackspace)
+        val backspace = findViewById<TextView>(R.id.unlockBackspace)
 
 
 

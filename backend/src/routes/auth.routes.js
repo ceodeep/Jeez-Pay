@@ -4,10 +4,13 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
+const { generateOTP } = require("../utils/otp");
+const { sendWhatsAppOTP } = require("../services/whatsapp.service");
 const bcrypt = require("bcrypt");
 
 // You can keep your currencies here
 const DEFAULT_CURRENCIES = ["USDT", "SDG", "SSP", "EGP", "UGX"];
+const OTP_EXPIRY_MINUTES = 5;
 
 function normalizePhone(raw) {
   const p = String(raw || "").trim();
@@ -15,12 +18,10 @@ function normalizePhone(raw) {
 
   if (!digits) return "";
 
-  // If already international with +
   if (p.startsWith("+")) {
     return "+" + digits;
   }
 
-  // Otherwise assume caller already selected a country code and sent full number
   return "+" + digits;
 }
 
@@ -29,7 +30,7 @@ function mapAccountTypeToRole(accountType) {
 
   if (value === "agent") return "agent";
   if (value === "merchant") return "merchant";
-  return "user"; // Personal -> user
+  return "user";
 }
 
 async function seedWalletsForUser(userId) {
@@ -46,30 +47,93 @@ async function seedWalletsForUser(userId) {
   }
 }
 
+async function createAndSendOtp(phone, purpose) {
+  const code = generateOTP();
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+
+  const { error: deleteErr } = await supabase
+    .from("otp_codes")
+    .delete()
+    .eq("phone", phone)
+    .eq("purpose", purpose);
+
+  if (deleteErr) {
+    throw deleteErr;
+  }
+
+  const { error: insertErr } = await supabase.from("otp_codes").insert({
+    phone,
+    purpose,
+    code,
+    expires_at: expiresAt,
+  });
+
+  if (insertErr) {
+    throw insertErr;
+  }
+
+  await sendWhatsAppOTP(phone, code);
+}
+
+async function verifyOtpCode(phone, purpose, code) {
+  const { data, error } = await supabase
+    .from("otp_codes")
+    .select("*")
+    .eq("phone", phone)
+    .eq("purpose", purpose)
+    .eq("code", code)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return { ok: false, status: 401, message: "Invalid OTP" };
+  }
+
+  if (new Date(data.expires_at) < new Date()) {
+    await supabase.from("otp_codes").delete().eq("id", data.id);
+    return { ok: false, status: 400, message: "OTP expired" };
+  }
+
+  const { error: deleteErr } = await supabase
+    .from("otp_codes")
+    .delete()
+    .eq("id", data.id);
+
+  if (deleteErr) {
+    throw deleteErr;
+  }
+
+  return { ok: true };
+}
+
 // =====================================
 // SIGNUP OTP REQUEST
-// OTP is used ONLY for phone verification during signup
 // =====================================
 router.post("/signup/request-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
-const fullName = String(req.body.fullName || "").trim();
-const password = String(req.body.password || "");
-const accountType = String(req.body.accountType || "").trim();
-const countryCode = String(req.body.countryCode || "").trim();
-const termsAccepted = !!req.body.termsAccepted;
+    const fullName = String(req.body.fullName || "").trim();
+    const password = String(req.body.password || "");
+    const accountType = String(req.body.accountType || "").trim();
+    const countryCode = String(req.body.countryCode || "").trim();
+    const termsAccepted = !!req.body.termsAccepted;
 
-    if (!phone || !password || !accountType || !countryCode) {
+    if (!phone || !fullName || !password || !accountType || !countryCode) {
       return res.status(400).json({
         message: "phone, fullName, password, accountType and countryCode are required",
       });
     }
 
     if (password.length < 8) {
-  return res.status(400).json({
-    message: "Password must be at least 8 characters",
-  });
-}
+      return res.status(400).json({
+        message: "Password must be at least 8 characters",
+      });
+    }
 
     if (!termsAccepted) {
       return res.status(400).json({
@@ -94,31 +158,31 @@ const termsAccepted = !!req.body.termsAccepted;
       });
     }
 
-    // Mock OTP generation/sending for now
+    await createAndSendOtp(phone, "signup");
+
     return res.json({
-      message: "Enter the code sent to your phone",
+      message: "OTP sent via WhatsApp",
     });
   } catch (err) {
     console.error("signup/request-otp crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Failed to send OTP" });
   }
 });
 
 // =====================================
 // SIGNUP OTP VERIFY
-// Creates the user ONLY after OTP is verified
 // =====================================
 router.post("/signup/verify-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
-const fullName = String(req.body.fullName || "").trim();
-const otp = String(req.body.otp || "").trim();
-const password = String(req.body.password || "");
-const accountType = String(req.body.accountType || "").trim();
-const countryCode = String(req.body.countryCode || "").trim();
-const termsAccepted = !!req.body.termsAccepted;
+    const fullName = String(req.body.fullName || "").trim();
+    const otp = String(req.body.otp || "").trim();
+    const password = String(req.body.password || "");
+    const accountType = String(req.body.accountType || "").trim();
+    const countryCode = String(req.body.countryCode || "").trim();
+    const termsAccepted = !!req.body.termsAccepted;
 
-    if (!phone || !otp || !password || !accountType || !countryCode) {
+    if (!phone || !fullName || !otp || !password || !accountType || !countryCode) {
       return res.status(400).json({
         message: "phone, fullName, otp, password, accountType and countryCode are required",
       });
@@ -130,15 +194,15 @@ const termsAccepted = !!req.body.termsAccepted;
       });
     }
 
-    if (password.length < 4) {
+    if (password.length < 8) {
       return res.status(400).json({
-        message: "Password must be at least 4 characters",
+        message: "Password must be at least 8 characters",
       });
     }
 
-    // Mock OTP check
-    if (otp !== "123456") {
-      return res.status(401).json({ message: "Invalid OTP" });
+    const otpCheck = await verifyOtpCode(phone, "signup", otp);
+    if (!otpCheck.ok) {
+      return res.status(otpCheck.status).json({ message: otpCheck.message });
     }
 
     const { data: existingUser, error: fetchErr } = await supabase
@@ -166,16 +230,18 @@ const termsAccepted = !!req.body.termsAccepted;
     if (!user) {
       const { data: newUser, error: createErr } = await supabase
         .from("users")
-        .insert([{
-          phone,
-          fullName: fullName,
-          password_hash: passwordHash,
-          phone_verified: true,
-          account_type: accountType,
-          country_code: countryCode,
-          terms_accepted: termsAccepted,
-          role,
-        }])
+        .insert([
+          {
+            phone,
+            fullName,
+            password_hash: passwordHash,
+            phone_verified: true,
+            account_type: accountType,
+            country_code: countryCode,
+            terms_accepted: termsAccepted,
+            role,
+          },
+        ])
         .select()
         .single();
 
@@ -196,7 +262,7 @@ const termsAccepted = !!req.body.termsAccepted;
       const { data: updatedUser, error: updateErr } = await supabase
         .from("users")
         .update({
-          fullName: fullName,
+          fullName,
           password_hash: passwordHash,
           phone_verified: true,
           account_type: accountType,
@@ -215,7 +281,6 @@ const termsAccepted = !!req.body.termsAccepted;
 
       user = updatedUser;
 
-      // Seed wallets only if they do not already exist
       const { data: existingWallets, error: walletsErr } = await supabase
         .from("wallets")
         .select("id")
@@ -256,7 +321,6 @@ const termsAccepted = !!req.body.termsAccepted;
 
 // =====================================
 // LOGIN WITH PHONE + PASSWORD
-// No OTP here
 // =====================================
 router.post("/login", async (req, res) => {
   try {
@@ -289,8 +353,8 @@ router.post("/login", async (req, res) => {
     }
 
     if (user.is_active === false) {
-  return res.status(403).json({ message: "Account is suspended" });
-}
+      return res.status(403).json({ message: "Account is suspended" });
+    }
 
     const match = await bcrypt.compare(password, user.password_hash);
 
@@ -330,17 +394,18 @@ router.post("/set-pin", authMiddleware, async (req, res) => {
     if (!/^\d{4}$/.test(pin)) {
       return res.status(400).json({ message: "PIN must be exactly 4 digits" });
     }
+
     if (
-  pin === "0000" ||
-  pin === "1111" ||
-  pin === "1234" ||
-  pin === "4321" ||
-  /^(\d)\1{3}$/.test(pin)
-) {
-  return res.status(400).json({
-    message: "Choose a stronger PIN",
-  });
-}
+      pin === "0000" ||
+      pin === "1111" ||
+      pin === "1234" ||
+      pin === "4321" ||
+      /^(\d)\1{3}$/.test(pin)
+    ) {
+      return res.status(400).json({
+        message: "Choose a stronger PIN",
+      });
+    }
 
     const pinHash = await bcrypt.hash(pin, 10);
 
@@ -426,19 +491,15 @@ router.post("/verify-pin", authMiddleware, async (req, res) => {
 
     if (!match) {
       const failedAttempts = Number(user.pin_failed_attempts || 0) + 1;
-
       let updates = { pin_failed_attempts: failedAttempts };
 
       if (failedAttempts >= 5) {
-        const lockUntil = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        const lockUntil = new Date(Date.now() + 10 * 60 * 1000);
         updates.pin_locked_until = lockUntil.toISOString();
         updates.pin_failed_attempts = 0;
       }
 
-      await supabase
-        .from("users")
-        .update(updates)
-        .eq("id", userId);
+      await supabase.from("users").update(updates).eq("id", userId);
 
       return res.json({
         ok: false,
@@ -494,6 +555,9 @@ router.get("/me", authMiddleware, async (req, res) => {
   }
 });
 
+// =====================================
+// FORGOT PASSWORD OTP REQUEST
+// =====================================
 router.post("/forgot-password/request-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
@@ -517,16 +581,20 @@ router.post("/forgot-password/request-otp", async (req, res) => {
       return res.status(404).json({ message: "Account not found" });
     }
 
-    // Mock OTP for now
+    await createAndSendOtp(phone, "forgot_password");
+
     return res.json({
-      message: "Enter the code sent to your phone",
+      message: "OTP sent via WhatsApp",
     });
   } catch (err) {
     console.error("forgot-password/request-otp crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Failed to send OTP" });
   }
 });
 
+// =====================================
+// FORGOT PASSWORD OTP VERIFY
+// =====================================
 router.post("/forgot-password/verify-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
@@ -545,9 +613,9 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
       });
     }
 
-    // Mock OTP check
-    if (otp !== "123456") {
-      return res.status(401).json({ message: "Invalid OTP" });
+    const otpCheck = await verifyOtpCode(phone, "forgot_password", otp);
+    if (!otpCheck.ok) {
+      return res.status(otpCheck.status).json({ message: otpCheck.message });
     }
 
     const { data: user, error: fetchErr } = await supabase
@@ -594,6 +662,9 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
   }
 });
 
+// =====================================
+// FORGOT PIN OTP REQUEST
+// =====================================
 router.post("/forgot-pin/request-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
@@ -617,16 +688,20 @@ router.post("/forgot-pin/request-otp", async (req, res) => {
       return res.status(404).json({ message: "Account not found" });
     }
 
-    // Mock OTP for now
+    await createAndSendOtp(phone, "forgot_pin");
+
     return res.json({
-      message: "Enter the code sent to your phone",
+      message: "OTP sent via WhatsApp",
     });
   } catch (err) {
     console.error("forgot-pin/request-otp crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Failed to send OTP" });
   }
 });
 
+// =====================================
+// FORGOT PIN OTP VERIFY
+// =====================================
 router.post("/forgot-pin/verify-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
@@ -638,9 +713,9 @@ router.post("/forgot-pin/verify-otp", async (req, res) => {
       });
     }
 
-    // Mock OTP check
-    if (otp !== "123456") {
-      return res.status(401).json({ message: "Invalid OTP" });
+    const otpCheck = await verifyOtpCode(phone, "forgot_pin", otp);
+    if (!otpCheck.ok) {
+      return res.status(otpCheck.status).json({ message: otpCheck.message });
     }
 
     const { data: user, error: fetchErr } = await supabase
@@ -688,7 +763,5 @@ router.post("/forgot-pin/verify-otp", async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
-
-
 
 module.exports = router;
