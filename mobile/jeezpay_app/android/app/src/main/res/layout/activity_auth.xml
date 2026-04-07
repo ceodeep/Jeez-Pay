@@ -679,10 +679,12 @@
                     android:src="@drawable/ic_backspace"
                     android:clickable="true"
                     android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Delete PIN digit"
                     app:layout_columnWeight="1"
                     app:layout_gravity="center"
                     app:layout_rowWeight="1"
-                    app:tint="#000000" />
+                    app:tint="#1E232C" />
             </androidx.gridlayout.widget.GridLayout>
 
             <com.google.android.material.button.MaterialButton
@@ -933,10 +935,12 @@
                     android:src="@drawable/ic_backspace"
                     android:clickable="true"
                     android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Delete PIN digit"
                     app:layout_columnWeight="1"
                     app:layout_gravity="center"
                     app:layout_rowWeight="1"
-                    app:tint="#000000" />
+                    app:tint="#1E232C" />
             </androidx.gridlayout.widget.GridLayout>
 
             <com.google.android.material.button.MaterialButton
