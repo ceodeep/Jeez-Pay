@@ -141,7 +141,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     const { data, error } = await supabase
       .from("kyc_profiles")
-      .select("full_name, dob, address, id_path, selfie_path, status, created_at, updated_at")
+      .select("fullName, dob, address, id_path, selfie_path, status, created_at, updated_at")
       .eq("user_id", userId)
       .maybeSingle();
 
