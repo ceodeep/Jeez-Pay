@@ -104,7 +104,7 @@ router.post("/submit", authMiddleware, async (req, res) => {
     // Save only paths, not public URLs
     const payload = {
       user_id: userId,
-      full_name: fullName,
+      fullName,
       dob,
       address,
       id_path: idPath,
