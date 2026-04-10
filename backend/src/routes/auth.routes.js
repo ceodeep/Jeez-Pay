@@ -536,7 +536,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone, fullName, role, account_type, country_code, phone_verified, terms_accepted")
+      .select("id, phone, fullName, avatar_key, role, account_type, country_code, phone_verified, terms_accepted")
       .eq("id", userId)
       .maybeSingle();
 
@@ -760,6 +760,57 @@ router.post("/forgot-pin/verify-otp", async (req, res) => {
     });
   } catch (err) {
     console.error("forgot-pin/verify-otp crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// =====================================
+// UPDATE AVATAR
+// =====================================
+router.patch("/avatar", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const avatarKey = String(req.body?.avatarKey || "").trim();
+
+    const allowedAvatars = [
+      "avatar_1",
+      "avatar_2",
+      "avatar_3",
+      "avatar_4",
+      "avatar_5",
+      "avatar_6",
+    ];
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (!allowedAvatars.includes(avatarKey)) {
+      return res.status(400).json({ message: "Invalid avatar selection" });
+    }
+
+    const { data, error } = await supabase
+      .from("users")
+      .update({ avatar_key: avatarKey })
+      .eq("id", userId)
+      .select("id, avatar_key")
+      .maybeSingle();
+
+    if (error) {
+      console.error("auth/avatar update error:", error);
+      return res.status(500).json({ message: "Failed to update avatar" });
+    }
+
+    if (!data) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      message: "Avatar updated successfully",
+      avatarKey: data.avatar_key,
+    });
+  } catch (err) {
+    console.error("auth/avatar crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });

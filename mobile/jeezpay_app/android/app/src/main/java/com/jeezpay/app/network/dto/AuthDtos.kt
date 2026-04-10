@@ -106,3 +106,12 @@ data class ForgotPinVerifyOtpResponse(
     val hasPin: Boolean = false,
     val isNewUser: Boolean = false
 )
+
+data class UpdateAvatarRequest(
+    val avatarKey: String
+)
+
+data class UpdateAvatarResponse(
+    val message: String,
+    val avatarKey: String?
+)

@@ -21,6 +21,8 @@ import com.jeezpay.app.network.dto.SignupVerifyOtpResponse
 import com.jeezpay.app.network.dto.VerifyPinRequest
 import com.jeezpay.app.network.dto.VerifyPinResponse
 import com.jeezpay.app.network.safeApiCall
+import com.jeezpay.app.network.dto.UpdateAvatarRequest
+import com.jeezpay.app.network.dto.UpdateAvatarResponse
 
 class AuthRepository {
 
@@ -222,6 +224,16 @@ class AuthRepository {
                     otp = otp
                 )
             )
+        }
+    }
+
+    suspend fun updateAvatar(avatarKey: String): UpdateAvatarResponse {
+        return api.updateAvatar(UpdateAvatarRequest(avatarKey = avatarKey))
+    }
+
+    suspend fun updateAvatarSafe(avatarKey: String): ApiResult<UpdateAvatarResponse> {
+        return safeApiCall {
+            api.updateAvatar(UpdateAvatarRequest(avatarKey = avatarKey))
         }
     }
 }

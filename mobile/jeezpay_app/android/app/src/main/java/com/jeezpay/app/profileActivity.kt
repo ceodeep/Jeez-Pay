@@ -3,35 +3,59 @@ package com.jeezpay.app
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.widget.GridLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.cardview.widget.CardView
 import androidx.lifecycle.lifecycleScope
 import com.jeezpay.app.databinding.ActivityProfileBinding
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.AppError
+import com.jeezpay.app.network.dto.KycProfile
+import com.jeezpay.app.repository.AuthRepository
 import com.jeezpay.app.repository.KycRepository
+import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.launch
 import java.util.Locale
-import android.widget.TextView
-import android.widget.ImageView
-import androidx.appcompat.app.AlertDialog
-import com.jeezpay.app.storage.SessionManager
-import com.jeezpay.app.network.AppError
-import com.jeezpay.app.network.ApiResult
 
 class ProfileActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityProfileBinding
-    private var approvedKyc: com.jeezpay.app.network.dto.KycProfile? = null
+    private var approvedKyc: KycProfile? = null
     private val kycRepo = KycRepository()
+    private val authRepo = AuthRepository()
+
+    companion object {
+        private const val PREFS_NAME = "jeezpay_prefs"
+        private const val KEY_SELECTED_AVATAR = "selected_avatar"
+    }
+
+    private val avatarOptions = listOf(
+        "avatar_1" to R.drawable.avatar_1,
+        "avatar_2" to R.drawable.avatar_2,
+        "avatar_3" to R.drawable.avatar_3,
+        "avatar_4" to R.drawable.avatar_4,
+        "avatar_5" to R.drawable.avatar_5,
+        "avatar_6" to R.drawable.avatar_6
+    )
+
+    private var currentAvatarDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityProfileBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Back
         binding.btnBack.setOnClickListener { finish() }
 
-        // Menu rows (placeholders for now)
+        binding.avatarClickArea.setOnClickListener {
+            showAvatarPickerDialog()
+        }
+
         binding.rowProfile.setOnClickListener {
             lifecycleScope.launch {
                 when (val result = kycRepo.meSafe()) {
@@ -51,6 +75,7 @@ class ProfileActivity : AppCompatActivity() {
                             putExtra("dob", kyc.dob ?: "")
                             putExtra("address", kyc.address ?: "")
                             putExtra("status", kyc.status ?: "")
+                            putExtra("avatarResId", getAvatarResIdFromKey(getSelectedAvatarKey()))
                         }
                         startActivity(i)
                     }
@@ -63,17 +88,19 @@ class ProfileActivity : AppCompatActivity() {
                 }
             }
         }
+
         binding.rowSecurity.setOnClickListener {
             toast("Security settings (coming soon)")
         }
+
         binding.rowPayments.setOnClickListener {
             toast("Payment settings (coming soon)")
         }
+
         binding.rowAbout.setOnClickListener {
             toast("About us (coming soon)")
         }
 
-        // Logout
         binding.rowLogout.setOnClickListener {
             showCustomConfirmDialog(
                 message = "Are you sure you want to logout?",
@@ -81,7 +108,7 @@ class ProfileActivity : AppCompatActivity() {
                 cancelText = "Stay"
             ) {
                 SessionManager(this).clearAll()
-                getSharedPreferences("jeezpay_prefs", MODE_PRIVATE).edit().clear().apply()
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().clear().apply()
 
                 val i = Intent(this, AuthActivity::class.java)
                 i.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -90,19 +117,106 @@ class ProfileActivity : AppCompatActivity() {
             }
         }
 
-        // Default click: open KYC screen
         binding.btnStartKyc.setOnClickListener {
             startActivity(Intent(this, KycActivity::class.java))
         }
 
-        // First load
+        applySelectedAvatar()
+        populateHeader()
         refreshKycCard()
     }
 
     override fun onResume() {
         super.onResume()
-        // If user completed KYC and came back, refresh status
+        applySelectedAvatar()
+        populateHeader()
         refreshKycCard()
+    }
+
+    private fun getSelectedAvatarKey(): String {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val saved = prefs.getString(KEY_SELECTED_AVATAR, "avatar_1").orEmpty()
+        return if (avatarOptions.any { it.first == saved }) saved else "avatar_1"
+    }
+
+    private fun getAvatarResIdFromKey(key: String?): Int {
+        return avatarOptions.firstOrNull { it.first == key }?.second ?: R.drawable.avatar_1
+    }
+
+    private fun saveSelectedAvatarKey(key: String) {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putString(KEY_SELECTED_AVATAR, key)
+            .apply()
+    }
+
+    private fun applySelectedAvatar() {
+        binding.ivAvatar.setImageResource(getAvatarResIdFromKey(getSelectedAvatarKey()))
+    }
+
+    private fun updateAvatarSelection(avatarKey: String) {
+        saveSelectedAvatarKey(avatarKey)
+        applySelectedAvatar()
+
+        lifecycleScope.launch {
+            when (val result = authRepo.updateAvatarSafe(avatarKey)) {
+                is ApiResult.Success -> {
+                    toast("Avatar updated")
+                    currentAvatarDialog?.dismiss()
+                }
+
+                is ApiResult.Error -> {
+                    handleProfileError(result.error) {
+                        updateAvatarSelection(avatarKey)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun populateHeader() {
+        val session = SessionManager(this)
+        val phone = session.getPhone().orEmpty()
+
+        binding.tvUserPhone.text = phone.ifBlank { "No phone available" }
+
+        lifecycleScope.launch {
+            when (val result = kycRepo.meSafe()) {
+                is ApiResult.Success -> {
+                    val kyc = result.data.kyc
+                    val fullName = kyc?.fullName?.trim().orEmpty()
+                    val status = (kyc?.status ?: "").trim().lowercase(Locale.ROOT)
+
+                    val displayName = if (fullName.isNotBlank()) fullName else "JeezPay User"
+                    binding.tvUserName.text = displayName
+
+                    when (status) {
+                        "approved", "verified" -> {
+                            binding.tvKycBadge.visibility = View.VISIBLE
+                            binding.tvKycBadge.text = "Verified"
+                        }
+                        "pending" -> {
+                            binding.tvKycBadge.visibility = View.VISIBLE
+                            binding.tvKycBadge.text = "Pending"
+                        }
+                        "rejected" -> {
+                            binding.tvKycBadge.visibility = View.VISIBLE
+                            binding.tvKycBadge.text = "Rejected"
+                        }
+                        else -> {
+                            binding.tvKycBadge.visibility = View.VISIBLE
+                            binding.tvKycBadge.text = "Unverified"
+                        }
+                    }
+                }
+
+                is ApiResult.Error -> {
+                    binding.tvUserName.text = "JeezPay User"
+                    binding.tvKycBadge.visibility = View.VISIBLE
+                    binding.tvKycBadge.text = "Profile"
+                }
+            }
+        }
     }
 
     private fun refreshKycCard() {
@@ -213,9 +327,76 @@ class ProfileActivity : AppCompatActivity() {
         binding.tvKycStatus.text = statusChip
         binding.tvKycTitle.text = title
         binding.tvKycDesc.text = desc
-
         binding.btnStartKyc.visibility = if (showButton) View.VISIBLE else View.GONE
         binding.btnStartKyc.text = buttonText
+    }
+
+    private fun showAvatarPickerDialog() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(36, 32, 36, 20)
+        }
+
+        val title = TextView(this).apply {
+            text = "Choose Avatar"
+            textSize = 20f
+            setTextColor(getColor(R.color.text_primary))
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+
+        val subtitle = TextView(this).apply {
+            text = "Select one of the predefined avatars"
+            textSize = 14f
+            setTextColor(getColor(R.color.text_secondary))
+            setPadding(0, 10, 0, 24)
+        }
+
+        val grid = GridLayout(this).apply {
+            columnCount = 3
+            rowCount = 2
+            useDefaultMargins = true
+            alignmentMode = GridLayout.ALIGN_MARGINS
+        }
+
+        avatarOptions.forEach { (avatarKey, avatarRes) ->
+            val card = CardView(this).apply {
+                radius = 999f
+                cardElevation = 0f
+                setCardBackgroundColor(getColor(R.color.card_white))
+                layoutParams = LinearLayout.LayoutParams(220, 220).apply {
+                    setMargins(12, 12, 12, 12)
+                }
+                preventCornerOverlap = true
+                useCompatPadding = true
+                setContentPadding(18, 18, 18, 18)
+            }
+
+            val image = ImageView(this).apply {
+                setImageResource(avatarRes)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                )
+                setOnClickListener {
+                    updateAvatarSelection(avatarKey)
+                }
+            }
+
+            card.addView(image)
+            grid.addView(card)
+        }
+
+        root.addView(title)
+        root.addView(subtitle)
+        root.addView(grid)
+
+        currentAvatarDialog = AlertDialog.Builder(this)
+            .setView(root)
+            .create()
+
+        currentAvatarDialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        currentAvatarDialog?.show()
     }
 
     private fun showServerFailureDialog(
@@ -244,10 +425,7 @@ class ProfileActivity : AppCompatActivity() {
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        btnClose.setOnClickListener {
-            dialog.dismiss()
-        }
-
+        btnClose.setOnClickListener { dialog.dismiss() }
         btnRetry.setOnClickListener {
             dialog.dismiss()
             onRetry()
@@ -276,8 +454,6 @@ class ProfileActivity : AppCompatActivity() {
         tvMessage.text = message
         btnCancel.text = cancelText
         btnConfirm.text = confirmText
-
-        // keep your red icon for warning/offline state
         ivIcon.setImageResource(R.drawable.ic_warning_red)
 
         val dialog = AlertDialog.Builder(this)
@@ -287,10 +463,7 @@ class ProfileActivity : AppCompatActivity() {
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        btnCancel.setOnClickListener {
-            dialog.dismiss()
-        }
-
+        btnCancel.setOnClickListener { dialog.dismiss() }
         btnConfirm.setOnClickListener {
             dialog.dismiss()
             onConfirm()
@@ -322,7 +495,7 @@ class ProfileActivity : AppCompatActivity() {
             is AppError.Unauthorized -> {
                 toast(error.message)
                 SessionManager(this).clearAll()
-                getSharedPreferences("jeezpay_prefs", MODE_PRIVATE).edit().clear().apply()
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().clear().apply()
 
                 val i = Intent(this, AuthActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

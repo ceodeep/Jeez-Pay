@@ -18,8 +18,21 @@ class ProfileDetailsActivity : AppCompatActivity() {
             finish()
         }
 
-        findViewById<TextView>(R.id.tvTitle).text = "Profile"
-        findViewById<TextView>(R.id.tvDetails).text =
-            "Name: $fullName\n\nDOB: $dob\n\nAddress: $address"
+        findViewById<TextView>(R.id.tvTitle).text =
+            if (fullName.isBlank()) "Profile" else fullName
+
+        findViewById<TextView>(R.id.tvSubtitle).text = "Your verified profile information"
+
+        findViewById<TextView>(R.id.tvAvatarLetter).text =
+            fullName.firstOrNull()?.uppercase() ?: "J"
+
+        findViewById<TextView>(R.id.tvValueName).text =
+            if (fullName.isBlank()) "-" else fullName
+
+        findViewById<TextView>(R.id.tvValueDob).text =
+            if (dob.isBlank()) "-" else dob
+
+        findViewById<TextView>(R.id.tvValueAddress).text =
+            if (address.isBlank()) "-" else address
     }
 }

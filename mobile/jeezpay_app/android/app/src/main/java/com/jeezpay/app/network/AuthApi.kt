@@ -16,10 +16,13 @@ import com.jeezpay.app.network.dto.SignupRequestOtpRequest
 import com.jeezpay.app.network.dto.SignupRequestOtpResponse
 import com.jeezpay.app.network.dto.SignupVerifyOtpRequest
 import com.jeezpay.app.network.dto.SignupVerifyOtpResponse
+import com.jeezpay.app.network.dto.UpdateAvatarRequest
+import com.jeezpay.app.network.dto.UpdateAvatarResponse
 import com.jeezpay.app.network.dto.VerifyPinRequest
 import com.jeezpay.app.network.dto.VerifyPinResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.PATCH
 
 interface AuthApi {
 
@@ -57,6 +60,11 @@ interface AuthApi {
     suspend fun forgotPinVerifyOtp(
         @Body body: ForgotPinVerifyOtpRequest
     ): ForgotPinVerifyOtpResponse
+
+    @PATCH("auth/avatar")
+    suspend fun updateAvatar(
+        @Body request: UpdateAvatarRequest
+    ): UpdateAvatarResponse
 }
 
 
