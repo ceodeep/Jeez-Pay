@@ -6,30 +6,30 @@ import android.text.InputType
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
 import androidx.activity.result.contract.ActivityResultContracts
-import com.jeezpay.app.base.BaseFintechActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.jeezpay.app.base.BaseFintechActivity
+import com.jeezpay.app.common.LoaderOverlayController
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.AppError
 import com.jeezpay.app.repository.AuthRepository
 import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.appcompat.app.AlertDialog
-import android.widget.ImageView
-import com.jeezpay.app.network.ApiResult
-import com.jeezpay.app.network.AppError
-import com.jeezpay.app.utils.NetworkUtils
-import com.jeezpay.app.common.LoaderOverlayController
 
 class AuthActivity : BaseFintechActivity() {
 
-    companion object{const val EXTRA_FORCE_LOGIN = "extra_force_login"}
+    companion object {
+        const val EXTRA_FORCE_LOGIN = "extra_force_login"
+    }
 
     private lateinit var session: SessionManager
     private val repo = AuthRepository()
@@ -43,6 +43,8 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var createAccountRow: LinearLayout
     private lateinit var tvForgotPassword: TextView
     private lateinit var passwordBox: LinearLayout
+    private lateinit var etLoginPassword: EditText
+    private lateinit var ivLoginEye: ImageView
 
     // OTP screen
     private lateinit var btnBackOtp: TextView
@@ -54,15 +56,6 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var otpBox4: TextView
     private lateinit var otpBox5: TextView
     private lateinit var otpBox6: TextView
-    private lateinit var setPinDot1: android.widget.ImageView
-    private lateinit var setPinDot2: android.widget.ImageView
-    private lateinit var setPinDot3: android.widget.ImageView
-    private lateinit var setPinDot4: android.widget.ImageView
-    private lateinit var unlockDot1: android.widget.ImageView
-    private lateinit var unlockDot2: android.widget.ImageView
-    private lateinit var unlockDot3: android.widget.ImageView
-    private lateinit var unlockDot4: android.widget.ImageView
-    private lateinit var etUnlockPin: EditText
     private lateinit var otpBoxesRow: LinearLayout
     private lateinit var btnVerify: MaterialButton
 
@@ -70,10 +63,20 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var btnBackPin: TextView
     private lateinit var etPin: EditText
     private lateinit var btnSetPin: MaterialButton
+    private lateinit var setPinDot1: ImageView
+    private lateinit var setPinDot2: ImageView
+    private lateinit var setPinDot3: ImageView
+    private lateinit var setPinDot4: ImageView
 
     // Unlock
     private lateinit var btnUseAnotherAccount: TextView
     private lateinit var btnUnlock: MaterialButton
+    private lateinit var tvForgotPin: TextView
+    private lateinit var etUnlockPin: EditText
+    private lateinit var unlockDot1: ImageView
+    private lateinit var unlockDot2: ImageView
+    private lateinit var unlockDot3: ImageView
+    private lateinit var unlockDot4: ImageView
 
     // Create account
     private lateinit var actAccountType: AutoCompleteTextView
@@ -82,16 +85,13 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var etSignupPhone: EditText
     private lateinit var etSignupPassword: EditText
     private lateinit var etSignupConfirmPassword: EditText
+    private lateinit var etReferralCode: EditText
     private lateinit var cbTerms: android.widget.CheckBox
-    private lateinit var ivSignupEye1: android.widget.ImageView
-    private lateinit var ivSignupEye2: android.widget.ImageView
+    private lateinit var ivSignupEye1: ImageView
+    private lateinit var ivSignupEye2: ImageView
     private lateinit var btnCreateAccount: MaterialButton
     private lateinit var loginInsteadRow: LinearLayout
-    private lateinit var etLoginPassword: EditText
-    private lateinit var ivLoginEye: android.widget.ImageView
     private lateinit var btnAccountCreatedContinue: MaterialButton
-    private lateinit var tvForgotPin: TextView
-
 
     private lateinit var loaderOverlay: LoaderOverlayController
 
@@ -107,15 +107,14 @@ class AuthActivity : BaseFintechActivity() {
     private var pendingForgotPasswordPhone: String? = null
     private var pendingForgotPasswordNewPassword: String? = null
 
-
-
     private data class PendingSignup(
         val fullName: String,
         val phone: String,
         val password: String,
         val accountType: String,
         val countryCode: String,
-        val termsAccepted: Boolean
+        val termsAccepted: Boolean,
+        val referralCode: String?
     )
 
     private var pendingSignup: PendingSignup? = null
@@ -151,21 +150,24 @@ class AuthActivity : BaseFintechActivity() {
         setupExtraClicks()
         setupCreateAccountScreen()
         setupAccountCreatedScreen()
-        flipper.inAnimation = android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_in)
-        flipper.outAnimation = android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_out)
+
+        flipper.inAnimation =
+            android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_in)
+        flipper.outAnimation =
+            android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_out)
     }
 
     private fun bindViews() {
         flipper = findViewById(R.id.authFlipper)
 
         etPhone = findViewById(R.id.etPhone)
-        etSignupFullName = findViewById(R.id.etSignupFullName)
         btnContinue = findViewById(R.id.btnContinue)
         actCountryCode = findViewById(R.id.actCountryCode)
         createAccountRow = findViewById(R.id.createAccountRow)
         tvForgotPassword = findViewById(R.id.tvForgotPassword)
-        tvForgotPin = findViewById(R.id.tvForgotPin)
         passwordBox = findViewById(R.id.passwordBox)
+        etLoginPassword = findViewById(R.id.etLoginPassword)
+        ivLoginEye = findViewById(R.id.ivLoginEye)
 
         otpBox1 = findViewById(R.id.otpBox1)
         otpBox2 = findViewById(R.id.otpBox2)
@@ -173,13 +175,7 @@ class AuthActivity : BaseFintechActivity() {
         otpBox4 = findViewById(R.id.otpBox4)
         otpBox5 = findViewById(R.id.otpBox5)
         otpBox6 = findViewById(R.id.otpBox6)
-        unlockDot1 = findViewById(R.id.unlockDot1)
-        unlockDot2 = findViewById(R.id.unlockDot2)
-        unlockDot3 = findViewById(R.id.unlockDot3)
-        unlockDot4 = findViewById(R.id.unlockDot4)
-        etUnlockPin = findViewById(R.id.etUnlockPin)
         otpBoxesRow = findViewById(R.id.otpBoxesRow)
-
         btnBackOtp = findViewById(R.id.btnBackOtp)
         tvOtpHint = findViewById(R.id.tvOtpHint)
         etOtp = findViewById(R.id.etOtp)
@@ -188,28 +184,32 @@ class AuthActivity : BaseFintechActivity() {
         btnBackPin = findViewById(R.id.btnBackPin)
         etPin = findViewById(R.id.etPin)
         btnSetPin = findViewById(R.id.btnSetPin)
-
-        btnUseAnotherAccount = findViewById(R.id.btnUseAnotherAccount)
-        btnUnlock = findViewById(R.id.btnUnlock)
-
-        actAccountType = findViewById(R.id.actAccountType)
-        actSignupCountryCode = findViewById(R.id.actSignupCountryCode)
-        etSignupPhone = findViewById(R.id.etSignupPhone)
-        etSignupPassword = findViewById(R.id.etSignupPassword)
-        etSignupConfirmPassword = findViewById(R.id.etSignupConfirmPassword)
-        cbTerms = findViewById(R.id.cbTerms)
-        btnCreateAccount = findViewById(R.id.btnCreateAccount)
-        loginInsteadRow = findViewById(R.id.loginInsteadRow)
-        ivSignupEye1 = findViewById(R.id.ivSignupEye1)
-        ivSignupEye2 = findViewById(R.id.ivSignupEye2)
-
-        etLoginPassword = findViewById(R.id.etLoginPassword)
-        ivLoginEye = findViewById(R.id.ivLoginEye)
-
         setPinDot1 = findViewById(R.id.setPinDot1)
         setPinDot2 = findViewById(R.id.setPinDot2)
         setPinDot3 = findViewById(R.id.setPinDot3)
         setPinDot4 = findViewById(R.id.setPinDot4)
+
+        btnUseAnotherAccount = findViewById(R.id.btnUseAnotherAccount)
+        btnUnlock = findViewById(R.id.btnUnlock)
+        tvForgotPin = findViewById(R.id.tvForgotPin)
+        etUnlockPin = findViewById(R.id.etUnlockPin)
+        unlockDot1 = findViewById(R.id.unlockDot1)
+        unlockDot2 = findViewById(R.id.unlockDot2)
+        unlockDot3 = findViewById(R.id.unlockDot3)
+        unlockDot4 = findViewById(R.id.unlockDot4)
+
+        actAccountType = findViewById(R.id.actAccountType)
+        actSignupCountryCode = findViewById(R.id.actSignupCountryCode)
+        etSignupFullName = findViewById(R.id.etSignupFullName)
+        etSignupPhone = findViewById(R.id.etSignupPhone)
+        etSignupPassword = findViewById(R.id.etSignupPassword)
+        etSignupConfirmPassword = findViewById(R.id.etSignupConfirmPassword)
+        etReferralCode = findViewById(R.id.etReferralCode)
+        cbTerms = findViewById(R.id.cbTerms)
+        ivSignupEye1 = findViewById(R.id.ivSignupEye1)
+        ivSignupEye2 = findViewById(R.id.ivSignupEye2)
+        btnCreateAccount = findViewById(R.id.btnCreateAccount)
+        loginInsteadRow = findViewById(R.id.loginInsteadRow)
         btnAccountCreatedContinue = findViewById(R.id.btnAccountCreatedContinue)
     }
 
@@ -235,11 +235,10 @@ class AuthActivity : BaseFintechActivity() {
 
             val input = EditText(this).apply {
                 hint = "Enter new password"
-                inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                        android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             }
 
-            com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+            MaterialAlertDialogBuilder(this)
                 .setTitle("Reset Password")
                 .setView(input)
                 .setNegativeButton("Cancel", null)
@@ -247,7 +246,11 @@ class AuthActivity : BaseFintechActivity() {
                     val newPassword = input.text.toString().trim()
 
                     if (newPassword.length < 4) {
-                        Toast.makeText(this, "Password must be at least 4 characters", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this,
+                            "Password must be at least 4 characters",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         return@setPositiveButton
                     }
 
@@ -274,18 +277,14 @@ class AuthActivity : BaseFintechActivity() {
 
             etLoginPassword.inputType =
                 if (loginPasswordVisible) {
-                    android.text.InputType.TYPE_CLASS_TEXT or
-                            android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                 } else {
-                    android.text.InputType.TYPE_CLASS_TEXT or
-                            android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 }
 
             etLoginPassword.setSelection(etLoginPassword.text?.length ?: 0)
         }
     }
-
-
 
     private fun updateLoginButtonState() {
         btnContinue.isEnabled =
@@ -394,8 +393,12 @@ class AuthActivity : BaseFintechActivity() {
         otpBoxesRow.setOnClickListener {
             etOtp.requestFocus()
             etOtp.post {
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                imm.showSoftInput(etOtp, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                val imm =
+                    getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.showSoftInput(
+                    etOtp,
+                    android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
+                )
             }
         }
 
@@ -426,7 +429,8 @@ class AuthActivity : BaseFintechActivity() {
                         password = signup.password,
                         accountType = signup.accountType,
                         countryCode = signup.countryCode,
-                        termsAccepted = signup.termsAccepted
+                        termsAccepted = signup.termsAccepted,
+                        referralCode = signup.referralCode
                     ) { token, hasPin ->
                         session.saveToken(token)
                         session.savePhone(signup.phone)
@@ -517,7 +521,6 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun setupPinSetScreen() {
-
         val key1 = findViewById<TextView>(R.id.setPinKey1)
         val key2 = findViewById<TextView>(R.id.setPinKey2)
         val key3 = findViewById<TextView>(R.id.setPinKey3)
@@ -593,6 +596,7 @@ class AuthActivity : BaseFintechActivity() {
                 Toast.makeText(this, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+
             android.util.Log.d("AuthActivity", "SET_PIN value=[$pin], length=${pin.length}")
             setPinOnBackend(pin)
         }
@@ -601,7 +605,6 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun setupUnlockScreen() {
-
         val key1 = findViewById<TextView>(R.id.unlockKey1)
         val key2 = findViewById<TextView>(R.id.unlockKey2)
         val key3 = findViewById<TextView>(R.id.unlockKey3)
@@ -613,8 +616,6 @@ class AuthActivity : BaseFintechActivity() {
         val key9 = findViewById<TextView>(R.id.unlockKey9)
         val key0 = findViewById<TextView>(R.id.unlockKey0)
         val backspace = findViewById<TextView>(R.id.unlockBackspace)
-
-
 
         fun appendDigit(digit: String) {
             if (session.isPinLocked()) {
@@ -763,6 +764,7 @@ class AuthActivity : BaseFintechActivity() {
         accountType: String,
         countryCode: String,
         termsAccepted: Boolean,
+        referralCode: String?,
         onSuccess: () -> Unit
     ) {
         setMaterialButtonLoading(btnCreateAccount, true, "Create account", "Requesting OTP...")
@@ -775,7 +777,8 @@ class AuthActivity : BaseFintechActivity() {
                     password = password,
                     accountType = accountType,
                     countryCode = countryCode,
-                    termsAccepted = termsAccepted
+                    termsAccepted = termsAccepted,
+                    referralCode = referralCode
                 )
             ) {
                 is ApiResult.Success -> {
@@ -798,6 +801,7 @@ class AuthActivity : BaseFintechActivity() {
                                 accountType,
                                 countryCode,
                                 termsAccepted,
+                                referralCode,
                                 onSuccess
                             )
                         }
@@ -806,6 +810,7 @@ class AuthActivity : BaseFintechActivity() {
             }
         }
     }
+
     private fun signupVerifyOtp(
         fullName: String,
         phone: String,
@@ -814,6 +819,7 @@ class AuthActivity : BaseFintechActivity() {
         accountType: String,
         countryCode: String,
         termsAccepted: Boolean,
+        referralCode: String?,
         onSuccess: (token: String, hasPin: Boolean) -> Unit
     ) {
         setFullScreenLoading(true)
@@ -827,7 +833,8 @@ class AuthActivity : BaseFintechActivity() {
                     password = password,
                     accountType = accountType,
                     countryCode = countryCode,
-                    termsAccepted = termsAccepted
+                    termsAccepted = termsAccepted,
+                    referralCode = referralCode
                 )
             ) {
                 is ApiResult.Success -> {
@@ -851,6 +858,7 @@ class AuthActivity : BaseFintechActivity() {
                                 accountType,
                                 countryCode,
                                 termsAccepted,
+                                referralCode,
                                 onSuccess
                             )
                         }
@@ -870,7 +878,11 @@ class AuthActivity : BaseFintechActivity() {
                         setMaterialButtonLoading(btnSetPin, false, "Set PIN")
                         session.savePin(pin)
                         session.resetFailedPinAttempts()
-                        Toast.makeText(this@AuthActivity, "PIN set successfully", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            this@AuthActivity,
+                            "PIN set successfully",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         etPin.text?.clear()
                         openMain()
                     }
@@ -985,18 +997,26 @@ class AuthActivity : BaseFintechActivity() {
         actSignupCountryCode.dropDownWidth = 300
 
         fun validateSignup() {
-            val nameOk = etSignupFullName.text.toString().trim().isNotEmpty()
-            val phoneOk = etSignupPhone.text.toString().trim().length >= 6
+            val name = etSignupFullName.text.toString().trim()
+            val phone = etSignupPhone.text.toString().trim()
             val pass = etSignupPassword.text.toString().trim()
             val confirm = etSignupConfirmPassword.text.toString().trim()
+
+            val nameOk = name.isNotEmpty()
+            val phoneOk = phone.length >= 6
             val passOk = pass.length >= 4
-            val confirmOk = pass == confirm
-            btnCreateAccount.isEnabled = nameOk && phoneOk && passOk && confirmOk && cbTerms.isChecked
+            val confirmOk = pass == confirm && confirm.isNotEmpty()
+            val termsOk = cbTerms.isChecked
+
+            btnCreateAccount.isEnabled = nameOk && phoneOk && passOk && confirmOk && termsOk
+            btnCreateAccount.alpha = if (btnCreateAccount.isEnabled) 1f else 0.5f
         }
+
         etSignupFullName.addTextChangedListener(SimpleTextWatcher { validateSignup() })
         etSignupPhone.addTextChangedListener(SimpleTextWatcher { validateSignup() })
         etSignupPassword.addTextChangedListener(SimpleTextWatcher { validateSignup() })
         etSignupConfirmPassword.addTextChangedListener(SimpleTextWatcher { validateSignup() })
+        etReferralCode.addTextChangedListener(SimpleTextWatcher { validateSignup() })
         cbTerms.setOnCheckedChangeListener { _, _ -> validateSignup() }
 
         var signupPasswordVisible = false
@@ -1035,6 +1055,7 @@ class AuthActivity : BaseFintechActivity() {
             val accountType = actAccountType.text.toString().trim()
             val countryCode = actSignupCountryCode.text.toString().trim()
             val termsAccepted = cbTerms.isChecked
+            val referralCode = etReferralCode.text.toString().trim().ifEmpty { null }
 
             if (fullName.isBlank()) {
                 Toast.makeText(this, "Enter your full name", Toast.LENGTH_SHORT).show()
@@ -1045,6 +1066,7 @@ class AuthActivity : BaseFintechActivity() {
                 Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+
             otpFlowMode = OtpFlowMode.SIGNUP
 
             pendingSignup = PendingSignup(
@@ -1053,7 +1075,8 @@ class AuthActivity : BaseFintechActivity() {
                 password = password,
                 accountType = accountType,
                 countryCode = countryCode,
-                termsAccepted = termsAccepted
+                termsAccepted = termsAccepted,
+                referralCode = referralCode
             )
 
             signupRequestOtp(
@@ -1062,7 +1085,8 @@ class AuthActivity : BaseFintechActivity() {
                 password = password,
                 accountType = accountType,
                 countryCode = countryCode,
-                termsAccepted = termsAccepted
+                termsAccepted = termsAccepted,
+                referralCode = referralCode
             ) {
                 flipper.displayedChild = 1
                 tvOtpHint.text = "Enter the code sent to $phone"
@@ -1077,6 +1101,7 @@ class AuthActivity : BaseFintechActivity() {
 
         validateSignup()
     }
+
     private fun setupAccountCreatedScreen() {
         btnAccountCreatedContinue.setOnClickListener {
             flipper.displayedChild = 2
@@ -1180,12 +1205,6 @@ class AuthActivity : BaseFintechActivity() {
         }
     }
 
-
-
-
-
-
-
     private fun handleAuthError(
         error: AppError,
         retryAction: () -> Unit = {}
@@ -1199,6 +1218,7 @@ class AuthActivity : BaseFintechActivity() {
             }
         )
     }
+
     private fun renderUnlockDotsSafe(pin: String) {
         unlockDot1.setImageResource(
             if (pin.length >= 1) R.drawable.ic_pin_dot_filled else R.drawable.ic_pin_dot_empty
@@ -1229,7 +1249,7 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun setMaterialButtonLoading(
-        button: com.google.android.material.button.MaterialButton,
+        button: MaterialButton,
         loading: Boolean,
         idleText: String,
         loadingText: String = "Loading..."
@@ -1240,9 +1260,7 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun setFullScreenLoading(loading: Boolean) {
-
-        if (loading) showBlockingLoader()
-        else hideBlockingLoader()
+        if (loading) showBlockingLoader() else hideBlockingLoader()
 
         btnContinue.isEnabled = !loading
         btnVerify.isEnabled = !loading
@@ -1250,5 +1268,4 @@ class AuthActivity : BaseFintechActivity() {
         btnSetPin.isEnabled = !loading
         btnUnlock.isEnabled = !loading
     }
-
 }

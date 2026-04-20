@@ -5,7 +5,11 @@ const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
 const { generateOTP } = require("../utils/otp");
-const { sendWhatsAppOTP } = require("../services/whatsapp.service");
+const {
+  sendWhatsAppOTP,
+  USE_MOCK_OTP,
+  MOCK_OTP,
+} = require("../services/whatsapp.service");
 const bcrypt = require("bcrypt");
 
 // You can keep your currencies here
@@ -33,6 +37,45 @@ function mapAccountTypeToRole(accountType) {
   return "user";
 }
 
+function normalizeReferralCode(raw) {
+  return String(raw || "").trim().toUpperCase();
+}
+
+function generateReferralCode(fullName, phone) {
+  const namePart =
+    String(fullName || "")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .toUpperCase()
+      .slice(0, 4) || "JEEZ";
+
+  const phoneDigits = String(phone || "").replace(/\D/g, "").slice(-4) || "0000";
+  const randomPart = Math.random().toString(36).slice(2, 5).toUpperCase();
+
+  return `${namePart}${phoneDigits}${randomPart}`;
+}
+
+async function generateUniqueReferralCode(fullName, phone) {
+  for (let i = 0; i < 10; i++) {
+    const candidate = generateReferralCode(fullName, phone);
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("id")
+      .eq("referral_code", candidate)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Failed to generate unique referral code");
+}
+
 async function seedWalletsForUser(userId) {
   const seedRows = DEFAULT_CURRENCIES.map((currency) => ({
     user_id: userId,
@@ -48,8 +91,10 @@ async function seedWalletsForUser(userId) {
 }
 
 async function createAndSendOtp(phone, purpose) {
-  const code = generateOTP();
-  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
+  const code = USE_MOCK_OTP ? MOCK_OTP : generateOTP();
+  const expiresAt = new Date(
+    Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
+  ).toISOString();
 
   const { error: deleteErr } = await supabase
     .from("otp_codes")
@@ -70,6 +115,11 @@ async function createAndSendOtp(phone, purpose) {
 
   if (insertErr) {
     throw insertErr;
+  }
+
+  if (USE_MOCK_OTP) {
+    console.log("🧪 MOCK OTP MODE ENABLED");
+    console.log(`📲 Mock OTP for ${phone} (${purpose}): ${code}`);
   }
 
   await sendWhatsAppOTP(phone, code);
@@ -122,6 +172,7 @@ router.post("/signup/request-otp", async (req, res) => {
     const accountType = String(req.body.accountType || "").trim();
     const countryCode = String(req.body.countryCode || "").trim();
     const termsAccepted = !!req.body.termsAccepted;
+    const referralCode = normalizeReferralCode(req.body.referralCode);
 
     if (!phone || !fullName || !password || !accountType || !countryCode) {
       return res.status(400).json({
@@ -158,10 +209,31 @@ router.post("/signup/request-otp", async (req, res) => {
       });
     }
 
+    if (referralCode) {
+      const { data: referrer, error: referrerErr } = await supabase
+        .from("users")
+        .select("id, phone, referral_code")
+        .eq("referral_code", referralCode)
+        .maybeSingle();
+
+      if (referrerErr) {
+        console.error("signup/request-otp referral lookup error:", referrerErr);
+        return res.status(500).json({ message: "Referral lookup failed" });
+      }
+
+      if (!referrer) {
+        return res.status(400).json({ message: "Invalid referral code" });
+      }
+
+      if (referrer.phone === phone) {
+        return res.status(400).json({ message: "You cannot use your own referral code" });
+      }
+    }
+
     await createAndSendOtp(phone, "signup");
 
     return res.json({
-      message: "OTP sent via WhatsApp",
+      message: "OTP sent",
     });
   } catch (err) {
     console.error("signup/request-otp crash:", err);
@@ -181,6 +253,7 @@ router.post("/signup/verify-otp", async (req, res) => {
     const accountType = String(req.body.accountType || "").trim();
     const countryCode = String(req.body.countryCode || "").trim();
     const termsAccepted = !!req.body.termsAccepted;
+    const referralCode = normalizeReferralCode(req.body.referralCode);
 
     if (!phone || !fullName || !otp || !password || !accountType || !countryCode) {
       return res.status(400).json({
@@ -203,6 +276,31 @@ router.post("/signup/verify-otp", async (req, res) => {
     const otpCheck = await verifyOtpCode(phone, "signup", otp);
     if (!otpCheck.ok) {
       return res.status(otpCheck.status).json({ message: otpCheck.message });
+    }
+
+    let referrer = null;
+
+    if (referralCode) {
+      const { data: referrerData, error: referrerErr } = await supabase
+        .from("users")
+        .select("id, phone, referral_code")
+        .eq("referral_code", referralCode)
+        .maybeSingle();
+
+      if (referrerErr) {
+        console.error("signup/verify-otp referral lookup error:", referrerErr);
+        return res.status(500).json({ message: "Referral lookup failed" });
+      }
+
+      if (!referrerData) {
+        return res.status(400).json({ message: "Invalid referral code" });
+      }
+
+      if (referrerData.phone === phone) {
+        return res.status(400).json({ message: "You cannot use your own referral code" });
+      }
+
+      referrer = referrerData;
     }
 
     const { data: existingUser, error: fetchErr } = await supabase
@@ -240,6 +338,8 @@ router.post("/signup/verify-otp", async (req, res) => {
             country_code: countryCode,
             terms_accepted: termsAccepted,
             role,
+            referral_code: await generateUniqueReferralCode(fullName, phone),
+            referred_by_user_id: referrer?.id || null,
           },
         ])
         .select()
@@ -269,6 +369,7 @@ router.post("/signup/verify-otp", async (req, res) => {
           country_code: countryCode,
           terms_accepted: termsAccepted,
           role,
+          referred_by_user_id: user.referred_by_user_id || referrer?.id || null,
         })
         .eq("id", user.id)
         .select()
@@ -536,7 +637,7 @@ router.get("/me", authMiddleware, async (req, res) => {
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone, fullName, avatar_key, role, account_type, country_code, phone_verified, terms_accepted")
+      .select("id, phone, fullName, avatar_key, referral_code, referred_by_user_id, role, account_type, country_code, phone_verified, terms_accepted")
       .eq("id", userId)
       .maybeSingle();
 
@@ -584,7 +685,7 @@ router.post("/forgot-password/request-otp", async (req, res) => {
     await createAndSendOtp(phone, "forgot_password");
 
     return res.json({
-      message: "OTP sent via WhatsApp",
+      message: "OTP sent",
     });
   } catch (err) {
     console.error("forgot-password/request-otp crash:", err);
@@ -691,7 +792,7 @@ router.post("/forgot-pin/request-otp", async (req, res) => {
     await createAndSendOtp(phone, "forgot_pin");
 
     return res.json({
-      message: "OTP sent via WhatsApp",
+      message: "OTP sent",
     });
   } catch (err) {
     console.error("forgot-pin/request-otp crash:", err);

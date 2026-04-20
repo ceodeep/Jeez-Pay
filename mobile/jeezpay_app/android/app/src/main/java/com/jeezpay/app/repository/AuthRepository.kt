@@ -23,6 +23,7 @@ import com.jeezpay.app.network.dto.VerifyPinResponse
 import com.jeezpay.app.network.safeApiCall
 import com.jeezpay.app.network.dto.UpdateAvatarRequest
 import com.jeezpay.app.network.dto.UpdateAvatarResponse
+import com.jeezpay.app.network.dto.MeResponse
 
 class AuthRepository {
 
@@ -43,7 +44,8 @@ class AuthRepository {
         password: String,
         accountType: String,
         countryCode: String,
-        termsAccepted: Boolean
+        termsAccepted: Boolean,
+        referralCode: String?
     ): SignupRequestOtpResponse {
         return api.signupRequestOtp(
             SignupRequestOtpRequest(
@@ -52,7 +54,8 @@ class AuthRepository {
                 password = password,
                 accountType = accountType,
                 countryCode = countryCode,
-                termsAccepted = termsAccepted
+                termsAccepted = termsAccepted,
+                referralCode = referralCode
             )
         )
     }
@@ -64,7 +67,8 @@ class AuthRepository {
         password: String,
         accountType: String,
         countryCode: String,
-        termsAccepted: Boolean
+        termsAccepted: Boolean,
+        referralCode: String?
     ): SignupVerifyOtpResponse {
         return api.signupVerifyOtp(
             SignupVerifyOtpRequest(
@@ -74,7 +78,8 @@ class AuthRepository {
                 password = password,
                 accountType = accountType,
                 countryCode = countryCode,
-                termsAccepted = termsAccepted
+                termsAccepted = termsAccepted,
+                referralCode = referralCode
             )
         )
     }
@@ -137,7 +142,8 @@ class AuthRepository {
         password: String,
         accountType: String,
         countryCode: String,
-        termsAccepted: Boolean
+        termsAccepted: Boolean,
+        referralCode: String?
     ): ApiResult<SignupRequestOtpResponse> {
         return safeApiCall {
             api.signupRequestOtp(
@@ -147,7 +153,8 @@ class AuthRepository {
                     password = password,
                     accountType = accountType,
                     countryCode = countryCode,
-                    termsAccepted = termsAccepted
+                    termsAccepted = termsAccepted,
+                    referralCode = referralCode
                 )
             )
         }
@@ -160,7 +167,8 @@ class AuthRepository {
         password: String,
         accountType: String,
         countryCode: String,
-        termsAccepted: Boolean
+        termsAccepted: Boolean,
+        referralCode: String?
     ): ApiResult<SignupVerifyOtpResponse> {
         return safeApiCall {
             api.signupVerifyOtp(
@@ -171,7 +179,8 @@ class AuthRepository {
                     password = password,
                     accountType = accountType,
                     countryCode = countryCode,
-                    termsAccepted = termsAccepted
+                    termsAccepted = termsAccepted,
+                    referralCode = referralCode
                 )
             )
         }
@@ -234,6 +243,16 @@ class AuthRepository {
     suspend fun updateAvatarSafe(avatarKey: String): ApiResult<UpdateAvatarResponse> {
         return safeApiCall {
             api.updateAvatar(UpdateAvatarRequest(avatarKey = avatarKey))
+        }
+    }
+
+    suspend fun me(): MeResponse {
+        return api.me()
+    }
+
+    suspend fun meSafe(): ApiResult<MeResponse> {
+        return safeApiCall {
+            api.me()
         }
     }
 }

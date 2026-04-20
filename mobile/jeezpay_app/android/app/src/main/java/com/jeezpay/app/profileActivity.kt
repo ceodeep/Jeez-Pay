@@ -2,6 +2,7 @@ package com.jeezpay.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.GridLayout
 import android.widget.ImageView
@@ -21,8 +22,10 @@ import com.jeezpay.app.repository.KycRepository
 import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.launch
 import java.util.Locale
+import android.view.Gravity
 
 class ProfileActivity : AppCompatActivity() {
+    fun Int.dp(): Int = (this * resources.displayMetrics.density).toInt()
 
     private lateinit var binding: ActivityProfileBinding
     private var approvedKyc: KycProfile? = null
@@ -121,7 +124,7 @@ class ProfileActivity : AppCompatActivity() {
             startActivity(Intent(this, KycActivity::class.java))
         }
 
-        applySelectedAvatar()
+        syncAvatarFromBackend()
         populateHeader()
         refreshKycCard()
     }
@@ -155,8 +158,41 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun updateAvatarSelection(avatarKey: String) {
+        if (avatarKey == getSelectedAvatarKey()) {
+            currentAvatarDialog?.dismiss()
+            return
+        }
         saveSelectedAvatarKey(avatarKey)
-        applySelectedAvatar()
+
+        val newAvatarRes = getAvatarResIdFromKey(avatarKey)
+
+        binding.avatarClickArea.animate()
+            .scaleX(0.94f)
+            .scaleY(0.94f)
+            .setDuration(90)
+            .withEndAction {
+                binding.ivAvatar.setImageResource(newAvatarRes)
+
+                binding.avatarClickArea.animate()
+                    .scaleX(1.04f)
+                    .scaleY(1.04f)
+                    .setDuration(140)
+                    .withEndAction {
+                        binding.avatarClickArea.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(100)
+                            .start()
+                    }
+                    .start()
+
+                binding.ivAvatar.alpha = 0.82f
+                binding.ivAvatar.animate()
+                    .alpha(1f)
+                    .setDuration(160)
+                    .start()
+            }
+            .start()
 
         lifecycleScope.launch {
             when (val result = authRepo.updateAvatarSafe(avatarKey)) {
@@ -332,71 +368,83 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun showAvatarPickerDialog() {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(36, 32, 36, 20)
-        }
+        val view = layoutInflater.inflate(R.layout.dialog_avatar_picker, null)
 
-        val title = TextView(this).apply {
-            text = "Choose Avatar"
-            textSize = 20f
-            setTextColor(getColor(R.color.text_primary))
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
-
-        val subtitle = TextView(this).apply {
-            text = "Select one of the predefined avatars"
-            textSize = 14f
-            setTextColor(getColor(R.color.text_secondary))
-            setPadding(0, 10, 0, 24)
-        }
-
-        val grid = GridLayout(this).apply {
-            columnCount = 3
-            rowCount = 2
-            useDefaultMargins = true
-            alignmentMode = GridLayout.ALIGN_MARGINS
-        }
-
-        avatarOptions.forEach { (avatarKey, avatarRes) ->
-            val card = CardView(this).apply {
-                radius = 999f
-                cardElevation = 0f
-                setCardBackgroundColor(getColor(R.color.card_white))
-                layoutParams = LinearLayout.LayoutParams(220, 220).apply {
-                    setMargins(12, 12, 12, 12)
-                }
-                preventCornerOverlap = true
-                useCompatPadding = true
-                setContentPadding(18, 18, 18, 18)
-            }
-
-            val image = ImageView(this).apply {
-                setImageResource(avatarRes)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.MATCH_PARENT
-                )
-                setOnClickListener {
-                    updateAvatarSelection(avatarKey)
-                }
-            }
-
-            card.addView(image)
-            grid.addView(card)
-        }
-
-        root.addView(title)
-        root.addView(subtitle)
-        root.addView(grid)
-
-        currentAvatarDialog = AlertDialog.Builder(this)
-            .setView(root)
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
             .create()
 
-        currentAvatarDialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        currentAvatarDialog?.show()
+        val selectedKey = getSelectedAvatarKey()
+
+        val items = listOf(
+            Triple(
+                "avatar_1",
+                view.findViewById<View>(R.id.avatarItem1),
+                view.findViewById<ImageView>(R.id.avatarCheck1)
+            ),
+            Triple(
+                "avatar_2",
+                view.findViewById<View>(R.id.avatarItem2),
+                view.findViewById<ImageView>(R.id.avatarCheck2)
+            ),
+            Triple(
+                "avatar_3",
+                view.findViewById<View>(R.id.avatarItem3),
+                view.findViewById<ImageView>(R.id.avatarCheck3)
+            ),
+            Triple(
+                "avatar_4",
+                view.findViewById<View>(R.id.avatarItem4),
+                view.findViewById<ImageView>(R.id.avatarCheck4)
+            ),
+            Triple(
+                "avatar_5",
+                view.findViewById<View>(R.id.avatarItem5),
+                view.findViewById<ImageView>(R.id.avatarCheck5)
+            ),
+            Triple(
+                "avatar_6",
+                view.findViewById<View>(R.id.avatarItem6),
+                view.findViewById<ImageView>(R.id.avatarCheck6)
+            )
+        )
+
+        items.forEach { (key, container, check) ->
+            val isSelected = key == selectedKey
+            container.setBackgroundResource(
+                if (isSelected) R.drawable.bg_avatar_item_selected
+                else R.drawable.bg_avatar_item
+            )
+            check.visibility = if (isSelected) View.VISIBLE else View.GONE
+
+            container.setOnClickListener {
+                container.animate()
+                    .scaleX(0.96f)
+                    .scaleY(0.96f)
+                    .setDuration(80)
+                    .withEndAction {
+                        container.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .setDuration(80)
+                            .withEndAction {
+                                updateAvatarSelection(key)
+                                dialog.dismiss()
+                            }
+                            .start()
+                    }
+                    .start()
+            }
+        }
+
+        dialog.show()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setLayout(
+            (resources.displayMetrics.widthPixels * 0.92).toInt(),
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+
+        currentAvatarDialog = dialog
     }
 
     private fun showServerFailureDialog(
@@ -521,5 +569,25 @@ class ProfileActivity : AppCompatActivity() {
             cancelText = "Close",
             onConfirm = onRetry
         )
+    }
+
+    private fun syncAvatarFromBackend() {
+        lifecycleScope.launch {
+            when (val result = authRepo.meSafe()) {
+                is ApiResult.Success -> {
+                    val backendAvatarKey = result.data.user?.avatar_key?.trim().orEmpty()
+
+                    if (backendAvatarKey.isNotBlank() && avatarOptions.any { it.first == backendAvatarKey }) {
+                        saveSelectedAvatarKey(backendAvatarKey)
+                    }
+
+                    applySelectedAvatar()
+                }
+
+                is ApiResult.Error -> {
+                    applySelectedAvatar()
+                }
+            }
+        }
     }
 }

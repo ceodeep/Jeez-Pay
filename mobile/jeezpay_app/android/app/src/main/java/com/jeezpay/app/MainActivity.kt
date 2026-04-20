@@ -257,6 +257,7 @@ class MainActivity : BaseFintechActivity() {
         swipeRefreshLayout.setOnRefreshListener {
             fetchBalanceAndHistory()
         }
+        applyHeaderAvatar()
 
         val profileCard = findViewById<View>(R.id.profileCard)
         profileCard.setOnClickListener {
@@ -507,15 +508,10 @@ class MainActivity : BaseFintechActivity() {
 
     override fun onResume() {
         super.onResume()
+        applyHeaderAvatar() // ✅ refresh avatar
         fetchBalanceAndHistory()
-
     }
 
-    /**
-     * ✅ This is the missing function.
-     * It fetches the selected currency balance + its last transactions
-     * and updates UI + RecyclerView.
-     */
 
 
     private fun fetchBalanceAndHistory() {
@@ -640,8 +636,31 @@ class MainActivity : BaseFintechActivity() {
         btnCurrency.isEnabled = !loading
         btnToggleBalance.isEnabled = !loading
     }
+
+    private val avatarOptions = listOf(
+        "avatar_1" to R.drawable.avatar_1,
+        "avatar_2" to R.drawable.avatar_2,
+        "avatar_3" to R.drawable.avatar_3,
+        "avatar_4" to R.drawable.avatar_4,
+        "avatar_5" to R.drawable.avatar_5,
+        "avatar_6" to R.drawable.avatar_6
+    )
+
+    private fun getSelectedAvatarKey(): String {
+        return prefs.getString("selected_avatar", "avatar_1") ?: "avatar_1"
+    }
+
+    private fun getAvatarResIdFromKey(key: String): Int {
+        return avatarOptions.firstOrNull { it.first == key }?.second
+            ?: R.drawable.avatar_1
+    }
+
+    private fun applyHeaderAvatar() {
+        val key = getSelectedAvatarKey()
+        val resId = getAvatarResIdFromKey(key)
+
+        val imageView = findViewById<ImageView>(R.id.imgProfile)
+        imageView.setImageResource(resId)
+    }
 }
 
-/**
- * If you already have this class somewhere else, delete this one to avoid redeclare.
- */

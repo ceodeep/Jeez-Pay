@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@android:color/white">
+
+    <TextView
+        android:id="@+id/tvAvatarDialogTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Choose Avatar"
+        android:textColor="@color/text_primary"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvAvatarDialogSubtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="20dp"
+        android:text="Select one of the predefined avatars"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp" />
+
+    <GridLayout
+        android:id="@+id/avatarGrid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:alignmentMode="alignBounds"
+        android:columnCount="3"
+        android:useDefaultMargins="false">
+
+        <FrameLayout
+            android:id="@+id/avatarItem1"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_avatar_item"
+            android:padding="10dp">
+
+            <ImageView
+                android:id="@+id/avatarOption1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/avatar_1" />
+
+            <ImageView
+                android:id="@+id/avatarCheck1"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/currency_pill_bg"
+                android:padding="4dp"
+                android:src="@android:drawable/checkbox_on_background"
+                android:visibility="gone"
+                app:tint="@color/paypal_blue" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/avatarItem2"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_avatar_item"
+            android:padding="10dp">
+
+            <ImageView
+                android:id="@+id/avatarOption2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/avatar_2" />
+
+            <ImageView
+                android:id="@+id/avatarCheck2"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/currency_pill_bg"
+                android:padding="4dp"
+                android:src="@android:drawable/checkbox_on_background"
+                android:visibility="gone"
+                app:tint="@color/paypal_blue" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/avatarItem3"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_avatar_item"
+            android:padding="10dp">
+
+            <ImageView
+                android:id="@+id/avatarOption3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/avatar_3" />
+
+            <ImageView
+                android:id="@+id/avatarCheck3"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/currency_pill_bg"
+                android:padding="4dp"
+                android:src="@android:drawable/checkbox_on_background"
+                android:visibility="gone"
+                app:tint="@color/paypal_blue" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/avatarItem4"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_avatar_item"
+            android:padding="10dp">
+
+            <ImageView
+                android:id="@+id/avatarOption4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/avatar_4" />
+
+            <ImageView
+                android:id="@+id/avatarCheck4"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/currency_pill_bg"
+                android:padding="4dp"
+                android:src="@android:drawable/checkbox_on_background"
+                android:visibility="gone"
+                app:tint="@color/paypal_blue" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/avatarItem5"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_avatar_item"
+            android:padding="10dp">
+
+            <ImageView
+                android:id="@+id/avatarOption5"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/avatar_5" />
+
+            <ImageView
+                android:id="@+id/avatarCheck5"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/currency_pill_bg"
+                android:padding="4dp"
+                android:src="@android:drawable/checkbox_on_background"
+                android:visibility="gone"
+                app:tint="@color/paypal_blue" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/avatarItem6"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:layout_margin="8dp"
+            android:background="@drawable/bg_avatar_item"
+            android:padding="10dp">
+
+            <ImageView
+                android:id="@+id/avatarOption6"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/avatar_6" />
+
+            <ImageView
+                android:id="@+id/avatarCheck6"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|end"
+                android:background="@drawable/currency_pill_bg"
+                android:padding="4dp"
+                android:src="@android:drawable/checkbox_on_background"
+                android:visibility="gone"
+                app:tint="@color/paypal_blue" />
+        </FrameLayout>
+
+    </GridLayout>
+</LinearLayout>

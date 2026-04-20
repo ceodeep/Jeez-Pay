@@ -20,11 +20,16 @@ import com.jeezpay.app.network.dto.UpdateAvatarRequest
 import com.jeezpay.app.network.dto.UpdateAvatarResponse
 import com.jeezpay.app.network.dto.VerifyPinRequest
 import com.jeezpay.app.network.dto.VerifyPinResponse
+import com.jeezpay.app.network.dto.MeResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.GET
 import retrofit2.http.PATCH
 
 interface AuthApi {
+
+    @GET("auth/me")
+    suspend fun me(): MeResponse
 
     @POST("auth/login")
     suspend fun login(@Body body: LoginRequest): LoginResponse
