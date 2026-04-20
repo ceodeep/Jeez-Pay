@@ -1,5 +1,5 @@
 const express = require("express");
-console.log("USE_MOCK_OTP =", USE_MOCK_OTP, "MOCK_OTP =", MOCK_OTP);
+
 const router = express.Router();
 
 const supabase = require("../config/supabase");
