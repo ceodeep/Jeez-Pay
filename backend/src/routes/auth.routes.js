@@ -92,37 +92,30 @@ async function seedWalletsForUser(userId) {
 
 async function createAndSendOtp(phone, purpose) {
   const code = USE_MOCK_OTP ? MOCK_OTP : generateOTP();
+
   const expiresAt = new Date(
     Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
   ).toISOString();
 
-  const { error: deleteErr } = await supabase
+  await supabase
     .from("otp_codes")
     .delete()
     .eq("phone", phone)
     .eq("purpose", purpose);
 
-  if (deleteErr) {
-    throw deleteErr;
-  }
-
-  const { error: insertErr } = await supabase.from("otp_codes").insert({
+  await supabase.from("otp_codes").insert({
     phone,
     purpose,
     code,
     expires_at: expiresAt,
   });
 
-  if (insertErr) {
-    throw insertErr;
-  }
-
   if (USE_MOCK_OTP) {
-    console.log("🧪 MOCK OTP MODE ENABLED");
-    console.log(`📲 Mock OTP for ${phone} (${purpose}): ${code}`);
+    console.log("🧪 MOCK OTP:", code);
+    console.log("📵 WhatsApp skipped (mock mode)");
+  } else {
+    await sendWhatsAppOTP(phone, code);
   }
-
-  await sendWhatsAppOTP(phone, code);
 }
 
 async function verifyOtpCode(phone, purpose, code) {
