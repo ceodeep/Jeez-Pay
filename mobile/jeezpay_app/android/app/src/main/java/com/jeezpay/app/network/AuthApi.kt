@@ -21,6 +21,7 @@ import com.jeezpay.app.network.dto.UpdateAvatarResponse
 import com.jeezpay.app.network.dto.VerifyPinRequest
 import com.jeezpay.app.network.dto.VerifyPinResponse
 import com.jeezpay.app.network.dto.MeResponse
+import com.jeezpay.app.network.dto.ReferralSummaryResponse
 import retrofit2.http.Body
 import retrofit2.http.POST
 import retrofit2.http.GET
@@ -70,6 +71,9 @@ interface AuthApi {
     suspend fun updateAvatar(
         @Body request: UpdateAvatarRequest
     ): UpdateAvatarResponse
+
+    @GET("auth/referrals/summary")
+    suspend fun referralSummary(): ReferralSummaryResponse
 }
 
 

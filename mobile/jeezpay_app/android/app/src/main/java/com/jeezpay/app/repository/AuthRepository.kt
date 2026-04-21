@@ -24,6 +24,7 @@ import com.jeezpay.app.network.safeApiCall
 import com.jeezpay.app.network.dto.UpdateAvatarRequest
 import com.jeezpay.app.network.dto.UpdateAvatarResponse
 import com.jeezpay.app.network.dto.MeResponse
+import com.jeezpay.app.network.dto.ReferralSummaryResponse
 
 class AuthRepository {
 
@@ -254,5 +255,9 @@ class AuthRepository {
         return safeApiCall {
             api.me()
         }
+    }
+
+    suspend fun referralSummarySafe(): ApiResult<ReferralSummaryResponse> {
+        return safeApiCall { api.referralSummary() }
     }
 }

@@ -911,4 +911,34 @@ router.patch("/avatar", authMiddleware, async (req, res) => {
   }
 });
 
+router.get("/referrals/summary", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const { data: invitedRows, error } = await supabase
+      .from("users")
+      .select("id, phone_verified")
+      .eq("referred_by_user_id", userId);
+
+    if (error) {
+      console.error("referrals/summary error:", error);
+      return res.status(500).json({ message: "Failed to load referral summary" });
+    }
+
+    const invitedCount = invitedRows?.length || 0;
+    const successfulCount = (invitedRows || []).filter(u => u.phone_verified).length;
+
+    return res.json({
+      invitedCount,
+      successfulCount,
+      earnedAmount: 0,
+      currency: "USDT",
+      history: []
+    });
+  } catch (err) {
+    console.error("referrals/summary crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 module.exports = router;

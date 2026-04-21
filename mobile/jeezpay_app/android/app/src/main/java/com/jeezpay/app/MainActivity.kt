@@ -419,8 +419,14 @@ class MainActivity : BaseFintechActivity() {
 
     private fun setupActionButtons() {
         val btnSend = findViewById<View>(R.id.btnSend)
+        val btnReferral = findViewById<View>(R.id.btnReferral)
+
         btnSend.setOnClickListener {
             startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))
+        }
+
+        btnReferral.setOnClickListener {
+            startActivity(Intent(this, ReferralActivity::class.java))
         }
     }
 

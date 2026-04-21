@@ -53,6 +53,8 @@
 
         <activity android:name=".PinVerifyActivity" />
 
+        <activity android:name=".ReferralActivity" />
+
 
     </application>
 

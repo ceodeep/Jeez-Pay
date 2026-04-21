@@ -136,3 +136,17 @@ data class MeUser(
     val phone_verified: Boolean?,
     val terms_accepted: Boolean?
 )
+
+data class ReferralSummaryResponse(
+    val invitedCount: Int,
+    val successfulCount: Int,
+    val earnedAmount: Double,
+    val currency: String,
+    val history: List<ReferralHistoryItem> = emptyList()
+)
+
+data class ReferralHistoryItem(
+    val id: String? = null,
+    val label: String? = null,
+    val status: String? = null
+)
