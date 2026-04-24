@@ -1004,7 +1004,7 @@ class AuthActivity : BaseFintechActivity() {
 
             val nameOk = name.isNotEmpty()
             val phoneOk = phone.length >= 6
-            val passOk = pass.length >= 4
+            val passOk = pass.length >= 8
             val confirmOk = pass == confirm && confirm.isNotEmpty()
             val termsOk = cbTerms.isChecked
 

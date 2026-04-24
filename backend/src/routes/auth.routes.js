@@ -154,6 +154,167 @@ async function verifyOtpCode(phone, purpose, code) {
   return { ok: true };
 }
 
+async function processReferralReward({ refereeUserId, triggerEvent }) {
+  const { data: settings, error: settingsErr } = await supabase
+    .from("referral_reward_settings")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (settingsErr) throw settingsErr;
+
+  if (!settings || !settings.enabled) {
+    return { status: "skipped", reason: "referral rewards disabled" };
+  }
+
+  if (settings.trigger_event !== triggerEvent) {
+    return {
+      status: "skipped",
+      reason: `trigger is ${settings.trigger_event}, not ${triggerEvent}`,
+    };
+  }
+
+  const rewardAmount = Number(settings.reward_amount || 0);
+  const currency = String(settings.currency || "USDT").trim().toUpperCase();
+
+  if (!Number.isFinite(rewardAmount) || rewardAmount <= 0) {
+    return { status: "skipped", reason: "invalid reward amount" };
+  }
+
+  const { data: referee, error: refereeErr } = await supabase
+    .from("users")
+    .select("id, referred_by_user_id")
+    .eq("id", refereeUserId)
+    .maybeSingle();
+
+  if (refereeErr) throw refereeErr;
+
+  if (!referee || !referee.referred_by_user_id) {
+    return { status: "skipped", reason: "user was not referred" };
+  }
+
+  const referrerUserId = referee.referred_by_user_id;
+
+  const { data: existingReward, error: existingRewardErr } = await supabase
+    .from("referral_rewards")
+    .select("id, status")
+    .eq("referrer_user_id", referrerUserId)
+    .eq("referee_user_id", refereeUserId)
+    .eq("trigger_event", triggerEvent)
+    .maybeSingle();
+
+  if (existingRewardErr) throw existingRewardErr;
+
+  if (existingReward) {
+    return {
+      status: "skipped",
+      reason: "reward already exists",
+      rewardId: existingReward.id,
+    };
+  }
+
+  const maxRewardsPerUser = Number(settings.max_rewards_per_user || 0);
+
+  if (maxRewardsPerUser > 0) {
+    const { count, error: countErr } = await supabase
+      .from("referral_rewards")
+      .select("id", { count: "exact", head: true })
+      .eq("referrer_user_id", referrerUserId)
+      .eq("status", "rewarded");
+
+    if (countErr) throw countErr;
+
+    if ((count || 0) >= maxRewardsPerUser) {
+      return { status: "skipped", reason: "max rewards reached" };
+    }
+  }
+
+  const { data: reward, error: rewardInsertErr } = await supabase
+    .from("referral_rewards")
+    .insert([
+      {
+        referrer_user_id: referrerUserId,
+        referee_user_id: refereeUserId,
+        reward_amount: rewardAmount,
+        currency,
+        trigger_event: triggerEvent,
+        status: "pending",
+      },
+    ])
+    .select()
+    .single();
+
+  if (rewardInsertErr) throw rewardInsertErr;
+
+  let { data: wallet, error: walletErr } = await supabase
+    .from("wallets")
+    .select("id, balance")
+    .eq("user_id", referrerUserId)
+    .eq("currency", currency)
+    .maybeSingle();
+
+  if (walletErr) throw walletErr;
+
+  if (!wallet) {
+    const created = await supabase
+      .from("wallets")
+      .insert([{ user_id: referrerUserId, currency, balance: 0 }])
+      .select("id, balance")
+      .single();
+
+    if (created.error) throw created.error;
+    wallet = created.data;
+  }
+
+  const oldBalance = Number(wallet.balance || 0);
+  const newBalance = oldBalance + rewardAmount;
+
+  const { error: walletUpdateErr } = await supabase
+    .from("wallets")
+    .update({ balance: newBalance })
+    .eq("id", wallet.id);
+
+  if (walletUpdateErr) throw walletUpdateErr;
+
+  const reference = `REF-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+
+  const { data: tx, error: txErr } = await supabase
+    .from("transactions")
+    .insert([
+      {
+        wallet_id: wallet.id,
+        type: "credit",
+        amount: rewardAmount,
+        description: "Referral reward",
+        reference,
+      },
+    ])
+    .select()
+    .single();
+
+  if (txErr) throw txErr;
+
+  const { error: rewardUpdateErr } = await supabase
+    .from("referral_rewards")
+    .update({
+      status: "rewarded",
+      rewarded_at: new Date().toISOString(),
+    })
+    .eq("id", reward.id);
+
+  if (rewardUpdateErr) throw rewardUpdateErr;
+
+  return {
+    status: "rewarded",
+    rewardId: reward.id,
+    amount: rewardAmount,
+    currency,
+    transactionId: tx.id,
+    reference,
+  };
+}
+
 // =====================================
 // SIGNUP OTP REQUEST
 // =====================================
@@ -395,6 +556,17 @@ router.post("/signup/verify-otp", async (req, res) => {
         }
       }
     }
+
+    let referralReward = null;
+
+try {
+  referralReward = await processReferralReward({
+    refereeUserId: user.id,
+    triggerEvent: "signup_verified",
+  });
+} catch (rewardErr) {
+  console.error("signup referral reward failed:", rewardErr);
+}
 
     const token = generateToken({
       userId: user.id,
