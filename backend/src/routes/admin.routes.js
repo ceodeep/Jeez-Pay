@@ -211,6 +211,203 @@ router.get(
   }
 );
 
+async function processReferralRewardOnKycApproved({ refereeUserId, adminId, req }) {
+  const { data: settings, error: settingsErr } = await supabase
+    .from("referral_reward_settings")
+    .select("*")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (settingsErr) throw settingsErr;
+
+  if (!settings || !settings.enabled) {
+    return { status: "skipped", reason: "referral rewards disabled" };
+  }
+
+  if (settings.trigger_event !== "kyc_approved") {
+    return { status: "skipped", reason: "trigger is not kyc_approved" };
+  }
+
+  const rewardAmount = Number(settings.reward_amount || 0);
+  const currency = String(settings.currency || "USDT").trim().toUpperCase();
+
+  if (!Number.isFinite(rewardAmount) || rewardAmount <= 0) {
+    return { status: "skipped", reason: "invalid reward amount" };
+  }
+
+  const { data: referee, error: refereeErr } = await supabase
+    .from("users")
+    .select("id, phone, referred_by_user_id")
+    .eq("id", refereeUserId)
+    .maybeSingle();
+
+  if (refereeErr) throw refereeErr;
+
+  if (!referee || !referee.referred_by_user_id) {
+    return { status: "skipped", reason: "user was not referred" };
+  }
+
+  const referrerUserId = referee.referred_by_user_id;
+
+  const { data: existingReward, error: existingRewardErr } = await supabase
+    .from("referral_rewards")
+    .select("id, status")
+    .eq("referrer_user_id", referrerUserId)
+    .eq("referee_user_id", refereeUserId)
+    .eq("trigger_event", "kyc_approved")
+    .maybeSingle();
+
+  if (existingRewardErr) throw existingRewardErr;
+
+  if (existingReward) {
+    return {
+      status: "skipped",
+      reason: "reward already exists",
+      rewardId: existingReward.id,
+    };
+  }
+
+  const maxRewardsPerUser = Number(settings.max_rewards_per_user || 0);
+
+  if (maxRewardsPerUser > 0) {
+    const { count, error: countErr } = await supabase
+      .from("referral_rewards")
+      .select("id", { count: "exact", head: true })
+      .eq("referrer_user_id", referrerUserId)
+      .eq("status", "rewarded");
+
+    if (countErr) throw countErr;
+
+    if ((count || 0) >= maxRewardsPerUser) {
+      return {
+        status: "skipped",
+        reason: "max rewards per user reached",
+      };
+    }
+  }
+
+  const { data: reward, error: rewardInsertErr } = await supabase
+    .from("referral_rewards")
+    .insert([
+      {
+        referrer_user_id: referrerUserId,
+        referee_user_id: refereeUserId,
+        reward_amount: rewardAmount,
+        currency,
+        trigger_event: "kyc_approved",
+        status: "pending",
+      },
+    ])
+    .select()
+    .single();
+
+  if (rewardInsertErr) throw rewardInsertErr;
+
+  const { data: existingWallet, error: walletFetchErr } = await supabase
+    .from("wallets")
+    .select("id, balance")
+    .eq("user_id", referrerUserId)
+    .eq("currency", currency)
+    .maybeSingle();
+
+  if (walletFetchErr) throw walletFetchErr;
+
+  let wallet = existingWallet;
+
+  if (!wallet) {
+    const { data: createdWallet, error: walletCreateErr } = await supabase
+      .from("wallets")
+      .insert([
+        {
+          user_id: referrerUserId,
+          currency,
+          balance: 0,
+        },
+      ])
+      .select("id, balance")
+      .single();
+
+    if (walletCreateErr) throw walletCreateErr;
+    wallet = createdWallet;
+  }
+
+  const oldBalance = Number(wallet.balance || 0);
+  const newBalance = oldBalance + rewardAmount;
+
+  const { error: walletUpdateErr } = await supabase
+    .from("wallets")
+    .update({ balance: newBalance })
+    .eq("id", wallet.id);
+
+  if (walletUpdateErr) throw walletUpdateErr;
+
+  const reference = `REF-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+
+  const { data: tx, error: txErr } = await supabase
+    .from("transactions")
+    .insert([
+      {
+        wallet_id: wallet.id,
+        type: "credit",
+        amount: rewardAmount,
+        description: "Referral reward",
+        reference,
+      },
+    ])
+    .select()
+    .single();
+
+  if (txErr) throw txErr;
+
+  const { data: rewarded, error: rewardUpdateErr } = await supabase
+    .from("referral_rewards")
+    .update({
+      status: "rewarded",
+      rewarded_at: new Date().toISOString(),
+    })
+    .eq("id", reward.id)
+    .select()
+    .single();
+
+  if (rewardUpdateErr) throw rewardUpdateErr;
+
+  const adminInfo = req.adminUser;
+
+  await logAdminAction({
+    adminId,
+    adminPhone: adminInfo?.phone || null,
+    action: "REFERRAL_REWARD_GRANTED",
+    targetType: "referral_reward",
+    targetId: reward.id,
+    targetDisplay: `${rewardAmount} ${currency}`,
+    oldValue: {
+      walletBalance: oldBalance,
+      rewardStatus: "pending",
+    },
+    newValue: {
+      walletBalance: newBalance,
+      rewardStatus: "rewarded",
+      referrerUserId,
+      refereeUserId,
+      transactionId: tx.id,
+      reference,
+    },
+    req,
+  });
+
+  return {
+    status: "rewarded",
+    rewardId: rewarded.id,
+    referrerUserId,
+    refereeUserId,
+    amount: rewardAmount,
+    currency,
+    transactionId: tx.id,
+    reference,
+  };
+}
+
 // =====================================
 // POST /admin/kyc/approve
 // Body: { userId }
@@ -221,69 +418,83 @@ router.post(
   requireAdmin,
   requirePermission("kyc.approve"),
   async (req, res) => {
-  try {
-    const adminId = req.user.userId;
+    try {
+      const adminId = req.user.userId;
+      const adminInfo = req.adminUser;
+      const userId = String(req.body.userId || "").trim();
 
+      if (!userId) {
+        return res.status(400).json({ message: "userId is required" });
+      }
 
-    const userId = String(req.body.userId || "").trim();
+      const { data: existing, error: fetchErr } = await supabase
+        .from("kyc_profiles")
+        .select("user_id, status")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-    if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
+      if (fetchErr) {
+        console.error("admin/kyc/approve lookup error:", fetchErr);
+        return res.status(500).json({ message: "KYC lookup failed" });
+      }
+
+      if (!existing) {
+        return res.status(404).json({ message: "KYC record not found" });
+      }
+
+      const { data, error } = await supabase
+        .from("kyc_profiles")
+        .update({
+          status: "approved",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("admin/kyc/approve update error:", error);
+        return res.status(500).json({ message: "Failed to approve KYC" });
+      }
+
+      let referralReward = null;
+
+      try {
+        referralReward = await processReferralRewardOnKycApproved({
+          refereeUserId: userId,
+          adminId,
+          req,
+        });
+      } catch (rewardErr) {
+        console.error("referral reward processing failed:", rewardErr);
+      }
+
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "KYC_APPROVED",
+        targetType: "kyc",
+        targetId: userId,
+        targetDisplay: userId,
+        oldValue: { status: existing.status },
+        newValue: {
+          status: "approved",
+          referralReward,
+        },
+        req,
+      });
+
+      return res.json({
+        message: "KYC approved successfully",
+        kyc: data,
+        referralReward,
+      });
+    } catch (err) {
+      console.error("admin/kyc/approve crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
     }
-
-    const { data: existing, error: fetchErr } = await supabase
-      .from("kyc_profiles")
-      .select("user_id, status")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (fetchErr) {
-      console.error("admin/kyc/approve lookup error:", fetchErr);
-      return res.status(500).json({ message: "KYC lookup failed" });
-    }
-
-    if (!existing) {
-      return res.status(404).json({ message: "KYC record not found" });
-    }
-
-    const { data, error } = await supabase
-      .from("kyc_profiles")
-      .update({
-        status: "approved",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("admin/kyc/approve update error:", error);
-      return res.status(500).json({ message: "Failed to approve KYC" });
-    }
-
-    const adminInfo = req.adminUser;
-
-    await logAdminAction({
-      adminId,
-      adminPhone: adminInfo?.phone || null,
-      action: "KYC_APPROVED",
-      targetType: "kyc",
-      targetId: userId,
-      targetDisplay: userId,
-      oldValue: { status: existing.status },
-      newValue: { status: "approved" },
-      req,
-    });
-
-    return res.json({
-      message: "KYC approved successfully",
-      kyc: data,
-    });
-  } catch (err) {
-    console.error("admin/kyc/approve crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
   }
-});
+);
 
 // =====================================
 // POST /admin/kyc/reject
@@ -1659,6 +1870,7 @@ router.get(
   }
 );
 
+
 // =====================================
 // POST /admin/settings
 // Body: {
@@ -1814,6 +2026,165 @@ router.post(
       });
     } catch (err) {
       console.error("admin/settings POST crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// GET /admin/referral-rewards/settings
+// =====================================
+router.get(
+  "/referral-rewards/settings",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("settings.view"),
+  async (req, res) => {
+    try {
+      let { data, error } = await supabase
+        .from("referral_reward_settings")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error("referral settings GET error:", error);
+        return res.status(500).json({ message: "Failed to fetch settings" });
+      }
+
+      // auto-seed if empty
+      if (!data) {
+        const seed = {
+          enabled: false,
+          reward_amount: 0,
+          currency: "USDT",
+          trigger_event: "kyc_approved",
+          max_rewards_per_user: 50,
+        };
+
+        const inserted = await supabase
+          .from("referral_reward_settings")
+          .insert([seed])
+          .select("*")
+          .single();
+
+        if (inserted.error) {
+          return res.status(500).json({ message: "Failed to init settings" });
+        }
+
+        data = inserted.data;
+      }
+
+      return res.json({ settings: data });
+    } catch (err) {
+      console.error("referral settings GET crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// POST /admin/referral-rewards/settings
+// =====================================
+router.post(
+  "/referral-rewards/settings",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("settings.update"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const adminInfo = req.adminUser;
+
+      const enabled = Boolean(req.body.enabled);
+      const rewardAmount = Number(req.body.rewardAmount || 0);
+      const currency = String(req.body.currency || "USDT").toUpperCase();
+      const triggerEvent = String(req.body.triggerEvent || "kyc_approved");
+      const maxRewards = Number(req.body.maxRewardsPerUser || 0);
+
+      const payload = {
+        enabled,
+        reward_amount: rewardAmount,
+        currency,
+        trigger_event: triggerEvent,
+        max_rewards_per_user: maxRewards,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: current } = await supabase
+        .from("referral_reward_settings")
+        .select("*")
+        .limit(1)
+        .maybeSingle();
+
+      let saved;
+
+      if (!current) {
+        const inserted = await supabase
+          .from("referral_reward_settings")
+          .insert([payload])
+          .select("*")
+          .single();
+
+        saved = inserted.data;
+      } else {
+        const updated = await supabase
+          .from("referral_reward_settings")
+          .update(payload)
+          .eq("id", current.id)
+          .select("*")
+          .single();
+
+        saved = updated.data;
+      }
+
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "REFERRAL_SETTINGS_UPDATED",
+        targetType: "referral_settings",
+        targetId: saved.id,
+        oldValue: current,
+        newValue: saved,
+        req,
+      });
+
+      return res.json({
+        message: "Referral settings updated",
+        settings: saved,
+      });
+    } catch (err) {
+      console.error("referral settings POST crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// =====================================
+// GET /admin/referral-rewards/history
+// =====================================
+router.get(
+  "/referral-rewards/history",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("transactions.view"),
+  async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from("referral_rewards")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error("referral history error:", error);
+        return res.status(500).json({ message: "Failed to fetch history" });
+      }
+
+      return res.json({ rewards: data || [] });
+    } catch (err) {
+      console.error("referral history crash:", err);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

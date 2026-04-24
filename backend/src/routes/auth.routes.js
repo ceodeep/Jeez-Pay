@@ -924,26 +924,59 @@ router.get("/referrals/summary", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to load referral summary" });
     }
 
+    const { data: rewards, error: rewardsErr } = await supabase
+      .from("referral_rewards")
+      .select("referee_user_id, reward_amount, currency, status")
+      .eq("referrer_user_id", userId)
+      .eq("status", "rewarded");
+
+    if (rewardsErr) {
+      console.error("referrals/summary rewards error:", rewardsErr);
+      return res.status(500).json({ message: "Failed to load referral rewards" });
+    }
+
     const rows = invitedRows || [];
+    const rewardedRows = rewards || [];
 
     const invitedCount = rows.length;
     const successfulCount = rows.filter((u) => u.phone_verified).length;
 
-    const history = rows.map((u) => ({
-      id: u.id,
-      name: u.fullName || "JeezPay user",
-      phone: maskPhone(u.phone),
-      status: u.phone_verified ? "successful" : "pending",
-      rewardAmount: 0,
-      currency: "USDT",
-      joinedAt: u.created_at,
-    }));
+    const currency = rewardedRows[0]?.currency || "USDT";
+
+    const earnedAmount = rewardedRows.reduce(
+      (sum, reward) => sum + Number(reward.reward_amount || 0),
+      0
+    );
+
+    const rewardByRefereeId = new Map(
+      rewardedRows.map((reward) => [
+        reward.referee_user_id,
+        {
+          amount: Number(reward.reward_amount || 0),
+          currency: reward.currency || "USDT",
+        },
+      ])
+    );
+
+    const history = rows.map((u) => {
+      const reward = rewardByRefereeId.get(u.id);
+
+      return {
+        id: u.id,
+        name: u.fullName || "JeezPay user",
+        phone: maskPhone(u.phone),
+        status: reward ? "rewarded" : u.phone_verified ? "successful" : "pending",
+        rewardAmount: reward?.amount || 0,
+        currency: reward?.currency || "USDT",
+        joinedAt: u.created_at,
+      };
+    });
 
     return res.json({
       invitedCount,
       successfulCount,
-      earnedAmount: 0,
-      currency: "USDT",
+      earnedAmount,
+      currency,
       history,
     });
   } catch (err) {
