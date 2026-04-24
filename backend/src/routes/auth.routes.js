@@ -277,7 +277,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
 
   if (walletUpdateErr) throw walletUpdateErr;
 
-  const reference = `REF-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  const reference = Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
 
   const { data: tx, error: txErr } = await supabase
     .from("transactions")
