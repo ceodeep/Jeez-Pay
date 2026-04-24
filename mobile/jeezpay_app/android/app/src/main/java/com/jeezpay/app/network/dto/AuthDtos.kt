@@ -146,7 +146,11 @@ data class ReferralSummaryResponse(
 )
 
 data class ReferralHistoryItem(
-    val id: String? = null,
-    val label: String? = null,
-    val status: String? = null
+    val id: String?,
+    val name: String?,
+    val phone: String?,
+    val status: String?,
+    val rewardAmount: Double?,
+    val currency: String?,
+    val joinedAt: String?
 )

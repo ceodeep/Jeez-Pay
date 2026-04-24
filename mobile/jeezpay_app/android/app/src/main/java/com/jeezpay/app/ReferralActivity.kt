@@ -101,8 +101,16 @@ class ReferralActivity : AppCompatActivity() {
                     tvEarnedAmount.text = "${data.earnedAmount} ${data.currency}"
 
                     tvHistoryState.text =
-                        if (data.history.isEmpty()) "No referrals yet"
-                        else "You have ${data.history.size} referrals"
+                        if (data.history.isEmpty()) {
+                            "No referrals yet"
+                        } else {
+                            data.history.joinToString("\n\n") { item ->
+                                val status = item.status ?: "pending"
+                                val name = item.name ?: "JeezPay user"
+                                val phone = item.phone ?: ""
+                                "$name\n$phone • $status"
+                            }
+                        }
                 }
 
                 is ApiResult.Error -> {

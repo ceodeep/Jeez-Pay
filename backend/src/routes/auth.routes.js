@@ -42,22 +42,20 @@ function normalizeReferralCode(raw) {
   return String(raw || "").trim().toUpperCase();
 }
 
-function generateReferralCode(fullName, phone) {
-  const namePart =
-    String(fullName || "")
-      .replace(/[^A-Za-z0-9]/g, "")
-      .toUpperCase()
-      .slice(0, 4) || "JEEZ";
+function generateReferralCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "JZ";
 
-  const phoneDigits = String(phone || "").replace(/\D/g, "").slice(-4) || "0000";
-  const randomPart = Math.random().toString(36).slice(2, 5).toUpperCase();
+  for (let i = 0; i < 4; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
 
-  return `${namePart}${phoneDigits}${randomPart}`;
+  return code;
 }
 
 async function generateUniqueReferralCode(fullName, phone) {
   for (let i = 0; i < 10; i++) {
-    const candidate = generateReferralCode(fullName, phone);
+    const candidate = generateReferralCode();
 
     const { data, error } = await supabase
       .from("users")
@@ -917,28 +915,48 @@ router.get("/referrals/summary", authMiddleware, async (req, res) => {
 
     const { data: invitedRows, error } = await supabase
       .from("users")
-      .select("id, phone_verified")
-      .eq("referred_by_user_id", userId);
+      .select("id, phone, fullName, phone_verified, created_at")
+      .eq("referred_by_user_id", userId)
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error("referrals/summary error:", error);
       return res.status(500).json({ message: "Failed to load referral summary" });
     }
 
-    const invitedCount = invitedRows?.length || 0;
-    const successfulCount = (invitedRows || []).filter(u => u.phone_verified).length;
+    const rows = invitedRows || [];
+
+    const invitedCount = rows.length;
+    const successfulCount = rows.filter((u) => u.phone_verified).length;
+
+    const history = rows.map((u) => ({
+      id: u.id,
+      name: u.fullName || "JeezPay user",
+      phone: maskPhone(u.phone),
+      status: u.phone_verified ? "successful" : "pending",
+      rewardAmount: 0,
+      currency: "USDT",
+      joinedAt: u.created_at,
+    }));
 
     return res.json({
       invitedCount,
       successfulCount,
       earnedAmount: 0,
       currency: "USDT",
-      history: []
+      history,
     });
   } catch (err) {
     console.error("referrals/summary crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+function maskPhone(phone) {
+  const value = String(phone || "");
+  if (value.length <= 6) return value;
+
+  return `${value.slice(0, 4)}****${value.slice(-3)}`;
+}
 
 module.exports = router;
