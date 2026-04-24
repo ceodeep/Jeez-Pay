@@ -116,6 +116,16 @@ function AppShell({ onLogout }) {
     supportedCurrencies: "USDT,SSP,SDG,EGP,UGX",
   });
 
+  const [referralRewardsLoading, setReferralRewardsLoading] = useState(false);
+const [referralRewardHistory, setReferralRewardHistory] = useState([]);
+const [referralRewardForm, setReferralRewardForm] = useState({
+  enabled: false,
+  rewardAmount: "",
+  currency: "USDT",
+  triggerEvent: "kyc_approved",
+  maxRewardsPerUser: "50",
+});
+
   const [currencySettingsLoading, setCurrencySettingsLoading] = useState(false);
   const [currencySettings, setCurrencySettings] = useState([]);
   const [selectedCurrency, setSelectedCurrency] = useState("");
@@ -175,6 +185,7 @@ function AppShell({ onLogout }) {
       auditLogs: "audit_logs.view",
       walletView: "wallets.view",
       wallet: "wallets.adjust",
+      referralRewards: "settings.view",
       settings: "settings.view",
       currencySettings: "currency_settings.view",
       roles: "users.role.update",
@@ -195,6 +206,60 @@ function AppShell({ onLogout }) {
       );
     }
   }
+
+  async function loadReferralRewardSettings() {
+  setReferralRewardsLoading(true);
+  setMessage("");
+
+  try {
+    const res = await api.get("/admin/referral-rewards/settings");
+    const s = res.data?.settings || {};
+
+    setReferralRewardForm({
+      enabled: Boolean(s.enabled),
+      rewardAmount: String(s.reward_amount ?? ""),
+      currency: s.currency || "USDT",
+      triggerEvent: s.trigger_event || "kyc_approved",
+      maxRewardsPerUser: String(s.max_rewards_per_user ?? "50"),
+    });
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to load referral reward settings");
+  } finally {
+    setReferralRewardsLoading(false);
+  }
+}
+
+async function saveReferralRewardSettings(e) {
+  e.preventDefault();
+  setReferralRewardsLoading(true);
+  setMessage("");
+
+  try {
+    await api.post("/admin/referral-rewards/settings", {
+      enabled: Boolean(referralRewardForm.enabled),
+      rewardAmount: Number(referralRewardForm.rewardAmount || 0),
+      currency: referralRewardForm.currency,
+      triggerEvent: referralRewardForm.triggerEvent,
+      maxRewardsPerUser: Number(referralRewardForm.maxRewardsPerUser || 0),
+    });
+
+    setMessage("Referral reward settings saved successfully");
+    await loadReferralRewardSettings();
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to save referral reward settings");
+  } finally {
+    setReferralRewardsLoading(false);
+  }
+}
+
+async function loadReferralRewardHistory() {
+  try {
+    const res = await api.get("/admin/referral-rewards/history");
+    setReferralRewardHistory(res.data?.rewards || []);
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to load referral reward history");
+  }
+}
 
   async function loadRoleMatrix() {
     try {
@@ -795,6 +860,7 @@ function AppShell({ onLogout }) {
       "transactions",
       "withdrawals",
       "auditLogs",
+      "referralRewards",
       "walletView",
       "wallet",
       "settings",
@@ -821,6 +887,10 @@ function AppShell({ onLogout }) {
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
     if (page === "currencySettings") loadCurrencySettings();
+    if (page === "referralRewards") {
+  loadReferralRewardSettings();
+  loadReferralRewardHistory();
+}
   }, [page, kycStatusFilter, userRoleFilter, txTypeFilter, withdrawStatusFilter]);
   const kycCounts = {
     all: kycs.length,
@@ -932,6 +1002,7 @@ function AppShell({ onLogout }) {
               ["wallet", "Wallet Adjust"],
               ["settings", "System Settings"],
               ["currencySettings", "Currency Settings"],
+              ["referralRewards", "Referral Rewards"],
               ["roles", "Roles & Permissions"],
             ]
               .filter(([key]) => canAccessPage(key))
@@ -998,6 +1069,7 @@ function AppShell({ onLogout }) {
                 {page === "settings" && "System Settings"}
                 {page === "currencySettings" && "Currency Settings"}
                 {page === "roles" && "Roles & Permissions"}
+                {page === "referralRewards" && "Referral Rewards"}
               </h1>
               <p style={{ margin: "6px 0 0", color: "#64748b" }}>
                 Admin operations panel for JeezPay.
@@ -1819,6 +1891,8 @@ function AppShell({ onLogout }) {
                   ["USER_ROLE_CHANGED", "Role Changed"],
                   ["SYSTEM_SETTINGS_UPDATED", "System Settings"],
                   ["CURRENCY_SETTINGS_UPDATED", "Currency Settings"],
+                  ["REFERRAL_SETTINGS_UPDATED", "Referral Settings"],
+["REFERRAL_REWARD_GRANTED", "Referral Reward"],
                 ].map(([action, label]) => (
                   <button
                     key={action}
@@ -2991,6 +3065,405 @@ function AppShell({ onLogout }) {
               </div>
             </div>
           )}
+
+          {page === "referralRewards" && (
+  <div style={{ display: "grid", gap: 18 }}>
+    <div
+      style={{
+        background: "linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%)",
+        color: "#fff",
+        padding: 28,
+        borderRadius: 24,
+        boxShadow: "0 18px 45px rgba(15, 23, 42, 0.18)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 20,
+        flexWrap: "wrap",
+      }}
+    >
+      <div>
+        <div style={{ fontSize: 13, opacity: 0.8, fontWeight: 700 }}>
+          REFERRAL PROGRAM
+        </div>
+        <h2 style={{ margin: "8px 0 8px", fontSize: 30 }}>
+          Reward users for growing JeezPay
+        </h2>
+        <p style={{ margin: 0, opacity: 0.82, maxWidth: 560, lineHeight: 1.6 }}>
+          Configure referral payouts, reward triggers, supported currency, and monitor recent reward activity.
+        </p>
+      </div>
+
+      <div
+        style={{
+          background: "rgba(255,255,255,0.14)",
+          border: "1px solid rgba(255,255,255,0.22)",
+          borderRadius: 20,
+          padding: 18,
+          minWidth: 220,
+        }}
+      >
+        <div style={{ fontSize: 13, opacity: 0.8 }}>Current Status</div>
+        <div style={{ marginTop: 8 }}>
+          <StatusBadge value={referralRewardForm.enabled ? "enabled" : "disabled"} />
+        </div>
+        <div style={{ marginTop: 14, fontSize: 26, fontWeight: 800 }}>
+          {referralRewardForm.rewardAmount || "0"} {referralRewardForm.currency}
+        </div>
+        <div style={{ fontSize: 13, opacity: 0.8, marginTop: 4 }}>
+          Trigger: {referralRewardForm.triggerEvent}
+        </div>
+      </div>
+    </div>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        gap: 16,
+      }}
+    >
+      <Card
+        title="Program Status"
+        value={referralRewardForm.enabled ? "Enabled" : "Disabled"}
+      />
+      <Card
+        title="Reward Amount"
+        value={`${referralRewardForm.rewardAmount || "0"} ${referralRewardForm.currency}`}
+      />
+      <Card
+        title="Reward Trigger"
+        value={referralRewardForm.triggerEvent.replaceAll("_", " ")}
+      />
+      <Card
+        title="Recent Rewards"
+        value={String(referralRewardHistory.length)}
+      />
+    </div>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "420px 1fr",
+        gap: 18,
+        alignItems: "start",
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          padding: 22,
+          borderRadius: 22,
+          boxShadow: "0 10px 32px rgba(15, 23, 42, 0.08)",
+          border: "1px solid #eef2f7",
+        }}
+      >
+        <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>
+          Reward Configuration
+        </div>
+        <div style={{ color: "#64748b", fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
+          Set how referral rewards are paid. For fintech safety, KYC approval is the recommended trigger.
+        </div>
+
+        {referralRewardsLoading ? (
+          <p>Loading referral settings...</p>
+        ) : (
+          <form onSubmit={saveReferralRewardSettings} style={{ display: "grid", gap: 16 }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                padding: 14,
+                borderRadius: 16,
+                fontWeight: 700,
+              }}
+            >
+              <span>Enable referral rewards</span>
+              <input
+                type="checkbox"
+                checked={referralRewardForm.enabled}
+                onChange={(e) =>
+                  setReferralRewardForm({
+                    ...referralRewardForm,
+                    enabled: e.target.checked,
+                  })
+                }
+              />
+            </label>
+
+            <div style={{ display: "grid", gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                Reward Amount
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={referralRewardForm.rewardAmount}
+                onChange={(e) =>
+                  setReferralRewardForm({
+                    ...referralRewardForm,
+                    rewardAmount: e.target.value,
+                  })
+                }
+                style={{
+                  padding: 14,
+                  borderRadius: 14,
+                  border: "1px solid #dbe2ea",
+                  background: "#f8fafc",
+                  fontSize: 15,
+                }}
+              />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                  Currency
+                </label>
+                <select
+                  value={referralRewardForm.currency}
+                  onChange={(e) =>
+                    setReferralRewardForm({
+                      ...referralRewardForm,
+                      currency: e.target.value,
+                    })
+                  }
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    border: "1px solid #dbe2ea",
+                    background: "#f8fafc",
+                    fontSize: 15,
+                  }}
+                >
+                  <option value="USDT">USDT</option>
+                  <option value="SSP">SSP</option>
+                  <option value="SDG">SDG</option>
+                  <option value="EGP">EGP</option>
+                  <option value="UGX">UGX</option>
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                  Max / User
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={referralRewardForm.maxRewardsPerUser}
+                  onChange={(e) =>
+                    setReferralRewardForm({
+                      ...referralRewardForm,
+                      maxRewardsPerUser: e.target.value,
+                    })
+                  }
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    border: "1px solid #dbe2ea",
+                    background: "#f8fafc",
+                    fontSize: 15,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                Reward Trigger
+              </label>
+              <select
+                value={referralRewardForm.triggerEvent}
+                onChange={(e) =>
+                  setReferralRewardForm({
+                    ...referralRewardForm,
+                    triggerEvent: e.target.value,
+                  })
+                }
+                style={{
+                  padding: 14,
+                  borderRadius: 14,
+                  border: "1px solid #dbe2ea",
+                  background: "#f8fafc",
+                  fontSize: 15,
+                }}
+              >
+                <option value="kyc_approved">KYC Approved</option>
+                <option value="signup_verified">Signup Verified</option>
+                <option value="first_deposit">First Deposit</option>
+                <option value="first_transfer">First Transfer</option>
+              </select>
+            </div>
+
+            <div
+              style={{
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                color: "#1d4ed8",
+                borderRadius: 16,
+                padding: 14,
+                fontSize: 13,
+                lineHeight: 1.6,
+              }}
+            >
+              Recommended: use <strong>KYC Approved</strong> to prevent fake-account reward abuse.
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+              <button
+                type="submit"
+                style={{
+                  flex: 1,
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  border: "none",
+                  background: "#0f172a",
+                  color: "#fff",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                }}
+              >
+                Save Settings
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  loadReferralRewardSettings();
+                  loadReferralRewardHistory();
+                }}
+                style={{
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  border: "1px solid #cbd5e1",
+                  background: "#fff",
+                  color: "#334155",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                }}
+              >
+                Reload
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      <div
+        style={{
+          background: "#fff",
+          padding: 22,
+          borderRadius: 22,
+          boxShadow: "0 10px 32px rgba(15, 23, 42, 0.08)",
+          border: "1px solid #eef2f7",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800 }}>Reward Activity</div>
+            <div style={{ color: "#64748b", fontSize: 14, marginTop: 4 }}>
+              Latest referral reward payouts and statuses.
+            </div>
+          </div>
+
+          <button
+            onClick={loadReferralRewardHistory}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {referralRewardHistory.length === 0 ? (
+          <div
+            style={{
+              border: "1px dashed #cbd5e1",
+              background: "#f8fafc",
+              borderRadius: 18,
+              padding: 28,
+              color: "#64748b",
+              textAlign: "center",
+            }}
+          >
+            No referral rewards found yet.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {referralRewardHistory.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 18,
+                  padding: 16,
+                  background: "#ffffff",
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  gap: 14,
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ fontWeight: 800, color: "#0f172a" }}>
+                      Referral Reward
+                    </div>
+                    <StatusBadge value={item.status} />
+                  </div>
+
+                  <div
+                    style={{
+                      color: "#64748b",
+                      fontSize: 13,
+                      marginTop: 8,
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    <div>Referrer: {item.referrer_user_id}</div>
+                    <div>Referee: {item.referee_user_id}</div>
+                    <div>Trigger: {item.trigger_event}</div>
+                    <div>Created: {formatDate(item.created_at)}</div>
+                    <div>Rewarded: {formatDate(item.rewarded_at)}</div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: "#166534" }}>
+                    +{renderMoney(item.reward_amount)}
+                  </div>
+                  <div style={{ color: "#64748b", fontWeight: 700 }}>
+                    {item.currency}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
 
                     {page === "roles" && (
             <div style={{ display: "grid", gap: 16 }}>
