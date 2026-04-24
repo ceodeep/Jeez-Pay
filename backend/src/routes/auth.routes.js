@@ -578,6 +578,7 @@ try {
       token,
       hasPin: !!user.pin_hash,
       isNewUser: true,
+      referralReward
     });
   } catch (err) {
     console.error("signup/verify-otp crash:", err);
