@@ -568,6 +568,8 @@ try {
   console.error("signup referral reward failed:", rewardErr);
 }
 
+console.log("SIGNUP REFERRAL REWARD RESULT:", referralReward);
+
     const token = generateToken({
       userId: user.id,
       phone: user.phone,
