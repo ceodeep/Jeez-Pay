@@ -155,6 +155,8 @@ async function verifyOtpCode(phone, purpose, code) {
 }
 
 async function processReferralReward({ refereeUserId, triggerEvent }) {
+  console.log("[REFERRAL] start", { refereeUserId, triggerEvent });
+
   const { data: settings, error: settingsErr } = await supabase
     .from("referral_reward_settings")
     .select("*")
@@ -162,7 +164,12 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     .limit(1)
     .maybeSingle();
 
-  if (settingsErr) throw settingsErr;
+  if (settingsErr) {
+    console.error("[REFERRAL] settings fetch failed:", settingsErr);
+    throw settingsErr;
+  }
+
+  console.log("[REFERRAL] settings", settings);
 
   if (!settings || !settings.enabled) {
     return { status: "skipped", reason: "referral rewards disabled" };
@@ -188,7 +195,12 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     .eq("id", refereeUserId)
     .maybeSingle();
 
-  if (refereeErr) throw refereeErr;
+  if (refereeErr) {
+    console.error("[REFERRAL] referee fetch failed:", refereeErr);
+    throw refereeErr;
+  }
+
+  console.log("[REFERRAL] referee", referee);
 
   if (!referee || !referee.referred_by_user_id) {
     return { status: "skipped", reason: "user was not referred" };
@@ -204,13 +216,19 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     .eq("trigger_event", triggerEvent)
     .maybeSingle();
 
-  if (existingRewardErr) throw existingRewardErr;
+  if (existingRewardErr) {
+    console.error("[REFERRAL] existing reward lookup failed:", existingRewardErr);
+    throw existingRewardErr;
+  }
+
+  console.log("[REFERRAL] existingReward", existingReward);
 
   if (existingReward) {
     return {
       status: "skipped",
       reason: "reward already exists",
       rewardId: existingReward.id,
+      existingStatus: existingReward.status,
     };
   }
 
@@ -223,7 +241,15 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
       .eq("referrer_user_id", referrerUserId)
       .eq("status", "rewarded");
 
-    if (countErr) throw countErr;
+    if (countErr) {
+      console.error("[REFERRAL] reward count failed:", countErr);
+      throw countErr;
+    }
+
+    console.log("[REFERRAL] reward count", {
+      count,
+      maxRewardsPerUser,
+    });
 
     if ((count || 0) >= maxRewardsPerUser) {
       return { status: "skipped", reason: "max rewards reached" };
@@ -245,7 +271,12 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     .select()
     .single();
 
-  if (rewardInsertErr) throw rewardInsertErr;
+  if (rewardInsertErr) {
+    console.error("[REFERRAL] reward insert failed:", rewardInsertErr);
+    throw rewardInsertErr;
+  }
+
+  console.log("[REFERRAL] inserted reward", reward);
 
   let { data: wallet, error: walletErr } = await supabase
     .from("wallets")
@@ -254,7 +285,12 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     .eq("currency", currency)
     .maybeSingle();
 
-  if (walletErr) throw walletErr;
+  if (walletErr) {
+    console.error("[REFERRAL] wallet fetch failed:", walletErr);
+    throw walletErr;
+  }
+
+  console.log("[REFERRAL] wallet before", wallet);
 
   if (!wallet) {
     const created = await supabase
@@ -263,21 +299,43 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
       .select("id, balance")
       .single();
 
-    if (created.error) throw created.error;
+    if (created.error) {
+      console.error("[REFERRAL] wallet create failed:", created.error);
+      throw created.error;
+    }
+
     wallet = created.data;
+    console.log("[REFERRAL] wallet created", wallet);
   }
 
   const oldBalance = Number(wallet.balance || 0);
   const newBalance = oldBalance + rewardAmount;
+
+  console.log("[REFERRAL] updating wallet", {
+    walletId: wallet.id,
+    oldBalance,
+    newBalance,
+    rewardAmount,
+    currency,
+  });
 
   const { error: walletUpdateErr } = await supabase
     .from("wallets")
     .update({ balance: newBalance })
     .eq("id", wallet.id);
 
-  if (walletUpdateErr) throw walletUpdateErr;
+  if (walletUpdateErr) {
+    console.error("[REFERRAL] wallet update failed:", walletUpdateErr);
+    throw walletUpdateErr;
+  }
 
-  const reference = Number(`${Date.now()}${Math.floor(Math.random() * 1000)}`);
+  const reference = Date.now();
+
+  console.log("[REFERRAL] inserting transaction", {
+    walletId: wallet.id,
+    rewardAmount,
+    reference,
+  });
 
   const { data: tx, error: txErr } = await supabase
     .from("transactions")
@@ -293,17 +351,31 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     .select()
     .single();
 
-  if (txErr) throw txErr;
+  if (txErr) {
+    console.error("[REFERRAL] transaction insert failed:", txErr);
+    throw txErr;
+  }
 
-  const { error: rewardUpdateErr } = await supabase
+  console.log("[REFERRAL] inserted transaction", tx);
+
+  console.log("[REFERRAL] updating reward to rewarded", reward.id);
+
+  const { data: updatedReward, error: rewardUpdateErr } = await supabase
     .from("referral_rewards")
     .update({
       status: "rewarded",
       rewarded_at: new Date().toISOString(),
     })
-    .eq("id", reward.id);
+    .eq("id", reward.id)
+    .select()
+    .single();
 
-  if (rewardUpdateErr) throw rewardUpdateErr;
+  if (rewardUpdateErr) {
+    console.error("[REFERRAL] reward update failed:", rewardUpdateErr);
+    throw rewardUpdateErr;
+  }
+
+  console.log("[REFERRAL] rewarded successfully", updatedReward);
 
   return {
     status: "rewarded",
