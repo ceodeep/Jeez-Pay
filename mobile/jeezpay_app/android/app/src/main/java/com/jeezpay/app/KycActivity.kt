@@ -23,6 +23,11 @@ import androidx.appcompat.app.AlertDialog
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
 import com.jeezpay.app.storage.SessionManager
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import java.io.File
 
 class KycActivity : AppCompatActivity() {
 
@@ -36,16 +41,61 @@ class KycActivity : AppCompatActivity() {
         if (uri != null) {
             idUri = uri
             binding.imgIdPreview.setImageURI(uri)
-            binding.btnPickId.text = "ID selected"
+            binding.imgIdPreview.visibility = android.view.View.VISIBLE
+            binding.btnPickId.text = "Change ID photo"
         }
     }
 
-    private val pickSelfie = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            selfieUri = uri
-            binding.imgSelfiePreview.setImageURI(uri)
-            binding.btnPickSelfie.text = "Selfie selected"
+    private var pendingSelfieCameraUri: Uri? = null
+
+    private val takeSelfie = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val uri = pendingSelfieCameraUri
+            if (uri != null) {
+                selfieUri = uri
+                binding.imgSelfiePreview.setImageURI(uri)
+                binding.imgSelfiePreview.visibility = android.view.View.VISIBLE
+                binding.btnPickSelfie.text = "Retake live selfie"
+            }
         }
+    }
+
+    private val requestCameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchSelfieCamera()
+        } else {
+            toast("Camera permission is required for live selfie")
+        }
+    }
+
+    private fun startLiveSelfie() {
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (granted) {
+            launchSelfieCamera()
+        } else {
+            requestCameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun launchSelfieCamera() {
+        val file = File.createTempFile("kyc_selfie_", ".jpg", cacheDir)
+
+        val uri = FileProvider.getUriForFile(
+            this,
+            "${packageName}.fileprovider",
+            file
+        )
+
+        pendingSelfieCameraUri = uri
+        takeSelfie.launch(uri)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,7 +115,7 @@ class KycActivity : AppCompatActivity() {
 
         // Pickers
         binding.btnPickId.setOnClickListener { pickId.launch("image/*") }
-        binding.btnPickSelfie.setOnClickListener { pickSelfie.launch("image/*") }
+        binding.btnPickSelfie.setOnClickListener { startLiveSelfie() }
 
         // Submit
         binding.btnSubmitKyc.setOnClickListener { submitKyc() }

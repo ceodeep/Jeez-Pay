@@ -136,46 +136,53 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
                     android:padding="14dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ID Photo"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold"
-                        android:textSize="15sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Upload a clear photo of your ID (front)."
-                        android:textColor="@color/text_tertiary"
-                        android:textSize="13sp"/>
 
                     <ImageView
                         android:id="@+id/imgIdPreview"
-                        android:layout_width="match_parent"
-                        android:layout_height="160dp"
-                        android:layout_marginTop="10dp"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
                         android:scaleType="centerCrop"
+                        android:visibility="gone"
                         android:background="@drawable/kyc_preview_bg"
-                        android:contentDescription="ID preview"/>
+                        android:contentDescription="ID preview" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ID Photo"
+                            android:textColor="@color/text_primary"
+                            android:textStyle="bold"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Upload a clear photo of your ID front."
+                            android:textColor="@color/text_tertiary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnPickId"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="10dp"
-                        android:text="Choose ID photo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:text="Choose"
                         app:cornerRadius="14dp"
-                        style="@style/Widget.Material3.Button.OutlinedButton"/>
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Selfie Upload Card -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardSelfieUpload"
                 android:layout_width="match_parent"
@@ -189,42 +196,50 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
                     android:padding="14dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Selfie"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold"
-                        android:textSize="15sp"/>
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Take a selfie in good lighting."
-                        android:textColor="@color/text_tertiary"
-                        android:textSize="13sp"/>
 
                     <ImageView
                         android:id="@+id/imgSelfiePreview"
-                        android:layout_width="match_parent"
-                        android:layout_height="160dp"
-                        android:layout_marginTop="10dp"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
                         android:scaleType="centerCrop"
+                        android:visibility="gone"
                         android:background="@drawable/kyc_preview_bg"
-                        android:contentDescription="Selfie preview"/>
+                        android:contentDescription="Selfie preview" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Live Selfie"
+                            android:textColor="@color/text_primary"
+                            android:textStyle="bold"
+                            android:textSize="15sp" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="Take a live camera selfie. Gallery is not allowed."
+                            android:textColor="@color/text_tertiary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnPickSelfie"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="10dp"
-                        android:text="Choose selfie"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:text="Camera"
                         app:cornerRadius="14dp"
-                        style="@style/Widget.Material3.Button.OutlinedButton"/>
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
