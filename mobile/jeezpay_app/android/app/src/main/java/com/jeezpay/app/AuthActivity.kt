@@ -918,8 +918,7 @@ class AuthActivity : BaseFintechActivity() {
                 is ApiResult.Success -> {
                     val res = result.data
                     withContext(Dispatchers.Main) {
-                        setMaterialButtonLoading(btnUnlock, false, "Unlock")
-
+                        setFullScreenLoading(false)
                         if (!res.ok) {
                             val attempts = session.incrementFailedPinAttempts()
 
@@ -954,7 +953,7 @@ class AuthActivity : BaseFintechActivity() {
 
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
-                        setMaterialButtonLoading(btnUnlock, false, "Unlock")
+                        setFullScreenLoading(false)
                         handleAuthError(result.error) {
                             verifyPinOnBackend(pin)
                         }

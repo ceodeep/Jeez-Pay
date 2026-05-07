@@ -93,7 +93,7 @@ class ProfileActivity : AppCompatActivity() {
         }
 
         binding.rowSecurity.setOnClickListener {
-            toast("Security settings (coming soon)")
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         binding.rowPayments.setOnClickListener {

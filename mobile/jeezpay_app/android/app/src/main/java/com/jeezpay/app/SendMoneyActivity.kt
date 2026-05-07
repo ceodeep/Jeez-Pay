@@ -6,17 +6,14 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.widget.EditText
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
-import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.jeezpay.app.AuthActivity
 import com.jeezpay.app.R
 import com.jeezpay.app.SendMoneyUiState
 import com.jeezpay.app.SendMoneyViewModel
@@ -31,6 +28,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.jeezpay.app.common.LoaderOverlayController
+import android.view.MotionEvent
+import kotlin.math.abs
 
 class SendMoneyActivity : BaseFintechActivity() {
 
@@ -38,6 +37,7 @@ class SendMoneyActivity : BaseFintechActivity() {
     private lateinit var sendFlipper: ViewFlipper
 
     // PAGE 0
+    private lateinit var ivBackRecipient: View
     private lateinit var etPhone: EditText
     private lateinit var btnNext: TextView
     private lateinit var ivBack: View
@@ -74,6 +74,10 @@ class SendMoneyActivity : BaseFintechActivity() {
     private var lastConfirmedCurrency: String? = null
     private var lastConfirmedAmount: Double? = null
     private var lastConfirmedDescription: String? = null
+    private var touchStartX = 0f
+    private var touchStartY = 0f
+    private val swipeThreshold = 120
+    private val swipeVelocityGuard = 80
 
     private val pinLauncher =
         registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
@@ -110,10 +114,8 @@ class SendMoneyActivity : BaseFintechActivity() {
         vm.loadBalances()
 
         sendFlipper = findViewById(R.id.sendFlipper)
-        sendFlipper.inAnimation =
-            android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_in)
-        sendFlipper.outAnimation =
-            android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_out)
+        setSlideForwardAnimation()
+
 
         etPhone = findViewById(R.id.etPhone)
         btnNext = findViewById(R.id.btnNext)
@@ -122,6 +124,7 @@ class SendMoneyActivity : BaseFintechActivity() {
         recentStore = RecentRecipientsStore(this)
         recentList = findViewById(R.id.recentList)
         ivBack = findViewById(R.id.ivBack)
+        ivBackRecipient = findViewById(R.id.ivBackRecipient)
 
         etAmount = findViewById(R.id.etAmount)
         ddCurrency = findViewById(R.id.ddCurrency)
@@ -138,14 +141,21 @@ class SendMoneyActivity : BaseFintechActivity() {
 
 
         sendFlipper.displayedChild = 0
+        setupSwipeBackGesture()
         ivBack.setOnClickListener {
             if (sendFlipper.displayedChild == 1) {
+                setSlideBackAnimation()
                 sendFlipper.displayedChild = 0
                 tvError.visibility = View.GONE
             } else {
                 finish()
             }
         }
+        ivBackRecipient.setOnClickListener {
+            finish()
+        }
+
+
 
         setMode(IdMode.UID)
         setNextEnabled(false)
@@ -178,6 +188,7 @@ class SendMoneyActivity : BaseFintechActivity() {
                 return@setOnClickListener
             }
 
+            setSlideForwardAnimation()
             sendFlipper.displayedChild = 1
             tvRecipientName.text = receiverIdentifier
         }
@@ -440,6 +451,7 @@ class SendMoneyActivity : BaseFintechActivity() {
 
             row.setOnClickListener {
                 etPhone.setText(rec.identifier)
+                setSlideForwardAnimation()
                 sendFlipper.displayedChild = 1
                 tvRecipientName.text = rec.displayName ?: rec.identifier
             }
@@ -480,5 +492,82 @@ class SendMoneyActivity : BaseFintechActivity() {
             description = description,
             pin = pin
         )
+    }
+
+    private fun setupSwipeBackGesture() {
+        sendFlipper.setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    touchStartX = event.x
+                    touchStartY = event.y
+                    true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    val deltaX = event.x - touchStartX
+                    val deltaY = event.y - touchStartY
+
+                    val isHorizontalSwipe = abs(deltaX) > abs(deltaY)
+                    val isSwipeRight = deltaX > swipeThreshold
+                    val isNotTinySwipe = abs(deltaX) > swipeVelocityGuard
+
+                    if (
+                        sendFlipper.displayedChild == 1 &&
+                        isHorizontalSwipe &&
+                        isSwipeRight &&
+                        isNotTinySwipe
+                    ) {
+                        setSlideBackAnimation()
+                        sendFlipper.displayedChild = 0
+                        tvError.visibility = View.GONE
+                        true
+                    } else {
+                        false
+                    }
+                }
+
+                else -> false
+            }
+        }
+    }
+
+    private fun setSlideForwardAnimation() {
+        sendFlipper.inAnimation = android.view.animation.TranslateAnimation(
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 1.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f
+        ).apply {
+            duration = 260
+        }
+
+        sendFlipper.outAnimation = android.view.animation.TranslateAnimation(
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, -1.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f
+        ).apply {
+            duration = 260
+        }
+    }
+
+    private fun setSlideBackAnimation() {
+        sendFlipper.inAnimation = android.view.animation.TranslateAnimation(
+            android.view.animation.Animation.RELATIVE_TO_PARENT, -1.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f
+        ).apply {
+            duration = 260
+        }
+
+        sendFlipper.outAnimation = android.view.animation.TranslateAnimation(
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 1.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f,
+            android.view.animation.Animation.RELATIVE_TO_PARENT, 0.0f
+        ).apply {
+            duration = 260
+        }
     }
 }

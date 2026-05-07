@@ -1,13 +1,16 @@
 package com.jeezpay.app
 
 import android.os.Bundle
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
 class PaymentSettingsActivity : AppCompatActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_simple_page)
-        findViewById<TextView>(R.id.tvTitle).text = "Payment settings"
+        setContentView(R.layout.activity_payment_settings)
+
+        findViewById<android.view.View>(R.id.btnBack).setOnClickListener {
+            finish()
+        }
     }
 }

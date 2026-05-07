@@ -779,6 +779,132 @@ router.post("/set-pin", authMiddleware, async (req, res) => {
 });
 
 // =====================================
+// CHANGE PIN
+// =====================================
+router.post("/change-pin", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const currentPin = String(req.body?.currentPin ?? "").trim();
+    const newPin = String(req.body?.newPin ?? "").trim();
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized (no userId)" });
+    }
+
+    if (!/^\d{4}$/.test(currentPin) || !/^\d{4}$/.test(newPin)) {
+      return res.status(400).json({
+        message: "PIN must be exactly 4 digits",
+      });
+    }
+
+    if (currentPin === newPin) {
+      return res.status(400).json({
+        message: "New PIN must be different from current PIN",
+      });
+    }
+
+    if (
+      newPin === "0000" ||
+      newPin === "1111" ||
+      newPin === "1234" ||
+      newPin === "4321" ||
+      /^(\d)\1{3}$/.test(newPin)
+    ) {
+      return res.status(400).json({
+        message: "Choose a stronger PIN",
+      });
+    }
+
+    const { data: user, error: fetchErr } = await supabase
+      .from("users")
+      .select("id, pin_hash, pin_failed_attempts, pin_locked_until")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error("[change-pin] user lookup error:", fetchErr);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.pin_hash) {
+      return res.status(400).json({
+        message: "No PIN is set for this account",
+      });
+    }
+
+    if (user.pin_locked_until) {
+      const lockedUntil = new Date(user.pin_locked_until);
+
+      if (lockedUntil > new Date()) {
+        return res.status(423).json({
+          message: "PIN is temporarily locked. Please try again later.",
+        });
+      }
+    }
+
+    const currentPinMatches = await bcrypt.compare(currentPin, user.pin_hash);
+
+    if (!currentPinMatches) {
+      const failedAttempts = Number(user.pin_failed_attempts || 0) + 1;
+
+      const updates = {
+        pin_failed_attempts: failedAttempts,
+      };
+
+      if (failedAttempts >= 5) {
+        const lockUntil = new Date(Date.now() + 10 * 60 * 1000);
+
+        updates.pin_failed_attempts = 0;
+        updates.pin_locked_until = lockUntil.toISOString();
+      }
+
+      await supabase
+        .from("users")
+        .update(updates)
+        .eq("id", userId);
+
+      return res.status(400).json({
+        message: "Current PIN is incorrect",
+      });
+    }
+
+    const newPinHash = await bcrypt.hash(newPin, 10);
+
+    const { data: updatedUser, error: updateErr } = await supabase
+      .from("users")
+      .update({
+        pin_hash: newPinHash,
+        pin_failed_attempts: 0,
+        pin_locked_until: null,
+      })
+      .eq("id", userId)
+      .select("id, pin_hash")
+      .maybeSingle();
+
+    if (updateErr) {
+      console.error("[change-pin] update error:", updateErr);
+      return res.status(500).json({ message: "Failed to change PIN" });
+    }
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      message: "PIN changed successfully",
+      hasPin: true,
+    });
+  } catch (err) {
+    console.error("[change-pin] crash:", err?.message, err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// =====================================
 // VERIFY PIN
 // =====================================
 router.post("/verify-pin", authMiddleware, async (req, res) => {
