@@ -30,6 +30,9 @@ import java.util.Locale
 import com.jeezpay.app.common.LoaderOverlayController
 import android.view.MotionEvent
 import kotlin.math.abs
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 
 class SendMoneyActivity : BaseFintechActivity() {
 
@@ -238,19 +241,20 @@ class SendMoneyActivity : BaseFintechActivity() {
                 fee = fee
             ) {
                 openPinThenConfirm { pin ->
+                    requireTransactionApproval {
+                        lastConfirmedReceiverIdentifier = receiverIdentifier
+                        lastConfirmedCurrency = currency
+                        lastConfirmedAmount = amount
+                        lastConfirmedDescription = description
 
-                    lastConfirmedReceiverIdentifier = receiverIdentifier
-                    lastConfirmedCurrency = currency
-                    lastConfirmedAmount = amount
-                    lastConfirmedDescription = description
-
-                    vm.sendMoney(
-                        toPhone = receiverIdentifier,
-                        currency = currency,
-                        amount = amount,
-                        description = description,
-                        pin = pin
-                    )
+                        vm.sendMoney(
+                            toPhone = receiverIdentifier,
+                            currency = currency,
+                            amount = amount,
+                            description = description,
+                            pin = pin
+                        )
+                    }
                 }
             }.show(supportFragmentManager, "SendReviewBottomSheet")
         }
@@ -569,5 +573,66 @@ class SendMoneyActivity : BaseFintechActivity() {
         ).apply {
             duration = 260
         }
+    }
+
+    private fun requireTransactionApproval(onApproved: () -> Unit) {
+        val session = SessionManager(this)
+
+        if (!session.isBiometricEnabled()) {
+            onApproved()
+            return
+        }
+
+        val authenticators =
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+        val canAuthenticate =
+            BiometricManager.from(this).canAuthenticate(authenticators) ==
+                    BiometricManager.BIOMETRIC_SUCCESS
+
+        if (!canAuthenticate) {
+            Toast.makeText(
+                this,
+                "Biometric approval is unavailable. Please use your PIN.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            // Later we can open PinVerifyActivity here.
+            return
+        }
+
+        val prompt = BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(
+                    result: BiometricPrompt.AuthenticationResult
+                ) {
+                    super.onAuthenticationSucceeded(result)
+                    onApproved()
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(
+                        this@SendMoneyActivity,
+                        "Biometric authentication failed",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        )
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Approve transaction")
+            .setSubtitle("Confirm this payment securely")
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+
+        prompt.authenticate(promptInfo)
     }
 }

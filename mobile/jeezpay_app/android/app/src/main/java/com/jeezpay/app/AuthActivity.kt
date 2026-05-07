@@ -24,6 +24,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 
 class AuthActivity : BaseFintechActivity() {
 
@@ -77,6 +80,7 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var unlockDot2: ImageView
     private lateinit var unlockDot3: ImageView
     private lateinit var unlockDot4: ImageView
+    private lateinit var btnBiometricUnlock: ImageView
 
     // Create account
     private lateinit var actAccountType: AutoCompleteTextView
@@ -180,6 +184,7 @@ class AuthActivity : BaseFintechActivity() {
         tvOtpHint = findViewById(R.id.tvOtpHint)
         etOtp = findViewById(R.id.etOtp)
         btnVerify = findViewById(R.id.btnVerify)
+        btnBiometricUnlock = findViewById(R.id.btnBiometricUnlock)
 
         btnBackPin = findViewById(R.id.btnBackPin)
         etPin = findViewById(R.id.etPin)
@@ -1266,5 +1271,108 @@ class AuthActivity : BaseFintechActivity() {
         btnCreateAccount.isEnabled = !loading
         btnSetPin.isEnabled = !loading
         btnUnlock.isEnabled = !loading
+    }
+
+    private fun setupBiometricUnlock() {
+        val available = session.isBiometricEnabled() && canUseBiometric()
+
+        btnBiometricUnlock.visibility =
+            if (available) android.view.View.VISIBLE else android.view.View.GONE
+
+        btnBiometricUnlock.setOnClickListener {
+            showBiometricPrompt(
+                title = "Unlock JeezPay",
+                subtitle = "Use fingerprint, face unlock, or device lock to continue.",
+                onSuccess = {
+                    session.resetFailedPinAttempts()
+                    etUnlockPin.text?.clear()
+                    renderUnlockDotsSafe("")
+                    openMain()
+                }
+            )
+        }
+
+        if (available && flipper.displayedChild == 3) {
+            btnBiometricUnlock.postDelayed({
+                showBiometricPrompt(
+                    title = "Unlock JeezPay",
+                    subtitle = "Use fingerprint, face unlock, or device lock to continue.",
+                    onSuccess = {
+                        session.resetFailedPinAttempts()
+                        etUnlockPin.text?.clear()
+                        renderUnlockDotsSafe("")
+                        openMain()
+                    }
+                )
+            }, 350)
+        }
+    }
+
+    private fun canUseBiometric(): Boolean {
+        val authenticators =
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+        return BiometricManager.from(this).canAuthenticate(authenticators) ==
+                BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    private fun showBiometricPrompt(
+        title: String,
+        subtitle: String,
+        onSuccess: () -> Unit
+    ) {
+        val executor = ContextCompat.getMainExecutor(this)
+
+        val prompt = BiometricPrompt(
+            this,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(
+                    result: BiometricPrompt.AuthenticationResult
+                ) {
+                    super.onAuthenticationSucceeded(result)
+                    onSuccess()
+                }
+
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    Toast.makeText(
+                        this@AuthActivity,
+                        "Biometric authentication failed",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                override fun onAuthenticationError(
+                    errorCode: Int,
+                    errString: CharSequence
+                ) {
+                    super.onAuthenticationError(errorCode, errString)
+
+                    if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                        errorCode != BiometricPrompt.ERROR_CANCELED &&
+                        errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                    ) {
+                        Toast.makeText(
+                            this@AuthActivity,
+                            errString.toString(),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        )
+
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(title)
+            .setSubtitle(subtitle)
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+
+        prompt.authenticate(promptInfo)
     }
 }
