@@ -107,6 +107,16 @@ class SessionManager(context: Context) {
 
     fun isPinLocked(): Boolean = getPinLockRemainingMillis() > 0L
 
+    fun isBiometricEnabled(): Boolean {
+        return prefs.getBoolean(KEY_BIOMETRIC_ENABLED, false)
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        prefs.edit()
+            .putBoolean(KEY_BIOMETRIC_ENABLED, enabled)
+            .apply()
+    }
+
     private fun generateSalt(size: Int = 16): ByteArray {
         val salt = ByteArray(size)
         SecureRandom().nextBytes(salt)
@@ -154,5 +164,6 @@ class SessionManager(context: Context) {
 
         const val MAX_PIN_ATTEMPTS = 5
         const val PIN_LOCK_DURATION_MS = 60_000L
+        private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
     }
 }
