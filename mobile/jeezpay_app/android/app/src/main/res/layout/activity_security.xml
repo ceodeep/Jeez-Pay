@@ -76,7 +76,7 @@
                             android:layout_width="30dp"
                             android:layout_height="30dp"
                             android:layout_gravity="center"
-                            android:src="@drawable/ic_settings"
+                            android:src="@drawable/ic_security"
                             app:tint="@color/paypal_blue" />
                     </com.google.android.material.card.MaterialCardView>
 
@@ -179,7 +179,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_change_pass"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
@@ -240,7 +240,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_change_pass"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
@@ -298,7 +298,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_fingerprint"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
@@ -354,7 +354,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_require_pin"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
@@ -436,7 +436,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_pin"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
@@ -493,7 +493,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_otp"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
@@ -579,7 +579,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_current_device"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
@@ -646,7 +646,7 @@
                     <ImageView
                         android:layout_width="28dp"
                         android:layout_height="28dp"
-                        android:src="@drawable/ic_settings"
+                        android:src="@drawable/ic_session"
                         app:tint="@color/paypal_blue" />
 
                     <LinearLayout
