@@ -7,7 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 class SecurityActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_simple_page)
+        setContentView(R.layout.activity_security)
 
         findViewById<TextView>(R.id.tvTitle).text = "Security"
 

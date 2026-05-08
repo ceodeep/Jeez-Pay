@@ -93,15 +93,27 @@ class ProfileActivity : AppCompatActivity() {
         }
 
         binding.rowSecurity.setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            startActivity(Intent(this, SecurityActivity::class.java))
+        }
+
+        binding.rowChangePin.setOnClickListener {
+            startActivity(Intent(this, ChangePinActivity::class.java))
         }
 
         binding.rowPayments.setOnClickListener {
-            toast("Payment settings (coming soon)")
+            startActivity(Intent(this, PaymentSettingsActivity::class.java))
+        }
+
+        binding.rowLimits.setOnClickListener {
+            startActivity(Intent(this, LimitsActivity::class.java))
         }
 
         binding.rowAbout.setOnClickListener {
-            toast("About us (coming soon)")
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
+
+        binding.rowPrivacy.setOnClickListener {
+            startActivity(Intent(this, PrivacyActivity::class.java))
         }
 
         binding.rowLogout.setOnClickListener {
