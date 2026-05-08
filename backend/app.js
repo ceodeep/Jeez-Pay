@@ -35,4 +35,6 @@ app.get("/health", (req, res) => {
 app.get("/me", authMiddleware, (req, res) => {
     res.json({user: req.user});
 });
+
+
 module.exports = app;

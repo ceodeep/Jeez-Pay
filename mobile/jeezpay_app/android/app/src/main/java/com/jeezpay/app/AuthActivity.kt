@@ -27,6 +27,7 @@ import kotlinx.coroutines.withContext
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import android.view.View
 
 class AuthActivity : BaseFintechActivity() {
 
@@ -693,6 +694,7 @@ class AuthActivity : BaseFintechActivity() {
         }
 
         renderUnlockDotsSafe("")
+        setupBiometricUnlock()
 
         tvForgotPin.setOnClickListener {
             val phone = session.getPhone()
@@ -1274,12 +1276,31 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun setupBiometricUnlock() {
-        val available = session.isBiometricEnabled() && canUseBiometric()
+        val enabled = session.isBiometricEnabled()
+        val available = canUseBiometric()
 
-        btnBiometricUnlock.visibility =
-            if (available) android.view.View.VISIBLE else android.view.View.GONE
+        btnBiometricUnlock.visibility = View.VISIBLE
+        btnBiometricUnlock.alpha = if (enabled && available) 1f else 0.35f
 
         btnBiometricUnlock.setOnClickListener {
+            if (!session.isBiometricEnabled()) {
+                Toast.makeText(
+                    this,
+                    "Enable biometric unlock from Security settings",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@setOnClickListener
+            }
+
+            if (!canUseBiometric()) {
+                Toast.makeText(
+                    this,
+                    "Biometric unlock is not available on this device",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@setOnClickListener
+            }
+
             showBiometricPrompt(
                 title = "Unlock JeezPay",
                 subtitle = "Use fingerprint, face unlock, or device lock to continue.",
@@ -1290,21 +1311,6 @@ class AuthActivity : BaseFintechActivity() {
                     openMain()
                 }
             )
-        }
-
-        if (available && flipper.displayedChild == 3) {
-            btnBiometricUnlock.postDelayed({
-                showBiometricPrompt(
-                    title = "Unlock JeezPay",
-                    subtitle = "Use fingerprint, face unlock, or device lock to continue.",
-                    onSuccess = {
-                        session.resetFailedPinAttempts()
-                        etUnlockPin.text?.clear()
-                        renderUnlockDotsSafe("")
-                        openMain()
-                    }
-                )
-            }, 350)
         }
     }
 

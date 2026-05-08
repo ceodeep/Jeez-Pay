@@ -642,10 +642,45 @@ try {
 
 console.log("SIGNUP REFERRAL REWARD RESULT:", referralReward);
 
-    const token = generateToken({
-      userId: user.id,
-      phone: user.phone,
-    });
+    const deviceName =
+  req.headers["x-device-name"] ||
+  req.body.deviceName ||
+  "Unknown device";
+
+const appPlatform =
+  req.headers["x-app-platform"] ||
+  req.body.appPlatform ||
+  "android";
+
+const userAgent = req.headers["user-agent"] || "";
+const ipAddress =
+  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+  req.socket?.remoteAddress ||
+  null;
+
+const { data: sessionRow, error: sessionErr } = await supabase
+  .from("user_sessions")
+  .insert({
+    user_id: user.id,
+    device_name: deviceName,
+    device_type: "mobile",
+    app_platform: appPlatform,
+    ip_address: ipAddress,
+    user_agent: userAgent,
+  })
+  .select("id")
+  .single();
+
+if (sessionErr || !sessionRow) {
+  console.error("[login] session create error:", sessionErr);
+  return res.status(500).json({ message: "Failed to create session" });
+}
+
+const token = generateToken({
+  userId: user.id,
+  phone: user.phone,
+  sessionId: sessionRow.id,
+});
 
     return res.json({
       message: "Account created successfully",
@@ -703,10 +738,45 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = generateToken({
-      userId: user.id,
-      phone: user.phone,
-    });
+    const deviceName =
+  req.headers["x-device-name"] ||
+  req.body.deviceName ||
+  "Unknown device";
+
+const appPlatform =
+  req.headers["x-app-platform"] ||
+  req.body.appPlatform ||
+  "android";
+
+const userAgent = req.headers["user-agent"] || "";
+const ipAddress =
+  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+  req.socket?.remoteAddress ||
+  null;
+
+const { data: sessionRow, error: sessionErr } = await supabase
+  .from("user_sessions")
+  .insert({
+    user_id: user.id,
+    device_name: deviceName,
+    device_type: "mobile",
+    app_platform: appPlatform,
+    ip_address: ipAddress,
+    user_agent: userAgent,
+  })
+  .select("id")
+  .single();
+
+if (sessionErr || !sessionRow) {
+  console.error("[login] session create error:", sessionErr);
+  return res.status(500).json({ message: "Failed to create session" });
+}
+
+const token = generateToken({
+  userId: user.id,
+  phone: user.phone,
+  sessionId: sessionRow.id,
+});
 
     return res.json({
       message: "Authenticated",
@@ -1112,10 +1182,45 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
       return res.status(500).json({ message: "Failed to reset password" });
     }
 
-    const token = generateToken({
-      userId: user.id,
-      phone: user.phone,
-    });
+    const deviceName =
+  req.headers["x-device-name"] ||
+  req.body.deviceName ||
+  "Unknown device";
+
+const appPlatform =
+  req.headers["x-app-platform"] ||
+  req.body.appPlatform ||
+  "android";
+
+const userAgent = req.headers["user-agent"] || "";
+const ipAddress =
+  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+  req.socket?.remoteAddress ||
+  null;
+
+const { data: sessionRow, error: sessionErr } = await supabase
+  .from("user_sessions")
+  .insert({
+    user_id: user.id,
+    device_name: deviceName,
+    device_type: "mobile",
+    app_platform: appPlatform,
+    ip_address: ipAddress,
+    user_agent: userAgent,
+  })
+  .select("id")
+  .single();
+
+if (sessionErr || !sessionRow) {
+  console.error("[login] session create error:", sessionErr);
+  return res.status(500).json({ message: "Failed to create session" });
+}
+
+const token = generateToken({
+  userId: user.id,
+  phone: user.phone,
+  sessionId: sessionRow.id,
+});
 
     return res.json({
       message: "Password reset successfully",
@@ -1214,10 +1319,45 @@ router.post("/forgot-pin/verify-otp", async (req, res) => {
       return res.status(500).json({ message: "Failed to reset PIN" });
     }
 
-    const token = generateToken({
-      userId: user.id,
-      phone: user.phone,
-    });
+    const deviceName =
+  req.headers["x-device-name"] ||
+  req.body.deviceName ||
+  "Unknown device";
+
+const appPlatform =
+  req.headers["x-app-platform"] ||
+  req.body.appPlatform ||
+  "android";
+
+const userAgent = req.headers["user-agent"] || "";
+const ipAddress =
+  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+  req.socket?.remoteAddress ||
+  null;
+
+const { data: sessionRow, error: sessionErr } = await supabase
+  .from("user_sessions")
+  .insert({
+    user_id: user.id,
+    device_name: deviceName,
+    device_type: "mobile",
+    app_platform: appPlatform,
+    ip_address: ipAddress,
+    user_agent: userAgent,
+  })
+  .select("id")
+  .single();
+
+if (sessionErr || !sessionRow) {
+  console.error("[login] session create error:", sessionErr);
+  return res.status(500).json({ message: "Failed to create session" });
+}
+
+const token = generateToken({
+  userId: user.id,
+  phone: user.phone,
+  sessionId: sessionRow.id,
+});
 
     return res.json({
       message: "PIN reset successfully",
@@ -1364,5 +1504,103 @@ function maskPhone(phone) {
 
   return `${value.slice(0, 4)}****${value.slice(-3)}`;
 }
+
+// =====================================
+// ACTIVE SESSIONS
+// =====================================
+router.get("/sessions", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const currentSessionId = req.user.sessionId || null;
+
+    const { data, error } = await supabase
+      .from("user_sessions")
+      .select("id, device_name, device_type, app_platform, ip_address, last_seen_at, created_at, revoked_at")
+      .eq("user_id", userId)
+      .is("revoked_at", null)
+      .order("last_seen_at", { ascending: false });
+
+    if (error) {
+      console.error("[sessions] list error:", error);
+      return res.status(500).json({ message: "Failed to load sessions" });
+    }
+
+    const sessions = (data || []).map((s) => ({
+      id: s.id,
+      deviceName: s.device_name || "Unknown device",
+      deviceType: s.device_type || "mobile",
+      appPlatform: s.app_platform || "android",
+      ipAddress: s.ip_address,
+      lastSeenAt: s.last_seen_at,
+      createdAt: s.created_at,
+      isCurrent: currentSessionId ? s.id === currentSessionId : false,
+    }));
+
+    return res.json({ sessions });
+  } catch (err) {
+    console.error("[sessions] crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.delete("/sessions/:sessionId", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const currentSessionId = req.user.sessionId || null;
+    const sessionId = req.params.sessionId;
+
+    if (sessionId === currentSessionId) {
+      return res.status(400).json({
+        message: "You cannot revoke the current session from here",
+      });
+    }
+
+    const { error } = await supabase
+      .from("user_sessions")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("id", sessionId)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("[sessions] revoke error:", error);
+      return res.status(500).json({ message: "Failed to revoke session" });
+    }
+
+    return res.json({ message: "Session revoked successfully" });
+  } catch (err) {
+    console.error("[sessions] revoke crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/sessions/logout-others", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const currentSessionId = req.user.sessionId;
+
+    if (!currentSessionId) {
+      return res.status(400).json({
+        message: "Current session is not trackable. Please login again.",
+      });
+    }
+
+    const { error } = await supabase
+      .from("user_sessions")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("user_id", userId)
+      .neq("id", currentSessionId)
+      .is("revoked_at", null);
+
+    if (error) {
+      console.error("[sessions] logout others error:", error);
+      return res.status(500).json({ message: "Failed to logout other sessions" });
+    }
+
+    return res.json({ message: "Other sessions logged out successfully" });
+  } catch (err) {
+    console.error("[sessions] logout others crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 module.exports = router;

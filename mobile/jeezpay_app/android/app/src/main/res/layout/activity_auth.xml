@@ -807,21 +807,21 @@
                     android:src="@drawable/ic_pin_dot_empty" />
             </LinearLayout>
 
-            <ImageView
-                android:id="@+id/btnBiometricUnlock"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:layout_marginTop="18dp"
-                android:background="@drawable/bg_pin_icon_circle"
-                android:clickable="true"
-                android:focusable="true"
-                android:padding="14dp"
-                android:src="@drawable/ic_fingerprint"
-                android:visibility="gone"
-                app:layout_constraintTop_toBottomOf="@id/unlockDots"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:tint="#2A82EE" />
+<!--            <ImageView-->
+<!--                android:id="@+id/btnBiometricUnlock"-->
+<!--                android:layout_width="56dp"-->
+<!--                android:layout_height="56dp"-->
+<!--                android:layout_marginTop="18dp"-->
+<!--                android:background="@drawable/bg_pin_icon_circle"-->
+<!--                android:clickable="true"-->
+<!--                android:focusable="true"-->
+<!--                android:padding="14dp"-->
+<!--                android:src="@drawable/ic_fingerprint"-->
+<!--                android:visibility="gone"-->
+<!--                app:layout_constraintTop_toBottomOf="@id/unlockDots"-->
+<!--                app:layout_constraintStart_toStartOf="parent"-->
+<!--                app:layout_constraintEnd_toEndOf="parent"-->
+<!--                app:tint="#2A82EE" />-->
 
             <EditText
                 android:id="@+id/etUnlockPin"
@@ -847,7 +847,7 @@
                 android:paddingBottom="6dp"
                 app:columnCount="3"
                 app:rowCount="4"
-                app:layout_constraintTop_toBottomOf="@id/btnBiometricUnlock"
+                app:layout_constraintTop_toBottomOf="@id/unlockDots"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent">
 
@@ -923,10 +923,20 @@
                     android:focusable="true"
                     app:layout_columnWeight="1" />
 
-                <Space
+                <ImageView
+                    android:id="@+id/btnBiometricUnlock"
                     android:layout_width="0dp"
                     android:layout_height="64dp"
-                    app:layout_columnWeight="1"/>
+                    android:padding="18dp"
+                    android:src="@drawable/ic_fingerprint"
+                    android:visibility="visible"
+                    android:alpha="0.35"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Use fingerprint"
+                    app:tint="#2A82EE"
+                    app:layout_columnWeight="1" />
 
                 <TextView
                     android:id="@+id/unlockKey0"

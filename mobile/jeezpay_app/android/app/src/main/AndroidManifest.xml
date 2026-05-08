@@ -74,6 +74,7 @@
         <activity android:name=".LimitsActivity" android:exported="false" />
         <activity android:name=".PrivacyActivity" android:exported="false" />
         <activity android:name=".TermsActivity" android:exported="false" />
+        <activity android:name=".ActiveSessionsActivity" />
         
 
 

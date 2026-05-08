@@ -76,7 +76,12 @@ class SessionManager(context: Context) {
     }
 
     fun clearAll() {
-        prefs.edit().clear().commit()
+        val biometricEnabled = isBiometricEnabled()
+
+        prefs.edit()
+            .clear()
+            .putBoolean(KEY_BIOMETRIC_ENABLED, biometricEnabled)
+            .commit()
     }
 
     fun getFailedPinAttempts(): Int = prefs.getInt(KEY_PIN_FAILED_ATTEMPTS, 0)

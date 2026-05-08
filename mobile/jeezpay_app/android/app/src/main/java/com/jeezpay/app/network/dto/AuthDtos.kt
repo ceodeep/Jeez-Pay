@@ -163,3 +163,22 @@ data class ChangePinResponse(
     val message: String,
     val hasPin: Boolean? = null
 )
+data class ActiveSessionsResponse(
+    val sessions: List<UserSessionDto> = emptyList()
+)
+
+data class UserSessionDto(
+    val id: String,
+    val deviceName: String?,
+    val deviceType: String?,
+    val appPlatform: String?,
+    val ipAddress: String?,
+    val userAgent: String?,
+    val lastSeenAt: String?,
+    val createdAt: String?,
+    val isCurrent: Boolean = false
+)
+
+data class BasicMessageResponse(
+    val message: String
+)

@@ -71,7 +71,7 @@ class SecurityActivity : AppCompatActivity() {
         }
 
         binding.rowActiveSessions.setOnClickListener {
-            toast("Active sessions coming soon")
+            startActivity(Intent(this, ActiveSessionsActivity::class.java))
         }
     }
 

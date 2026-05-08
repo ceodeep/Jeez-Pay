@@ -27,6 +27,9 @@ import com.jeezpay.app.network.dto.UpdateAvatarRequest
 import com.jeezpay.app.network.dto.UpdateAvatarResponse
 import com.jeezpay.app.network.dto.MeResponse
 import com.jeezpay.app.network.dto.ReferralSummaryResponse
+import com.jeezpay.app.network.dto.ActiveSessionsResponse
+import com.jeezpay.app.network.dto.BasicMessageResponse
+
 
 class AuthRepository {
 
@@ -273,6 +276,23 @@ class AuthRepository {
                     newPin = newPin
                 )
             )
+        }
+    }
+    suspend fun activeSessionsSafe(): ApiResult<ActiveSessionsResponse> {
+        return safeApiCall {
+            api.activeSessions()
+        }
+    }
+
+    suspend fun revokeSessionSafe(sessionId: String): ApiResult<BasicMessageResponse> {
+        return safeApiCall {
+            api.revokeSession(sessionId)
+        }
+    }
+
+    suspend fun logoutOtherSessionsSafe(): ApiResult<BasicMessageResponse> {
+        return safeApiCall {
+            api.logoutOtherSessions()
         }
     }
 }

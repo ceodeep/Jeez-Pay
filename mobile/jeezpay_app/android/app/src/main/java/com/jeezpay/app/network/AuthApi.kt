@@ -1,5 +1,7 @@
 package com.jeezpay.app.network
 
+import com.jeezpay.app.network.dto.ActiveSessionsResponse
+import com.jeezpay.app.network.dto.BasicMessageResponse
 import com.jeezpay.app.network.dto.ChangePinRequest
 import com.jeezpay.app.network.dto.ChangePinResponse
 import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpRequest
@@ -25,9 +27,11 @@ import com.jeezpay.app.network.dto.VerifyPinResponse
 import com.jeezpay.app.network.dto.MeResponse
 import com.jeezpay.app.network.dto.ReferralSummaryResponse
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.POST
 import retrofit2.http.GET
 import retrofit2.http.PATCH
+import retrofit2.http.Path
 
 interface AuthApi {
 
@@ -81,6 +85,19 @@ interface AuthApi {
 
     @GET("auth/referrals/summary")
     suspend fun referralSummary(): ReferralSummaryResponse
+
+    @GET("auth/sessions")
+    suspend fun activeSessions(): ActiveSessionsResponse
+
+    @DELETE("auth/sessions/{sessionId}")
+    suspend fun revokeSession(
+        @Path("sessionId") sessionId: String
+    ): BasicMessageResponse
+
+    @POST("auth/sessions/logout-others")
+    suspend fun logoutOtherSessions(): BasicMessageResponse
+
+
 }
 
 
