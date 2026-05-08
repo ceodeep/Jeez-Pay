@@ -46,7 +46,7 @@ interface AuthApi {
     @POST("auth/set-pin")
     suspend fun setPin(@Body body: SetPinRequest): SetPinResponse
 
-    @POST("api/auth/change-pin")
+    @POST("auth/change-pin")
     suspend fun changePin(
         @Body body: ChangePinRequest
     ): ChangePinResponse
