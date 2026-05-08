@@ -29,6 +29,7 @@ import com.jeezpay.app.network.dto.MeResponse
 import com.jeezpay.app.network.dto.ReferralSummaryResponse
 import com.jeezpay.app.network.dto.ActiveSessionsResponse
 import com.jeezpay.app.network.dto.BasicMessageResponse
+import android.os.Build
 
 
 class AuthRepository {
@@ -39,7 +40,9 @@ class AuthRepository {
         return api.login(
             LoginRequest(
                 phone = phone,
-                password = password
+                password = password,
+                deviceName = getDeviceName(),
+                appPlatform = "android"
             )
         )
     }
@@ -138,7 +141,12 @@ class AuthRepository {
 
     suspend fun loginSafe(phone: String, password: String): ApiResult<LoginResponse> {
         return safeApiCall {
-            api.login(LoginRequest(phone = phone, password = password))
+            api.login(LoginRequest(
+                phone = phone,
+                password = password,
+                deviceName = getDeviceName(),
+                appPlatform = "android"
+            ))
         }
     }
 
@@ -293,6 +301,19 @@ class AuthRepository {
     suspend fun logoutOtherSessionsSafe(): ApiResult<BasicMessageResponse> {
         return safeApiCall {
             api.logoutOtherSessions()
+        }
+    }
+    private fun getDeviceName(): String {
+        val manufacturer = Build.MANUFACTURER.orEmpty().replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        }
+
+        val model = Build.MODEL.orEmpty()
+
+        return when {
+            manufacturer.isBlank() && model.isBlank() -> "Android device"
+            model.startsWith(manufacturer, ignoreCase = true) -> model
+            else -> "$manufacturer $model"
         }
     }
 }

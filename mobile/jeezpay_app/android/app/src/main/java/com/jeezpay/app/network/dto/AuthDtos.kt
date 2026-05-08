@@ -4,7 +4,9 @@ package com.jeezpay.app.network.dto
 
 data class LoginRequest(
     val phone: String,
-    val password: String
+    val password: String,
+    val deviceName: String? = null,
+    val appPlatform: String? = "android"
 )
 
 data class LoginResponse(
