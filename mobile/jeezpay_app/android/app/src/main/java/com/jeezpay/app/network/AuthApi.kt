@@ -1,5 +1,7 @@
 package com.jeezpay.app.network
 
+import com.jeezpay.app.network.dto.ChangePinRequest
+import com.jeezpay.app.network.dto.ChangePinResponse
 import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpRequest
 import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpResponse
 import com.jeezpay.app.network.dto.ForgotPasswordVerifyOtpRequest
@@ -43,6 +45,11 @@ interface AuthApi {
 
     @POST("auth/set-pin")
     suspend fun setPin(@Body body: SetPinRequest): SetPinResponse
+
+    @POST("api/auth/change-pin")
+    suspend fun changePin(
+        @Body body: ChangePinRequest
+    ): ChangePinResponse
 
     @POST("auth/verify-pin")
     suspend fun verifyPin(@Body body: VerifyPinRequest): VerifyPinResponse

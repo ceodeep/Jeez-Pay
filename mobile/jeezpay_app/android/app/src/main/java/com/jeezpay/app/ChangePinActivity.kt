@@ -6,7 +6,13 @@ import android.text.InputType
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.repository.AuthRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ChangePinActivity : AppCompatActivity() {
 
@@ -14,6 +20,8 @@ class ChangePinActivity : AppCompatActivity() {
     private lateinit var etNewPin: EditText
     private lateinit var etConfirmPin: EditText
     private lateinit var btnSavePin: MaterialButton
+
+    private val repo = AuthRepository()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,8 +75,39 @@ class ChangePinActivity : AppCompatActivity() {
             return
         }
 
-        // Backend connection comes next.
-        toast("Change PIN backend endpoint needed")
+        changePinOnBackend(currentPin, newPin)
+    }
+
+    private fun changePinOnBackend(currentPin: String, newPin: String) {
+        setLoading(true)
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = repo.changePinSafe(
+                currentPin = currentPin,
+                newPin = newPin
+            )
+
+            withContext(Dispatchers.Main) {
+                setLoading(false)
+
+                when (result) {
+                    is ApiResult.Success -> {
+                        toast(result.data.message.ifBlank { "PIN changed successfully" })
+                        finish()
+                    }
+
+                    is ApiResult.Error -> {
+                        toast("Failed to change PIN")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun setLoading(loading: Boolean) {
+        btnSavePin.isEnabled = !loading
+        btnSavePin.alpha = if (loading) 0.7f else 1f
+        btnSavePin.text = if (loading) "Saving..." else "Save New PIN"
     }
 
     private fun toast(message: String) {

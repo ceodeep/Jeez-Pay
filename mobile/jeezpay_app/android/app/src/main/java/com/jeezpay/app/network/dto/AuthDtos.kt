@@ -154,3 +154,12 @@ data class ReferralHistoryItem(
     val currency: String?,
     val joinedAt: String?
 )
+data class ChangePinRequest(
+    val currentPin: String,
+    val newPin: String
+)
+
+data class ChangePinResponse(
+    val message: String,
+    val hasPin: Boolean? = null
+)

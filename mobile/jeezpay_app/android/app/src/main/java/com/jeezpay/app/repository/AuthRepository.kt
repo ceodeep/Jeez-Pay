@@ -2,6 +2,8 @@ package com.jeezpay.app.repository
 
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.ApiClient
+import com.jeezpay.app.network.dto.ChangePinRequest
+import com.jeezpay.app.network.dto.ChangePinResponse
 import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpRequest
 import com.jeezpay.app.network.dto.ForgotPasswordRequestOtpResponse
 import com.jeezpay.app.network.dto.ForgotPasswordVerifyOtpRequest
@@ -259,5 +261,18 @@ class AuthRepository {
 
     suspend fun referralSummarySafe(): ApiResult<ReferralSummaryResponse> {
         return safeApiCall { api.referralSummary() }
+    }
+    suspend fun changePinSafe(
+        currentPin: String,
+        newPin: String
+    ): ApiResult<ChangePinResponse> {
+        return safeApiCall {
+            api.changePin(
+                ChangePinRequest(
+                    currentPin = currentPin,
+                    newPin = newPin
+                )
+            )
+        }
     }
 }
