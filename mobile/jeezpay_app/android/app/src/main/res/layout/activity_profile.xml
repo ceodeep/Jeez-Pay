@@ -117,6 +117,40 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
+            <LinearLayout
+                android:id="@+id/accountNumberRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:background="@drawable/currency_pill_bg"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:id="@+id/tvAccountNumber"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Account No: -"
+                    android:textColor="@color/paypal_blue"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:id="@+id/btnCopyAccountNumber"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginStart="8dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:padding="3dp"
+                    android:src="@drawable/ic_copy"
+                    app:tint="@color/paypal_blue" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/tvKycBadge"
                 android:layout_width="wrap_content"
@@ -347,58 +381,6 @@
                     android:layout_marginStart="60dp"
                     android:alpha="0.08"
                     android:background="@android:color/black" />
-
-                <LinearLayout
-                    android:id="@+id/rowChangePin"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="72dp"
-                    android:paddingStart="18dp"
-                    android:paddingTop="16dp"
-                    android:paddingEnd="18dp"
-                    android:paddingBottom="16dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground">
-
-                    <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
-                        android:src="@drawable/ic_pin"
-                        app:tint="@color/paypal_blue" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Change PIN"
-                            android:textColor="@color/text_primary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="Update your transaction PIN"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="13sp" />
-                    </LinearLayout>
-
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:src="@drawable/ic_hub"
-                        app:tint="@color/text_secondary" />
-                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

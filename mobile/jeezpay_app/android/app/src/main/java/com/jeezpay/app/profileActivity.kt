@@ -22,6 +22,9 @@ import com.jeezpay.app.repository.KycRepository
 import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.launch
 import java.util.Locale
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.Gravity
 
 class ProfileActivity : AppCompatActivity() {
@@ -31,6 +34,7 @@ class ProfileActivity : AppCompatActivity() {
     private var approvedKyc: KycProfile? = null
     private val kycRepo = KycRepository()
     private val authRepo = AuthRepository()
+    private var currentAccountNumber: String = ""
 
     companion object {
         private const val PREFS_NAME = "jeezpay_prefs"
@@ -57,6 +61,15 @@ class ProfileActivity : AppCompatActivity() {
 
         binding.avatarClickArea.setOnClickListener {
             showAvatarPickerDialog()
+        }
+        binding.btnCopyAccountNumber.setOnClickListener {
+            if (currentAccountNumber.isBlank()) {
+                toast("Account number unavailable")
+                return@setOnClickListener
+            }
+
+            copyToClipboard("JeezPay account number", currentAccountNumber)
+            toast("Account number copied")
         }
 
         binding.rowProfile.setOnClickListener {
@@ -96,9 +109,6 @@ class ProfileActivity : AppCompatActivity() {
             startActivity(Intent(this, SecurityActivity::class.java))
         }
 
-        binding.rowChangePin.setOnClickListener {
-            startActivity(Intent(this, ChangePinActivity::class.java))
-        }
 
         binding.rowPayments.setOnClickListener {
             startActivity(Intent(this, PaymentSettingsActivity::class.java))
@@ -601,5 +611,10 @@ class ProfileActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+    private fun copyToClipboard(label: String, value: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText(label, value)
+        clipboard.setPrimaryClip(clip)
     }
 }

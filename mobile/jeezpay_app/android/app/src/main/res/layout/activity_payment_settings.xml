@@ -41,75 +41,64 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardCornerRadius="22dp"
-            app:cardElevation="0dp"
-            android:backgroundTint="@color/card_white">
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="32dp"
+            android:layout_marginEnd="16dp"
+            android:backgroundTint="@color/card_white"
+            app:cardCornerRadius="26dp"
+            app:cardElevation="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:gravity="center"
                 android:orientation="vertical"
-                android:padding="20dp">
+                android:paddingStart="24dp"
+                android:paddingTop="42dp"
+                android:paddingEnd="24dp"
+                android:paddingBottom="42dp">
+
+                <ImageView
+                    android:layout_width="86dp"
+                    android:layout_height="86dp"
+                    android:background="@drawable/bg_pin_icon_circle"
+                    android:padding="22dp"
+                    android:src="@drawable/ic_card"
+                    app:tint="@color/paypal_blue" />
 
                 <TextView
-                    android:text="Wallet preferences"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center"
+                    android:text="Payment Settings"
                     android:textColor="@color/text_primary"
-                    android:textSize="19sp"
-                    android:textStyle="bold"
+                    android:textSize="24sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:lineSpacingExtra="3dp"
+                    android:text="Cards, preferred payment methods, wallet preferences, and advanced payment controls are coming soon."
+                    android:textColor="@color/text_secondary"
+                    android:textSize="15sp" />
+
+                <TextView
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-
-                <TextView
-                    android:text="Manage your default wallet currency and payment preferences."
-                    android:textColor="@color/text_secondary"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="22dp"
+                    android:background="@drawable/currency_pill_bg"
+                    android:paddingStart="16dp"
+                    android:paddingTop="8dp"
+                    android:paddingEnd="16dp"
+                    android:paddingBottom="8dp"
+                    android:text="Coming Soon"
+                    android:textColor="@color/paypal_blue"
                     android:textSize="14sp"
-                    android:layout_marginTop="6dp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="18dp"
-                    android:background="#EDF1F7" />
-
-                <TextView
-                    android:text="Default Currency"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <TextView
-                    android:text="USDT"
-                    android:textColor="@color/text_primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="4dp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginVertical="18dp"
-                    android:background="#EDF1F7" />
-
-                <TextView
-                    android:text="Transaction Fees"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <TextView
-                    android:text="Standard"
-                    android:textColor="@color/text_primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="4dp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:textStyle="bold" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
