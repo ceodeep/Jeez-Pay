@@ -975,6 +975,93 @@ router.post("/change-pin", authMiddleware, async (req, res) => {
 });
 
 // =====================================
+// CHANGE PASSWORD
+// =====================================
+router.post("/change-password", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const currentPassword = String(req.body?.currentPassword ?? "").trim();
+    const newPassword = String(req.body?.newPassword ?? "").trim();
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Current password and new password are required",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        message: "New password must be at least 8 characters",
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        message: "New password must be different from current password",
+      });
+    }
+
+    const { data: user, error: fetchErr } = await supabase
+      .from("users")
+      .select("id, password_hash")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (fetchErr) {
+      console.error("[change-password] user lookup error:", fetchErr);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.password_hash) {
+      return res.status(400).json({
+        message: "Password is not set for this account",
+      });
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      currentPassword,
+      user.password_hash
+    );
+
+    if (!passwordMatches) {
+      return res.status(400).json({
+        message: "Current password is incorrect",
+      });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    const { error: updateErr } = await supabase
+      .from("users")
+      .update({
+        password_hash: newPasswordHash,
+        password_updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (updateErr) {
+      console.error("[change-password] update error:", updateErr);
+      return res.status(500).json({ message: "Failed to change password" });
+    }
+
+    return res.json({
+      message: "Password changed successfully",
+    });
+  } catch (err) {
+    console.error("[change-password] crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// =====================================
 // VERIFY PIN
 // =====================================
 router.post("/verify-pin", authMiddleware, async (req, res) => {

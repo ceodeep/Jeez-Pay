@@ -40,7 +40,7 @@ class SecurityActivity : AppCompatActivity() {
         }
 
         binding.rowChangePassword.setOnClickListener {
-            toast("Change password coming soon")
+            startActivity(Intent(this, ChangePasswordActivity::class.java))
         }
 
         binding.switchBiometric.setOnCheckedChangeListener { _, isChecked ->

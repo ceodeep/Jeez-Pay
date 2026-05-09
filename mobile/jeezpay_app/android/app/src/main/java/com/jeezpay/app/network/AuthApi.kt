@@ -26,6 +26,8 @@ import com.jeezpay.app.network.dto.VerifyPinRequest
 import com.jeezpay.app.network.dto.VerifyPinResponse
 import com.jeezpay.app.network.dto.MeResponse
 import com.jeezpay.app.network.dto.ReferralSummaryResponse
+import com.jeezpay.app.network.dto.ChangePasswordRequest
+import com.jeezpay.app.network.dto.ChangePasswordResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.POST
@@ -96,6 +98,11 @@ interface AuthApi {
 
     @POST("auth/sessions/logout-others")
     suspend fun logoutOtherSessions(): BasicMessageResponse
+
+    @POST("auth/change-password")
+    suspend fun changePassword(
+        @Body body: ChangePasswordRequest
+    ): ChangePasswordResponse
 
 
 }

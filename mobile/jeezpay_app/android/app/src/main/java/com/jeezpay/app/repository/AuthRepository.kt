@@ -29,6 +29,8 @@ import com.jeezpay.app.network.dto.MeResponse
 import com.jeezpay.app.network.dto.ReferralSummaryResponse
 import com.jeezpay.app.network.dto.ActiveSessionsResponse
 import com.jeezpay.app.network.dto.BasicMessageResponse
+import com.jeezpay.app.network.dto.ChangePasswordRequest
+import com.jeezpay.app.network.dto.ChangePasswordResponse
 import android.os.Build
 
 
@@ -314,6 +316,19 @@ class AuthRepository {
             manufacturer.isBlank() && model.isBlank() -> "Android device"
             model.startsWith(manufacturer, ignoreCase = true) -> model
             else -> "$manufacturer $model"
+        }
+    }
+    suspend fun changePasswordSafe(
+        currentPassword: String,
+        newPassword: String
+    ): ApiResult<ChangePasswordResponse> {
+        return safeApiCall {
+            api.changePassword(
+                ChangePasswordRequest(
+                    currentPassword = currentPassword,
+                    newPassword = newPassword
+                )
+            )
         }
     }
 }

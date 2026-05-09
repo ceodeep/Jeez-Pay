@@ -184,3 +184,12 @@ data class UserSessionDto(
 data class BasicMessageResponse(
     val message: String
 )
+
+data class ChangePasswordRequest(
+    val currentPassword: String,
+    val newPassword: String
+)
+
+data class ChangePasswordResponse(
+    val message: String = ""
+)
