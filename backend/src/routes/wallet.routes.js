@@ -399,10 +399,26 @@ router.get("/recipient/resolve", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Receiver account is suspended" });
     }
 
+    const { data: kycProfile, error: kycNameErr } = await supabase
+      .from("kyc_profiles")
+      .select("fullName, full_name")
+      .eq("user_id", receiverUser.id)
+      .maybeSingle();
+
+    if (kycNameErr) {
+      console.error("resolve recipient kyc name error:", kycNameErr);
+    }
+
+    const receiverName =
+      receiverUser.fullName ||
+      kycProfile?.fullName ||
+      kycProfile?.full_name ||
+      "JeezPay User";
+
     return res.json({
       receiver: {
         id: receiverUser.id,
-        fullName: receiverUser.fullName || "JeezPay User",
+        fullName: receiverName,
         phone: receiverUser.phone,
         walletAccountNumber: receiverUser.wallet_account_number,
       },
