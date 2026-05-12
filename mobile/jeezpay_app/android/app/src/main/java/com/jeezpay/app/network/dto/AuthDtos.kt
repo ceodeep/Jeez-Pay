@@ -136,7 +136,7 @@ data class MeUser(
     val account_type: String?,
     val country_code: String?,
     val phone_verified: Boolean?,
-    val wallet_account_number: String?,
+    val wallet_account_number: Long?,
     val terms_accepted: Boolean?
 )
 

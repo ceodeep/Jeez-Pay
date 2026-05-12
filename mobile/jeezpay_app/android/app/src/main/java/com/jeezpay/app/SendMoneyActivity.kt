@@ -33,6 +33,9 @@ import kotlin.math.abs
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import com.jeezpay.app.PortraitCaptureActivity
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 class SendMoneyActivity : BaseFintechActivity() {
 
@@ -121,6 +124,11 @@ class SendMoneyActivity : BaseFintechActivity() {
 
 
         etPhone = findViewById(R.id.etPhone)
+        btnQrScanner = findViewById(R.id.scan_icon)
+
+        btnQrScanner.setOnClickListener {
+            openQrScanner()
+        }
         btnNext = findViewById(R.id.btnNext)
         btnUid = findViewById(R.id.btnUid)
         btnPhone = findViewById(R.id.btnPhone)
@@ -634,5 +642,104 @@ class SendMoneyActivity : BaseFintechActivity() {
             .build()
 
         prompt.authenticate(promptInfo)
+    }
+
+    private lateinit var btnQrScanner: View
+
+    private val qrScannerLauncher = registerForActivityResult(ScanContract()) { result ->
+        val scannedValue = result.contents?.trim()
+
+        if (scannedValue.isNullOrBlank()) {
+            Toast.makeText(this, "QR scan cancelled", Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+
+        handleScannedQr(scannedValue)
+    }
+    private fun openQrScanner() {
+        val options = ScanOptions().apply {
+            setPrompt("Scan JeezPay QR code")
+            setBeepEnabled(true)
+            setOrientationLocked(true)
+            setCaptureActivity(PortraitCaptureActivity::class.java)
+            setBarcodeImageEnabled(false)
+            setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+        }
+
+        qrScannerLauncher.launch(options)
+    }
+
+    private fun handleScannedQr(rawValue: String) {
+        val receiver = extractReceiverFromQr(rawValue)
+
+        if (receiver.isBlank()) {
+            showError("Invalid JeezPay QR code")
+            return
+        }
+
+        when {
+            receiver.startsWith("+") || receiver.length >= 9 && receiver.all { it.isDigit() } -> {
+                setMode(IdMode.PHONE)
+                etPhone.setText(receiver)
+                etPhone.setSelection(etPhone.text?.length ?: 0)
+                tvRecipientName.text = receiver
+            }
+
+            else -> {
+                setMode(IdMode.UID)
+                etPhone.setText(receiver)
+                etPhone.setSelection(etPhone.text?.length ?: 0)
+                tvRecipientName.text = receiver
+            }
+        }
+
+        setNextEnabled(true)
+
+        Toast.makeText(this, "Recipient added from QR", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun extractReceiverFromQr(rawValue: String): String {
+        val clean = rawValue.trim()
+
+        // Supports plain QR values:
+        // 123456
+        // +249929078393
+        if (!clean.contains("{") && !clean.contains(":") && !clean.contains("=")) {
+            return clean
+        }
+
+        // Supports simple URL format:
+        // jeezpay://pay?uid=123456
+        // jeezpay://pay?phone=+249929078393
+        if (clean.contains("?")) {
+            val query = clean.substringAfter("?")
+
+            val params = query.split("&")
+                .mapNotNull {
+                    val parts = it.split("=", limit = 2)
+                    if (parts.size == 2) parts[0] to parts[1] else null
+                }
+                .toMap()
+
+            return params["uid"]
+                ?: params["phone"]
+                ?: params["account"]
+                ?: params["wallet_account_number"]
+                ?: ""
+        }
+
+        // Supports simple JSON-like QR values:
+        // {"uid":"123456"}
+        // {"phone":"+249929078393"}
+        return try {
+            val json = org.json.JSONObject(clean)
+
+            json.optString("uid")
+                .ifBlank { json.optString("phone") }
+                .ifBlank { json.optString("account") }
+                .ifBlank { json.optString("wallet_account_number") }
+        } catch (_: Exception) {
+            ""
+        }
     }
 }

@@ -22,6 +22,8 @@
     <!-- Scroll Content -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollKyc"
+        android:scrollbars="none"
+        android:fadeScrollbars="false"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:fillViewport="true"

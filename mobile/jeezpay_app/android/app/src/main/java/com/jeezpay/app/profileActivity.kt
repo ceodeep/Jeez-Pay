@@ -597,16 +597,29 @@ class ProfileActivity : AppCompatActivity() {
         lifecycleScope.launch {
             when (val result = authRepo.meSafe()) {
                 is ApiResult.Success -> {
-                    val backendAvatarKey = result.data.user?.avatar_key?.trim().orEmpty()
+                    val user = result.data.user
+
+                    val backendAvatarKey = user?.avatar_key?.trim().orEmpty()
 
                     if (backendAvatarKey.isNotBlank() && avatarOptions.any { it.first == backendAvatarKey }) {
                         saveSelectedAvatarKey(backendAvatarKey)
                     }
 
+                    currentAccountNumber = user?.wallet_account_number?.toString()?.trim().orEmpty()
+
+                    binding.tvAccountNumber.text =
+                        if (currentAccountNumber.isBlank()) {
+                            "Account No: -"
+                        } else {
+                            "Account No: $currentAccountNumber"
+                        }
+
                     applySelectedAvatar()
                 }
 
                 is ApiResult.Error -> {
+                    currentAccountNumber = ""
+                    binding.tvAccountNumber.text = "Account No: -"
                     applySelectedAvatar()
                 }
             }

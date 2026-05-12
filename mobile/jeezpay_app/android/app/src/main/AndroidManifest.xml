@@ -76,7 +76,13 @@
         <activity android:name=".TermsActivity" android:exported="false" />
         <activity android:name=".ActiveSessionsActivity" />
         <activity android:name=".ChangePasswordActivity" />
-        
+        <activity android:name=".ReceiveQrActivity" />
+
+        <activity
+            android:name=".PortraitCaptureActivity"
+            android:screenOrientation="fullSensor"
+            android:stateNotNeeded="true"
+            android:theme="@style/zxing_CaptureTheme" />
 
 
     </application>

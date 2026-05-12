@@ -32,7 +32,9 @@
             android:paddingStart="18dp"
             android:paddingEnd="18dp"
             android:paddingTop="12dp"
-            android:clipToPadding="false">
+            android:clipToPadding="false"
+            android:scrollbars="none"
+            android:fadeScrollbars="false">
 
             <LinearLayout
                 android:layout_width="match_parent"

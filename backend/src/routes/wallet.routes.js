@@ -63,7 +63,7 @@ async function getUserByIdentifier(identifierRaw) {
   // 1️⃣ Try phone exact
   let { data, error } = await supabase
     .from("users")
-    .select("id, phone, role, wallet_account_number")
+    .select("id, phone, role, wallet_account_number, fullName")
     .eq("phone", raw)
     .maybeSingle();
 
@@ -75,7 +75,7 @@ async function getUserByIdentifier(identifierRaw) {
   if (phoneNorm !== raw) {
     const r2 = await supabase
       .from("users")
-      .select("id, phone, role, wallet_account_number")
+      .select("id, phone, role, wallet_account_number, fullName")
       .eq("phone", phoneNorm)
       .maybeSingle();
 
@@ -89,7 +89,7 @@ async function getUserByIdentifier(identifierRaw) {
     if (Number.isSafeInteger(acc)) {
       const r3 = await supabase
         .from("users")
-        .select("id, phone, role, wallet_account_number")
+        .select("id, phone, role, wallet_account_number, fullName")
         .eq("wallet_account_number", acc)
         .maybeSingle();
 
@@ -358,6 +358,58 @@ router.post("/credit", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("credit crash:", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+/**
+ * GET /wallet/recipient/resolve?identifier=...
+ * Resolves receiver by phone, normalized phone, or wallet account number
+ */
+router.get("/recipient/resolve", authMiddleware, async (req, res) => {
+  try {
+    const senderId = req.user.userId;
+    const identifier = String(req.query.identifier || "").trim();
+
+    if (!identifier) {
+      return res.status(400).json({ message: "Receiver is required" });
+    }
+
+    const receiverUser = await getUserByIdentifier(identifier);
+
+    if (!receiverUser) {
+      return res.status(404).json({ message: "Receiver not found" });
+    }
+
+    if (receiverUser.id === senderId) {
+      return res.status(400).json({ message: "You can't send money to yourself" });
+    }
+
+    const { data: receiverActive, error: receiverActiveErr } = await supabase
+      .from("users")
+      .select("is_active")
+      .eq("id", receiverUser.id)
+      .maybeSingle();
+
+    if (receiverActiveErr) {
+      console.error("resolve recipient receiver lookup error:", receiverActiveErr);
+      return res.status(500).json({ message: "Receiver lookup failed" });
+    }
+
+    if (!receiverActive || receiverActive.is_active === false) {
+      return res.status(400).json({ message: "Receiver account is suspended" });
+    }
+
+    return res.json({
+      receiver: {
+        id: receiverUser.id,
+        fullName: receiverUser.fullName || "JeezPay User",
+        phone: receiverUser.phone,
+        walletAccountNumber: receiverUser.wallet_account_number,
+      },
+    });
+  } catch (err) {
+    console.error("resolve recipient error:", err);
+    return res.status(500).json({ message: "Failed to resolve receiver" });
   }
 });
 

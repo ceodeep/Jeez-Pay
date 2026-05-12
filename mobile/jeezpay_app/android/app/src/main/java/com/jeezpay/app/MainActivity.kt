@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Locale
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import androidx.appcompat.app.AlertDialog
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
@@ -419,6 +420,7 @@ class MainActivity : BaseFintechActivity() {
 
     private fun setupActionButtons() {
         val btnSend = findViewById<View>(R.id.btnSend)
+        val btnReceive = findViewById<View>(R.id.btnEarn)
         val btnReferral = findViewById<View>(R.id.btnReferral)
 
         btnSend.setOnClickListener {
@@ -428,16 +430,36 @@ class MainActivity : BaseFintechActivity() {
         btnReferral.setOnClickListener {
             startActivity(Intent(this, ReferralActivity::class.java))
         }
+        btnReceive.setOnClickListener {
+            startActivity(Intent(this, ReceiveQrActivity::class.java))
+        }
     }
 
 
     private fun setupCustomBottomNav() {
         selectTab(0)
 
-        navHome.setOnClickListener { selectTab(0) }
-        navCard.setOnClickListener { selectTab(1) }
-        navSend.setOnClickListener { selectTab(2) }
-        navHub.setOnClickListener { selectTab(3) }
+        navHome.setOnClickListener {
+            selectTab(0)
+        }
+
+        navCard.setOnClickListener {
+            showComingSoon(
+                title = "Cards coming soon",
+                message = "You’ll soon be able to add and manage JeezPay virtual and physical cards here."
+            )
+        }
+
+        navSend.setOnClickListener {
+            startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))
+        }
+
+        navHub.setOnClickListener {
+            showComingSoon(
+                title = "JeezPay Hub coming soon",
+                message = "The Hub will bring shortcuts, rewards, offers, and account tools into one place."
+            )
+        }
     }
 
     private fun selectTab(index: Int) {
@@ -667,6 +689,13 @@ class MainActivity : BaseFintechActivity() {
 
         val imageView = findViewById<ImageView>(R.id.imgProfile)
         imageView.setImageResource(resId)
+    }
+    private fun showComingSoon(title: String, message: String) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("Got it", null)
+            .show()
     }
 }
 
