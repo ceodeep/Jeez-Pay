@@ -7,6 +7,7 @@ import com.jeezpay.app.network.dto.HistoryResponse
 import com.jeezpay.app.network.dto.TransferRequest
 import com.jeezpay.app.network.dto.TransferResponse
 import com.jeezpay.app.network.safeApiCall
+import com.jeezpay.app.network.dto.ResolveRecipientResponse
 
 class WalletRepository {
 
@@ -74,5 +75,13 @@ class WalletRepository {
 
     suspend fun fetchBalancesSafe(): ApiResult<BalanceResponse> {
         return safeApiCall { api.getBalances() }
+    }
+
+    suspend fun resolveRecipientSafe(
+        identifier: String
+    ): ApiResult<ResolveRecipientResponse> {
+        return safeApiCall {
+            api.resolveRecipient(identifier)
+        }
     }
 }

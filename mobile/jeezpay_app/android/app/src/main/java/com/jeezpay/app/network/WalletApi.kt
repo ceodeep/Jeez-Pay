@@ -8,6 +8,8 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
+import com.jeezpay.app.network.dto.ResolveRecipientResponse
+
 
 interface WalletApi {
 
@@ -24,5 +26,10 @@ interface WalletApi {
     suspend fun transfer(
         @Body body: com.jeezpay.app.network.dto.TransferRequest
     ): com.jeezpay.app.network.dto.TransferResponse
+
+    @GET("wallet/recipient/resolve")
+    suspend fun resolveRecipient(
+        @Query("identifier") identifier: String
+    ): ResolveRecipientResponse
 
 }

@@ -33,3 +33,14 @@ data class WalletHistoryResponse(
     val currency: String? = null,
     val transactions: List<TransactionDto> = emptyList()
 )
+
+data class ResolveRecipientResponse(
+    val receiver: ResolvedReceiverDto? = null
+)
+
+data class ResolvedReceiverDto(
+    val id: String? = null,
+    val fullName: String? = null,
+    val phone: String? = null,
+    val walletAccountNumber: Long? = null
+)

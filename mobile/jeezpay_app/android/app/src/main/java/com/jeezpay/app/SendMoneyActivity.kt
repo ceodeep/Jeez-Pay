@@ -34,8 +34,12 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import com.jeezpay.app.PortraitCaptureActivity
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.repository.WalletRepository
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class SendMoneyActivity : BaseFintechActivity() {
 
@@ -77,6 +81,8 @@ class SendMoneyActivity : BaseFintechActivity() {
 
 
     private var lastConfirmedReceiverIdentifier: String? = null
+    private var resolvedReceiverName: String? = null
+    private var resolvedReceiverAccountNumber: String? = null
     private var lastConfirmedCurrency: String? = null
     private var lastConfirmedAmount: Double? = null
     private var lastConfirmedDescription: String? = null
@@ -199,9 +205,7 @@ class SendMoneyActivity : BaseFintechActivity() {
                 return@setOnClickListener
             }
 
-            setSlideForwardAnimation()
-            sendFlipper.displayedChild = 1
-            tvRecipientName.text = receiverIdentifier
+            resolveReceiverAndContinue(receiverIdentifier)
         }
 
         ddCurrency.text = "SSP"
@@ -241,13 +245,21 @@ class SendMoneyActivity : BaseFintechActivity() {
                 return@setOnClickListener
             }
 
+            val receiverDisplayForReview =
+                resolvedReceiverName?.takeIf { it.isNotBlank() }
+                    ?: "JeezPay User"
+
+            val receiverIdentifierForReview =
+                resolvedReceiverAccountNumber?.takeIf { it.isNotBlank() }
+                    ?: receiverIdentifier
+
             SendReviewBottomSheet(
-                receiverIdentifier = receiverIdentifier,
-                recipientDisplay = tvRecipientName.text.toString(),
+                receiverIdentifier = receiverIdentifierForReview,
+                recipientDisplay = receiverDisplayForReview,
                 currency = currency,
                 amount = amount,
                 fee = fee
-            ) {
+            )  {
                 openPinThenConfirm { pin ->
                     requireTransactionApproval {
                         lastConfirmedReceiverIdentifier = receiverIdentifier
@@ -740,6 +752,52 @@ class SendMoneyActivity : BaseFintechActivity() {
                 .ifBlank { json.optString("wallet_account_number") }
         } catch (_: Exception) {
             ""
+        }
+    }
+
+    private fun resolveReceiverAndContinue(receiverIdentifier: String) {
+        setSendLoading(true)
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                WalletRepository().resolveRecipientSafe(receiverIdentifier)
+            }) {
+                is ApiResult.Success -> {
+                    setSendLoading(false)
+
+                    val receiver = result.data.receiver
+                    if (receiver == null) {
+                        showError("Receiver not found")
+                        return@launch
+                    }
+
+                    val displayName = receiver.fullName?.trim().orEmpty()
+                        .ifBlank { "JeezPay User" }
+
+                    val accountNumber = receiver.walletAccountNumber
+                        ?.toString()
+                        .orEmpty()
+
+                    resolvedReceiverName = displayName
+                    resolvedReceiverAccountNumber = accountNumber
+
+                    tvRecipientName.text =
+                        if (accountNumber.isNotBlank()) {
+                            "$displayName\nAccount: $accountNumber"
+                        } else {
+                            displayName
+                        }
+
+                    setSlideForwardAnimation()
+                    sendFlipper.displayedChild = 1
+                    tvError.visibility = View.GONE
+                }
+
+                is ApiResult.Error -> {
+                    setSendLoading(false)
+                    handleSendError(result.error)
+                }
+            }
         }
     }
 }
