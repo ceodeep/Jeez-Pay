@@ -43,8 +43,11 @@ class TransactionDetailsBottomSheet(
         val btnClose = view.findViewById<MaterialButton>(R.id.btnCloseTxSheet)
 
         val typeRaw = (tx.type ?: "").trim().lowercase(Locale.US)
-        val isCredit = typeRaw == "credit" || typeRaw.contains("receive") || typeRaw.contains("in")
-        val isDebit = typeRaw == "debit" || typeRaw.contains("send") || typeRaw.contains("out")
+        val description = tx.description?.trim().orEmpty()
+
+        val isSwap = typeRaw == "swap_in" || typeRaw == "swap_out"
+        val isCredit = typeRaw == "credit" || typeRaw.contains("receive") || typeRaw == "swap_in"
+        val isDebit = typeRaw == "debit" || typeRaw.contains("send") || typeRaw == "swap_out"
 
         val amount = tx.amount ?: 0.0
         val signed = when {
@@ -53,26 +56,43 @@ class TransactionDetailsBottomSheet(
             else -> nf.format(amount)
         }
 
-        tvTxAmount.text = "$signed $displayCurrency"
-        tvTxType.text = when {
-            isCredit -> "Credit"
-            isDebit -> "Debit"
-            typeRaw.isNotBlank() -> typeRaw.replaceFirstChar { it.uppercase() }
+        val friendlyType = when {
+            typeRaw == "swap_in" -> "Swap Received"
+            typeRaw == "swap_out" -> "Swap Sent"
+            typeRaw == "credit" && description.contains("admin", ignoreCase = true) -> "Wallet Top-up"
+            typeRaw == "credit" -> "Received Money"
+            typeRaw == "debit" -> "Sent Money"
+            typeRaw.contains("withdraw") -> "Withdrawal"
+            typeRaw.contains("deposit") -> "Deposit"
+            typeRaw.isNotBlank() -> typeRaw
+                .replace("_", " ")
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
             else -> "Transaction"
         }
 
-        tvTxDescription.text = (tx.description ?: "").ifBlank { "—" }
+        val friendlyDescription = when {
+            description.equals("Transfer fee", ignoreCase = true) -> "Transfer fee"
+            typeRaw == "swap_in" -> description.ifBlank { "Currency swap received" }
+            typeRaw == "swap_out" -> description.ifBlank { "Currency swap sent" }
+            typeRaw == "credit" -> description.ifBlank { "Money received" }
+            typeRaw == "debit" -> description.ifBlank { "Money sent" }
+            else -> description.ifBlank { "—" }
+        }
+
+        tvTxAmount.text = "$signed $displayCurrency"
+        tvTxType.text = friendlyType
+        tvTxDescription.text = friendlyDescription
         tvTxDate.text = formatTxDate(tx.created_at)
         tvTxReference.text = resolveReference(tx)
         tvTxStatus.text = resolveStatus(tx)
 
-        val statusColor = if (isCredit) {
-            ContextCompat.getColor(requireContext(), R.color.tx_credit)
-        } else if (isDebit) {
-            ContextCompat.getColor(requireContext(), R.color.tx_debit)
-        } else {
-            ContextCompat.getColor(requireContext(), R.color.text_primary)
+        val statusColor = when {
+            isSwap -> ContextCompat.getColor(requireContext(), R.color.paypal_blue)
+            isCredit -> ContextCompat.getColor(requireContext(), R.color.tx_credit)
+            isDebit -> ContextCompat.getColor(requireContext(), R.color.tx_debit)
+            else -> ContextCompat.getColor(requireContext(), R.color.text_primary)
         }
+
         tvTxStatus.setTextColor(statusColor)
 
         btnClose.setOnClickListener { dismiss() }

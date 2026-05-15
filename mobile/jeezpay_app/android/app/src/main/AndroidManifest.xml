@@ -79,6 +79,7 @@
         <activity android:name=".ReceiveQrActivity" />
         <activity android:name=".SwapActivity" />
         <activity android:name=".SwapReceiptActivity" />
+        <activity android:name=".TransactionsActivity" />
 
         <activity
             android:name=".PortraitCaptureActivity"

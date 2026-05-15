@@ -212,20 +212,39 @@ class TransactionsAdapter(
             val ctx = itemView.context
 
             val typeRaw = (tx.type ?: "").trim().lowercase(Locale.US)
-            val isCredit = typeRaw == "credit" || typeRaw.contains("receive") || typeRaw.contains("in")
-            val isDebit = typeRaw == "debit" || typeRaw.contains("send") || typeRaw.contains("out")
+            val isSwap = typeRaw == "swap_in" || typeRaw == "swap_out"
+            val isCredit = typeRaw == "credit" || typeRaw.contains("receive") || typeRaw == "swap_in"
+            val isDebit = typeRaw == "debit" || typeRaw.contains("send") || typeRaw == "swap_out"
 
             // Title + desc
-            tvTitle.text = when {
-                isCredit -> "CREDIT"
-                isDebit -> "DEBIT"
-                typeRaw.isNotBlank() -> typeRaw.uppercase(Locale.US)
-                else -> "TRANSACTION"
+            // Title + description: user-friendly activity labels
+            val description = tx.description?.trim().orEmpty()
+
+            val friendlyTitle = when {
+                typeRaw == "swap_in" -> "Swap Received"
+                typeRaw == "swap_out" -> "Swap Sent"
+                typeRaw == "credit" && description.contains("admin", ignoreCase = true) -> "Wallet Top-up"
+                typeRaw == "credit" -> "Received Money"
+                typeRaw == "debit" -> "Sent Money"
+                typeRaw.contains("withdraw") -> "Withdrawal"
+                typeRaw.contains("deposit") -> "Deposit"
+                typeRaw.isNotBlank() -> typeRaw
+                    .replace("_", " ")
+                    .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                else -> "Transaction"
             }
 
-            tvDesc.text = (tx.description ?: "").ifBlank {
-                if (isCredit || isDebit) "Transfer" else "—"
+            val friendlyDesc = when {
+                description.equals("Transfer fee", ignoreCase = true) -> "Transfer fee"
+                typeRaw == "swap_in" -> description.ifBlank { "Currency swap received" }
+                typeRaw == "swap_out" -> description.ifBlank { "Currency swap sent" }
+                typeRaw == "credit" -> description.ifBlank { "Money received" }
+                typeRaw == "debit" -> description.ifBlank { "Money sent" }
+                else -> description.ifBlank { "—" }
             }
+
+            tvTitle.text = friendlyTitle
+            tvDesc.text = friendlyDesc
 
             // Date
             tvDate.text = formatTxDate(tx.created_at)
@@ -251,6 +270,14 @@ class TransactionsAdapter(
             val primary = tryColor(ctx, R.color.text_primary, android.R.color.black)
 
             when {
+
+                isSwap -> {
+                    txIconWrap.setCardBackgroundColor(blueBg)
+                    txIcon.setImageResource(safeIconRes(R.drawable.ic_swap, R.drawable.ic_more))
+                    txIcon.setColorFilter(tryColor(ctx, R.color.paypal_blue, android.R.color.holo_blue_dark))
+                    tvAmount.setTextColor(primary)
+                }
+
                 isCredit -> {
                     txIconWrap.setCardBackgroundColor(greenBg)
                     txIcon.setImageResource(safeIconRes(R.drawable.ic_plus, R.drawable.ic_send))

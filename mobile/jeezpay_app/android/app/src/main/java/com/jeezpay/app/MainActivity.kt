@@ -183,9 +183,15 @@ class MainActivity : BaseFintechActivity() {
             }) {
                 is ApiResult.Success -> {
                     val list = result.data.transactions ?: emptyList()
-                    txAdapter.submit(list)
 
-                    if (list.isEmpty()) {
+                    val visibleList = list.filterNot { tx ->
+                        tx.description?.trim()?.equals("Transfer fee", ignoreCase = true) == true ||
+                                tx.type?.trim()?.equals("fee", ignoreCase = true) == true
+                    }
+
+                    txAdapter.submit(visibleList)
+
+                    if (visibleList.isEmpty()) {
                         showInfoState("No transactions yet")
                     } else {
                         hideStatus()
@@ -259,6 +265,13 @@ class MainActivity : BaseFintechActivity() {
             fetchBalanceAndHistory()
         }
         applyHeaderAvatar()
+        findViewById<TextView>(R.id.tvSeeAll).setOnClickListener {
+            startActivity(
+                Intent(this, TransactionsActivity::class.java).apply {
+                    putExtra("currency", selectedCode)
+                }
+            )
+        }
 
         val profileCard = findViewById<View>(R.id.profileCard)
         profileCard.setOnClickListener {
@@ -589,10 +602,16 @@ class MainActivity : BaseFintechActivity() {
                         walletStripAdapter?.notifyDataSetChanged()
 
                         val list = histResult.data.transactions ?: emptyList()
-                        txAdapter.submit(list)
+
+                        val visibleList = list.filterNot { tx ->
+                            tx.description?.trim()?.equals("Transfer fee", ignoreCase = true) == true ||
+                                    tx.type?.trim()?.equals("fee", ignoreCase = true) == true
+                        }
+
+                        txAdapter.submit(visibleList)
                         isPagingTransactions = false
 
-                        if (list.isEmpty()) {
+                        if (visibleList.isEmpty()) {
                             showInfoState("No transactions yet")
                         } else {
                             hideStatus()
