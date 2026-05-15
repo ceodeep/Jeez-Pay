@@ -8,6 +8,7 @@ const {
   createTronAccount,
   encryptPrivateKey,
 } = require("../services/tron.service");
+const { scanUsdtDeposits } = require("../services/usdtDepositScanner.service");
 
 // ---- helper: check admin ----
 async function isAdmin(userId) {
@@ -1282,6 +1283,27 @@ router.get("/crypto/deposit-address", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("[deposit-address] crash:", err);
     return res.status(500).json({ message: "Failed to prepare deposit address" });
+  }
+});
+
+// =====================================
+// ADMIN: SCAN USDT TRC20 DEPOSITS
+// POST /wallet/crypto/scan-deposits
+// =====================================
+router.post("/crypto/scan-deposits", authMiddleware, async (req, res) => {
+  try {
+    const adminId = req.user.userId;
+
+    const admin = await isAdmin(adminId);
+    if (!admin) {
+      return res.status(403).json({ message: "Only admin can scan deposits" });
+    }
+
+    const result = await scanUsdtDeposits();
+    return res.json(result);
+  } catch (err) {
+    console.error("[scan-deposits] crash:", err);
+    return res.status(500).json({ message: "Deposit scan failed" });
   }
 });
 
