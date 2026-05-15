@@ -76,105 +76,33 @@ async function creditDepositOnce({ addressRow, transfer }) {
   }
 
   if (String(toAddress).toLowerCase() !== String(addressRow.address).toLowerCase()) {
-    return { credited: false, reason: "not_target_address" };
+    return { credited: false, reason: "not_target_address", txHash };
   }
 
   const decimals = transfer.token_info?.decimals || USDT_DECIMALS;
   const amount = normalizeTronAmount(transfer.value, decimals);
 
   if (!amount || amount <= 0) {
-    return { credited: false, reason: "invalid_amount" };
+    return { credited: false, reason: "invalid_amount", txHash };
   }
 
-  const { data: existingDeposit, error: existingErr } = await supabase
-    .from("crypto_deposits")
-    .select("id, status, credited_at")
-    .eq("tx_hash", txHash)
-    .maybeSingle();
-
-  if (existingErr) throw existingErr;
-
-  if (existingDeposit?.status === "completed" || existingDeposit?.credited_at) {
-    return { credited: false, reason: "already_credited", txHash };
-  }
-
-  const { wallet, error: walletErr } = await ensureWallet(addressRow.user_id, "USDT");
-
-  if (walletErr || !wallet) {
-    throw walletErr || new Error("Wallet check failed");
-  }
-
-  let depositId = existingDeposit?.id || null;
-
-  if (!depositId) {
-    const { data: createdDeposit, error: depositInsertErr } = await supabase
-      .from("crypto_deposits")
-      .insert({
-        user_id: addressRow.user_id,
-        wallet_id: wallet.id,
-        network: "TRON",
-        token: "USDT",
-        tx_hash: txHash,
-        from_address: fromAddress,
-        to_address: toAddress,
-        amount,
-        confirmations: 1,
-        status: "pending",
-        raw_payload: transfer,
-      })
-      .select("id")
-      .single();
-
-    if (depositInsertErr) {
-      if (depositInsertErr.code === "23505") {
-        return { credited: false, reason: "duplicate_tx_hash", txHash };
-      }
-      throw depositInsertErr;
-    }
-
-    depositId = createdDeposit.id;
-  }
-
-  const currentBalance = Number(wallet.balance || 0);
-  const newBalance = currentBalance + amount;
-
-  const { error: balanceErr } = await supabase
-    .from("wallets")
-    .update({ balance: newBalance })
-    .eq("id", wallet.id);
-
-  if (balanceErr) throw balanceErr;
-
-  const { error: txErr } = await supabase.from("transactions").insert({
-    wallet_id: wallet.id,
-    type: "credit",
-    amount,
-    description: "USDT TRC20 deposit",
-    reference: txHash,
+  const { data, error } = await supabase.rpc("credit_usdt_trc20_deposit", {
+    p_user_id: addressRow.user_id,
+    p_tx_hash: txHash,
+    p_from_address: fromAddress || null,
+    p_to_address: toAddress,
+    p_amount: amount,
+    p_raw_payload: transfer,
   });
 
-  if (txErr) {
-    console.error("[usdt-deposit-scanner] transaction insert error:", txErr);
+  if (error) {
+    throw error;
   }
 
-  const { error: markErr } = await supabase
-    .from("crypto_deposits")
-    .update({
-      status: "completed",
-      confirmations: 1,
-      credited_at: new Date().toISOString(),
-      wallet_id: wallet.id,
-    })
-    .eq("id", depositId);
-
-  if (markErr) throw markErr;
-
-  return {
-    credited: true,
+  return data || {
+    credited: false,
+    reason: "empty_rpc_response",
     txHash,
-    amount,
-    userId: addressRow.user_id,
-    address: addressRow.address,
   };
 }
 
