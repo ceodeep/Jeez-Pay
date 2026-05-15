@@ -44,3 +44,40 @@ data class ResolvedReceiverDto(
     val phone: String? = null,
     val walletAccountNumber: Long? = null
 )
+
+data class SwapPreviewRequest(
+    val fromCurrency: String,
+    val toCurrency: String,
+    val amount: Double
+)
+
+data class SwapConfirmRequest(
+    val fromCurrency: String,
+    val toCurrency: String,
+    val amount: Double,
+    val pin: String
+)
+
+data class SwapPreviewResponse(
+    val fromCurrency: String?,
+    val toCurrency: String?,
+    val amount: Double?,
+    val rate: Double?,
+    val fee: Double?,
+    val totalDebit: Double?,
+    val receiveAmount: Double?
+)
+
+data class SwapConfirmResponse(
+    val message: String?,
+    val reference: String?,
+    val fromCurrency: String?,
+    val toCurrency: String?,
+    val amount: Double?,
+    val rate: Double?,
+    val fee: Double?,
+    val totalDebit: Double?,
+    val receiveAmount: Double?,
+    val fromBalance: Double?,
+    val toBalance: Double?
+)

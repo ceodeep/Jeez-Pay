@@ -8,6 +8,10 @@ import com.jeezpay.app.network.dto.TransferRequest
 import com.jeezpay.app.network.dto.TransferResponse
 import com.jeezpay.app.network.safeApiCall
 import com.jeezpay.app.network.dto.ResolveRecipientResponse
+import com.jeezpay.app.network.dto.SwapPreviewRequest
+import com.jeezpay.app.network.dto.SwapPreviewResponse
+import com.jeezpay.app.network.dto.SwapConfirmRequest
+import com.jeezpay.app.network.dto.SwapConfirmResponse
 
 class WalletRepository {
 
@@ -82,6 +86,40 @@ class WalletRepository {
     ): ApiResult<ResolveRecipientResponse> {
         return safeApiCall {
             api.resolveRecipient(identifier)
+        }
+    }
+
+    suspend fun swapPreviewSafe(
+        fromCurrency: String,
+        toCurrency: String,
+        amount: Double
+    ): ApiResult<SwapPreviewResponse> {
+        return safeApiCall {
+            api.swapPreview(
+                SwapPreviewRequest(
+                    fromCurrency = fromCurrency,
+                    toCurrency = toCurrency,
+                    amount = amount
+                )
+            )
+        }
+    }
+
+    suspend fun swapConfirmSafe(
+        fromCurrency: String,
+        toCurrency: String,
+        amount: Double,
+        pin: String
+    ): ApiResult<SwapConfirmResponse> {
+        return safeApiCall {
+            api.swapConfirm(
+                SwapConfirmRequest(
+                    fromCurrency = fromCurrency,
+                    toCurrency = toCurrency,
+                    amount = amount,
+                    pin = pin
+                )
+            )
         }
     }
 }

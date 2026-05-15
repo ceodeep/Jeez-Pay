@@ -422,6 +422,7 @@ class MainActivity : BaseFintechActivity() {
         val btnSend = findViewById<View>(R.id.btnSend)
         val btnReceive = findViewById<View>(R.id.btnEarn)
         val btnReferral = findViewById<View>(R.id.btnReferral)
+        val btnSwap = findViewById<View>(R.id.btnSwap)
 
         btnSend.setOnClickListener {
             startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))
@@ -429,6 +430,9 @@ class MainActivity : BaseFintechActivity() {
 
         btnReferral.setOnClickListener {
             startActivity(Intent(this, ReferralActivity::class.java))
+        }
+        btnSwap.setOnClickListener {
+            startActivity(Intent(this, SwapActivity::class.java))
         }
         btnReceive.setOnClickListener {
             startActivity(Intent(this, ReceiveQrActivity::class.java))

@@ -9,6 +9,10 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
 import com.jeezpay.app.network.dto.ResolveRecipientResponse
+import com.jeezpay.app.network.dto.SwapConfirmRequest
+import com.jeezpay.app.network.dto.SwapConfirmResponse
+import com.jeezpay.app.network.dto.SwapPreviewRequest
+import com.jeezpay.app.network.dto.SwapPreviewResponse
 
 
 interface WalletApi {
@@ -31,5 +35,15 @@ interface WalletApi {
     suspend fun resolveRecipient(
         @Query("identifier") identifier: String
     ): ResolveRecipientResponse
+
+    @POST("wallet/swap/preview")
+    suspend fun swapPreview(
+        @Body body: SwapPreviewRequest
+    ): SwapPreviewResponse
+
+    @POST("wallet/swap/confirm")
+    suspend fun swapConfirm(
+        @Body body: SwapConfirmRequest
+    ): SwapConfirmResponse
 
 }
