@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DecimalFormat
 
+
 class SwapActivity : BaseFintechActivity() {
 
     private val repo = WalletRepository()
@@ -68,7 +69,6 @@ class SwapActivity : BaseFintechActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_swap)
-        initBlockingLoader()
 
         bindViews()
         bindClicks()
@@ -281,15 +281,20 @@ class SwapActivity : BaseFintechActivity() {
             }) {
                 is ApiResult.Success -> {
                     setLoading(false)
-                    Toast.makeText(
-                        this@SwapActivity,
-                        result.data.message ?: "Swap successful",
-                        Toast.LENGTH_SHORT
-                    ).show()
 
-                    loadBalances()
-                    resetPreview()
-                    etAmount.text?.clear()
+                    val res = result.data
+
+                    val i = Intent(this@SwapActivity, SwapReceiptActivity::class.java).apply {
+                        putExtra("reference", res.reference ?: "-")
+                        putExtra("fromCurrency", res.fromCurrency ?: fromCurrency)
+                        putExtra("toCurrency", res.toCurrency ?: toCurrency)
+                        putExtra("amount", res.amount ?: previewAmount)
+                        putExtra("receiveAmount", res.receiveAmount ?: previewReceiveAmount)
+                        putExtra("rate", res.rate ?: previewRate)
+                    }
+
+                    startActivity(i)
+                    finish()
                 }
 
                 is ApiResult.Error -> {
@@ -321,10 +326,10 @@ class SwapActivity : BaseFintechActivity() {
     }
 
     private fun setLoading(loading: Boolean) {
-        if (loading) showBlockingLoader() else hideBlockingLoader()
-
         btnPreview.isEnabled = !loading
         btnPreview.alpha = if (loading) 0.7f else 1f
+        btnPreview.text = if (loading) "Please wait..." else "Preview Swap"
+
         btnReview.isEnabled = !loading && previewAmount > 0
         btnReview.alpha = if (btnReview.isEnabled) 1f else 0.55f
 

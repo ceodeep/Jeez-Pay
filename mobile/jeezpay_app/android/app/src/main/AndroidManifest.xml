@@ -78,6 +78,7 @@
         <activity android:name=".ChangePasswordActivity" />
         <activity android:name=".ReceiveQrActivity" />
         <activity android:name=".SwapActivity" />
+        <activity android:name=".SwapReceiptActivity" />
 
         <activity
             android:name=".PortraitCaptureActivity"
