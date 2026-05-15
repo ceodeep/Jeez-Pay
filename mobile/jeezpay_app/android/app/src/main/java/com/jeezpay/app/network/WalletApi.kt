@@ -13,6 +13,7 @@ import com.jeezpay.app.network.dto.SwapConfirmRequest
 import com.jeezpay.app.network.dto.SwapConfirmResponse
 import com.jeezpay.app.network.dto.SwapPreviewRequest
 import com.jeezpay.app.network.dto.SwapPreviewResponse
+import com.jeezpay.app.network.dto.CryptoDepositAddressResponse
 
 
 interface WalletApi {
@@ -45,5 +46,11 @@ interface WalletApi {
     suspend fun swapConfirm(
         @Body body: SwapConfirmRequest
     ): SwapConfirmResponse
+
+    @GET("wallet/crypto/deposit-address")
+    suspend fun cryptoDepositAddress(
+        @Query("token") token: String = "USDT",
+        @Query("network") network: String = "TRON"
+    ): CryptoDepositAddressResponse
 
 }

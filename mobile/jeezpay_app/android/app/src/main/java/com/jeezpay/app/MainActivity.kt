@@ -436,6 +436,11 @@ class MainActivity : BaseFintechActivity() {
         val btnReceive = findViewById<View>(R.id.btnEarn)
         val btnReferral = findViewById<View>(R.id.btnReferral)
         val btnSwap = findViewById<View>(R.id.btnSwap)
+        val btnDeposit = findViewById<View>(R.id.btnDeposit)
+
+        btnDeposit.setOnClickListener {
+            startActivity(Intent(this, DepositUsdtActivity::class.java))
+        }
 
         btnSend.setOnClickListener {
             startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))

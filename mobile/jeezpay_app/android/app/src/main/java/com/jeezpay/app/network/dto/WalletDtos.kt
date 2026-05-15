@@ -81,3 +81,9 @@ data class SwapConfirmResponse(
     val fromBalance: Double?,
     val toBalance: Double?
 )
+data class CryptoDepositAddressResponse(
+    val network: String? = null,
+    val token: String? = null,
+    val address: String? = null,
+    val createdAt: String? = null
+)

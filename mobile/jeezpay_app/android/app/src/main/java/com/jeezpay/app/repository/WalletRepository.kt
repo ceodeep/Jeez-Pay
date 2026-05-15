@@ -12,6 +12,7 @@ import com.jeezpay.app.network.dto.SwapPreviewRequest
 import com.jeezpay.app.network.dto.SwapPreviewResponse
 import com.jeezpay.app.network.dto.SwapConfirmRequest
 import com.jeezpay.app.network.dto.SwapConfirmResponse
+import com.jeezpay.app.network.dto.CryptoDepositAddressResponse
 
 class WalletRepository {
 
@@ -120,6 +121,14 @@ class WalletRepository {
                     pin = pin
                 )
             )
+        }
+    }
+    suspend fun cryptoDepositAddressSafe(
+        token: String = "USDT",
+        network: String = "TRON"
+    ): ApiResult<CryptoDepositAddressResponse> {
+        return safeApiCall {
+            api.cryptoDepositAddress(token, network)
         }
     }
 }
