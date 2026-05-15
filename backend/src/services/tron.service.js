@@ -1,4 +1,5 @@
-const TronWeb = require("tronweb");
+const tronwebPackage = require("tronweb");
+const TronWeb = tronwebPackage.TronWeb || tronwebPackage.default || tronwebPackage;
 const crypto = require("crypto");
 
 const fullHost = process.env.TRON_FULL_HOST || "https://api.trongrid.io";
