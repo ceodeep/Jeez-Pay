@@ -294,6 +294,274 @@ router.get("/history", authMiddleware, async (req, res) => {
   }
 });
 
+// =====================================
+// SWAP PREVIEW
+// POST /wallet/swap/preview
+// Body: { fromCurrency, toCurrency, amount }
+// =====================================
+router.post("/swap/preview", authMiddleware, async (req, res) => {
+  try {
+    const fromCurrency = normalizeCurrency(req.body.fromCurrency);
+    const toCurrency = normalizeCurrency(req.body.toCurrency);
+    const amount = Number(req.body.amount);
+
+    if (!fromCurrency || !toCurrency || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({
+        message: "fromCurrency, toCurrency, and valid amount are required",
+      });
+    }
+
+    if (fromCurrency === toCurrency) {
+      return res.status(400).json({
+        message: "Choose two different currencies",
+      });
+    }
+
+    const rateRow = await getExchangeRate(fromCurrency, toCurrency);
+
+    if (!rateRow) {
+      return res.status(400).json({
+        message: "Swap pair is not supported",
+      });
+    }
+
+    if (!rateRow.is_enabled) {
+      return res.status(400).json({
+        message: "This swap pair is currently disabled",
+      });
+    }
+
+    if (rateRow.min_amount && amount < Number(rateRow.min_amount)) {
+      return res.status(400).json({
+        message: `Minimum swap amount is ${rateRow.min_amount} ${fromCurrency}`,
+      });
+    }
+
+    if (rateRow.max_amount && amount > Number(rateRow.max_amount)) {
+      return res.status(400).json({
+        message: `Maximum swap amount is ${rateRow.max_amount} ${fromCurrency}`,
+      });
+    }
+
+    const quote = calculateSwapQuote(rateRow, amount);
+
+    return res.json({
+      fromCurrency,
+      toCurrency,
+      amount,
+      rate: quote.rate,
+      fee: quote.fee,
+      totalDebit: quote.totalDebit,
+      receiveAmount: quote.receiveAmount,
+    });
+  } catch (err) {
+    console.error("[swap preview] error:", err);
+    return res.status(500).json({ message: "Failed to preview swap" });
+  }
+});
+
+// =====================================
+// SWAP CONFIRM
+// POST /wallet/swap/confirm
+// Body: { fromCurrency, toCurrency, amount, pin }
+// =====================================
+router.post("/swap/confirm", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const fromCurrency = normalizeCurrency(req.body.fromCurrency);
+    const toCurrency = normalizeCurrency(req.body.toCurrency);
+    const amount = Number(req.body.amount);
+    const pin = String(req.body.pin || "").trim();
+
+    if (!fromCurrency || !toCurrency || !Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({
+        message: "fromCurrency, toCurrency, and valid amount are required",
+      });
+    }
+
+    if (fromCurrency === toCurrency) {
+      return res.status(400).json({
+        message: "Choose two different currencies",
+      });
+    }
+
+    const okKyc = await requireKycApproved(userId);
+    if (!okKyc) {
+      return res.status(403).json({
+        code: "KYC_REQUIRED",
+        message: "KYC must be approved before swaps",
+      });
+    }
+
+    if (!pin) {
+      return res.status(400).json({
+        code: "PIN_REQUIRED",
+        message: "PIN is required",
+      });
+    }
+
+    const pinState = await getUserPinState(userId);
+
+    if (!pinState?.pin_hash) {
+      return res.status(400).json({
+        code: "PIN_NOT_SET",
+        message: "PIN not set for this account",
+      });
+    }
+
+    if (pinState.pin_locked_until) {
+      const lockedUntil = new Date(pinState.pin_locked_until);
+      if (lockedUntil > new Date()) {
+        return res.status(403).json({
+          code: "PIN_LOCKED",
+          message: "Too many attempts. Try again later.",
+        });
+      }
+    }
+
+    const okPin = await bcrypt.compare(pin, pinState.pin_hash);
+
+    if (!okPin) {
+      const attempts = (pinState.pin_failed_attempts || 0) + 1;
+
+      if (attempts >= 5) {
+        const lockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        await updatePinFail(userId, attempts, lockedUntil);
+
+        return res.status(403).json({
+          code: "PIN_LOCKED",
+          message: "Too many wrong attempts. Locked for 5 minutes.",
+        });
+      }
+
+      await updatePinFail(userId, attempts, null);
+
+      return res.status(403).json({
+        code: "PIN_INVALID",
+        message: "Invalid PIN",
+      });
+    }
+
+    await resetPinFail(userId);
+
+    const rateRow = await getExchangeRate(fromCurrency, toCurrency);
+
+    if (!rateRow) {
+      return res.status(400).json({
+        message: "Swap pair is not supported",
+      });
+    }
+
+    if (!rateRow.is_enabled) {
+      return res.status(400).json({
+        message: "This swap pair is currently disabled",
+      });
+    }
+
+    if (rateRow.min_amount && amount < Number(rateRow.min_amount)) {
+      return res.status(400).json({
+        message: `Minimum swap amount is ${rateRow.min_amount} ${fromCurrency}`,
+      });
+    }
+
+    if (rateRow.max_amount && amount > Number(rateRow.max_amount)) {
+      return res.status(400).json({
+        message: `Maximum swap amount is ${rateRow.max_amount} ${fromCurrency}`,
+      });
+    }
+
+    const quote = calculateSwapQuote(rateRow, amount);
+
+    const { wallet: fromWallet, error: fromWalletErr } = await ensureWallet(
+      userId,
+      fromCurrency
+    );
+
+    if (fromWalletErr || !fromWallet) {
+      console.error("[swap confirm] from wallet error:", fromWalletErr);
+      return res.status(500).json({ message: "Source wallet check failed" });
+    }
+
+    const { wallet: toWallet, error: toWalletErr } = await ensureWallet(
+      userId,
+      toCurrency
+    );
+
+    if (toWalletErr || !toWallet) {
+      console.error("[swap confirm] to wallet error:", toWalletErr);
+      return res.status(500).json({ message: "Destination wallet check failed" });
+    }
+
+    const fromBalance = Number(fromWallet.balance || 0);
+
+    if (fromBalance < quote.totalDebit) {
+      return res.status(400).json({
+        message: "Insufficient balance",
+      });
+    }
+
+    const newFromBalance = fromBalance - quote.totalDebit;
+    const newToBalance = Number(toWallet.balance || 0) + quote.receiveAmount;
+
+    const reference = `SWP-${Date.now()}`;
+
+    const { error: updateFromErr } = await supabase
+      .from("wallets")
+      .update({ balance: newFromBalance })
+      .eq("id", fromWallet.id);
+
+    if (updateFromErr) {
+      console.error("[swap confirm] debit error:", updateFromErr);
+      return res.status(500).json({ message: "Swap debit failed" });
+    }
+
+    const { error: updateToErr } = await supabase
+      .from("wallets")
+      .update({ balance: newToBalance })
+      .eq("id", toWallet.id);
+
+    if (updateToErr) {
+      console.error("[swap confirm] credit error:", updateToErr);
+      return res.status(500).json({ message: "Swap credit failed" });
+    }
+
+    await supabase.from("transactions").insert([
+      {
+        wallet_id: fromWallet.id,
+        type: "swap_out",
+        amount: quote.totalDebit,
+        description: `Swapped ${amount} ${fromCurrency} to ${toCurrency}`,
+        reference,
+      },
+      {
+        wallet_id: toWallet.id,
+        type: "swap_in",
+        amount: quote.receiveAmount,
+        description: `Received from ${fromCurrency} swap`,
+        reference,
+      },
+    ]);
+
+    return res.json({
+      message: "Swap successful",
+      reference,
+      fromCurrency,
+      toCurrency,
+      amount,
+      rate: quote.rate,
+      fee: quote.fee,
+      totalDebit: quote.totalDebit,
+      receiveAmount: quote.receiveAmount,
+      fromBalance: newFromBalance,
+      toBalance: newToBalance,
+    });
+  } catch (err) {
+    console.error("[swap confirm] error:", err);
+    return res.status(500).json({ message: "Swap failed" });
+  }
+});
+
 /**
  * POST /wallet/credit (ADMIN ONLY)
  * Body: { userId, currency, amount, description }
@@ -905,5 +1173,43 @@ router.post("/withdraw", authMiddleware, async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
+async function getExchangeRate(fromCurrency, toCurrency) {
+  const { data, error } = await supabase
+    .from("exchange_rates")
+    .select(`
+      from_currency,
+      to_currency,
+      rate,
+      fee_percent,
+      flat_fee,
+      min_amount,
+      max_amount,
+      is_enabled
+    `)
+    .eq("from_currency", fromCurrency)
+    .eq("to_currency", toCurrency)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data || null;
+}
+
+function calculateSwapQuote(rateRow, amount) {
+  const rate = Number(rateRow.rate || 0);
+  const feePercent = Number(rateRow.fee_percent || 0);
+  const flatFee = Number(rateRow.flat_fee || 0);
+
+  const fee = (amount * feePercent) / 100 + flatFee;
+  const totalDebit = amount + fee;
+  const receiveAmount = amount * rate;
+
+  return {
+    rate,
+    fee,
+    totalDebit,
+    receiveAmount,
+  };
+}
 
 module.exports = router;

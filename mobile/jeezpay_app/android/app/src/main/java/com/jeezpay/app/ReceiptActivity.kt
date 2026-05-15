@@ -53,16 +53,49 @@ class ReceiptActivity : AppCompatActivity() {
         setContentView(R.layout.activity_receipt)
 
         val tvFrom = findViewById<TextView>(R.id.tvFrom)
-        val fromPhone = intent.getStringExtra("fromPhone") ?: "-"
-        tvFrom.text = fromPhone
+        val tvReceiverName = findViewById<TextView>(R.id.tvReceiverName)
+        val tvTo = findViewById<TextView>(R.id.tvTo)
+        val tvAmount = findViewById<TextView>(R.id.tvAmount)
+        val tvCurrency = findViewById<TextView>(R.id.tvCurrency)
+        val tvDesc = findViewById<TextView>(R.id.tvDesc)
+        val tvTime = findViewById<TextView>(R.id.tvTime)
+        val tvReference = findViewById<TextView>(R.id.tvReference)
+
+        val fromAccount = intent.getStringExtra("fromAccount")
+            ?: intent.getStringExtra("fromPhone")
+            ?: "-"
+
+        val toName = intent.getStringExtra("toName") ?: "-"
+
+        val toAccount = intent.getStringExtra("toAccount")
+            ?: intent.getStringExtra("toPhone")
+            ?: "-"
+
+        val createdAtRaw = intent.getStringExtra("createdAt") ?: "-"
+        val formattedTime = formatTime(createdAtRaw)
+
+        val currency = intent.getStringExtra("currency") ?: "-"
+        val amount = intent.getDoubleExtra("amount", 0.0)
+        val description = intent.getStringExtra("description") ?: "-"
+        val reference = intent.getStringExtra("reference") ?: "-"
+
+        tvFrom.text = fromAccount
+        tvReceiverName.text = toName
+        tvTo.text = toAccount
+        tvTime.text = formattedTime
+        tvReference.text = reference
+        tvAmount.text = df.format(amount)
+        tvCurrency.text = currency
+        tvDesc.text = if (description.isBlank()) "-" else description
+
+        val btnDone = findViewById<MaterialButton>(R.id.btnDone)
+        btnDone.setOnClickListener { finish() }
 
         val btnDownload = findViewById<MaterialButton>(R.id.btnDownload)
         btnDownload.setOnClickListener {
-            // Android 10+ (Q+) does not need storage permission to save via MediaStore
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 saveFullReceiptPageToGallery()
             } else {
-                // Android 9- needs WRITE permission
                 val granted = ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -75,33 +108,6 @@ class ReceiptActivity : AppCompatActivity() {
                 }
             }
         }
-
-        val tvTo = findViewById<TextView>(R.id.tvTo)
-        val tvAmount = findViewById<TextView>(R.id.tvAmount)
-        val tvCurrency = findViewById<TextView>(R.id.tvCurrency)
-        val tvDesc = findViewById<TextView>(R.id.tvDesc)
-        val tvTime = findViewById<TextView>(R.id.tvTime)
-
-        val createdAtRaw = intent.getStringExtra("createdAt") ?: "-"
-        val formattedTime = formatTime(createdAtRaw)
-        tvTime.text = formattedTime
-
-        val btnDone = findViewById<MaterialButton>(R.id.btnDone)
-        btnDone.setOnClickListener { finish() }
-
-        val toPhone = intent.getStringExtra("toPhone") ?: "-"
-        val currency = intent.getStringExtra("currency") ?: "-"
-        val amount = intent.getDoubleExtra("amount", 0.0)
-        val description = intent.getStringExtra("description") ?: "-"
-
-        val tvReference = findViewById<TextView>(R.id.tvReference)
-        val reference = intent.getStringExtra("reference") ?: "-"
-        tvReference.text = reference
-
-        tvTo.text = toPhone
-        tvAmount.text = df.format(amount)
-        tvCurrency.text = currency
-        tvDesc.text = if (description.isBlank()) "-" else description
     }
 
     private fun saveFullReceiptPageToGallery() {

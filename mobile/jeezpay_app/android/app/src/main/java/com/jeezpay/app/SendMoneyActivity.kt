@@ -35,6 +35,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import com.jeezpay.app.PortraitCaptureActivity
 import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.repository.AuthRepository
 import com.jeezpay.app.repository.WalletRepository
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -83,6 +84,7 @@ class SendMoneyActivity : BaseFintechActivity() {
     private var lastConfirmedReceiverIdentifier: String? = null
     private var resolvedReceiverName: String? = null
     private var resolvedReceiverAccountNumber: String? = null
+    private var senderAccountNumber: String = ""
     private var lastConfirmedCurrency: String? = null
     private var lastConfirmedAmount: Double? = null
     private var lastConfirmedDescription: String? = null
@@ -124,6 +126,7 @@ class SendMoneyActivity : BaseFintechActivity() {
 
         vm = ViewModelProvider(this)[SendMoneyViewModel::class.java]
         vm.loadBalances()
+        loadSenderAccountNumber()
 
         sendFlipper = findViewById(R.id.sendFlipper)
         setSlideForwardAnimation()
@@ -184,6 +187,8 @@ class SendMoneyActivity : BaseFintechActivity() {
         etPhone.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                resolvedReceiverName = null
+                resolvedReceiverAccountNumber = null
                 setNextEnabled(!s.isNullOrBlank())
                 tvError.visibility = View.GONE
             }
@@ -424,17 +429,29 @@ class SendMoneyActivity : BaseFintechActivity() {
         createdAtIso: String,
         reference: String
     ) {
-        val fromPhone = SessionManager(this).getPhone() ?: "-"
+        val fromAccount = senderAccountNumber.ifBlank {
+            SessionManager(this).getPhone() ?: "-"
+        }
+
+        val receiverName = resolvedReceiverName ?: "-"
+        val receiverAccount = resolvedReceiverAccountNumber ?: toPhone
 
         val i = Intent(this, com.jeezpay.app.ui.receipt.ReceiptActivity::class.java).apply {
-            putExtra("toPhone", toPhone)
-            putExtra("fromPhone", fromPhone)
+            putExtra("fromAccount", fromAccount)
+            putExtra("toName", receiverName)
+            putExtra("toAccount", receiverAccount)
+
+            // Keep old keys too, so ReceiptActivity does not break if it still uses them
+            putExtra("fromPhone", fromAccount)
+            putExtra("toPhone", receiverAccount)
+
             putExtra("currency", currency)
             putExtra("amount", amount)
             putExtra("description", description ?: "")
             putExtra("createdAt", createdAtIso)
             putExtra("reference", reference)
         }
+
         startActivity(i)
         finish()
     }
@@ -475,9 +492,7 @@ class SendMoneyActivity : BaseFintechActivity() {
 
             row.setOnClickListener {
                 etPhone.setText(rec.identifier)
-                setSlideForwardAnimation()
-                sendFlipper.displayedChild = 1
-                tvRecipientName.text = rec.displayName ?: rec.identifier
+                resolveReceiverAndContinue(rec.identifier)
             }
 
             recentList.addView(row)
@@ -690,8 +705,15 @@ class SendMoneyActivity : BaseFintechActivity() {
         }
 
         when {
-            receiver.startsWith("+") || receiver.length >= 9 && receiver.all { it.isDigit() } -> {
+            receiver.startsWith("+") -> {
                 setMode(IdMode.PHONE)
+                etPhone.setText(receiver)
+                etPhone.setSelection(etPhone.text?.length ?: 0)
+                tvRecipientName.text = receiver
+            }
+
+            receiver.all { it.isDigit() } -> {
+                setMode(IdMode.UID)
                 etPhone.setText(receiver)
                 etPhone.setSelection(etPhone.text?.length ?: 0)
                 tvRecipientName.text = receiver
@@ -766,6 +788,10 @@ class SendMoneyActivity : BaseFintechActivity() {
                     setSendLoading(false)
 
                     val receiver = result.data.receiver
+                    android.util.Log.d(
+                        "SendMoney",
+                        "Resolved receiver fullName=${receiver?.fullName}, account=${receiver?.walletAccountNumber}"
+                    )
                     if (receiver == null) {
                         showError("Receiver not found")
                         return@launch
@@ -796,6 +822,23 @@ class SendMoneyActivity : BaseFintechActivity() {
                 is ApiResult.Error -> {
                     setSendLoading(false)
                     handleSendError(result.error)
+                }
+            }
+        }
+    }
+    private fun loadSenderAccountNumber() {
+        lifecycleScope.launch {
+            when (val result = AuthRepository().meSafe()) {
+                is ApiResult.Success -> {
+                    senderAccountNumber = result.data.user
+                        ?.wallet_account_number
+                        ?.toString()
+                        ?.trim()
+                        .orEmpty()
+                }
+
+                is ApiResult.Error -> {
+                    senderAccountNumber = ""
                 }
             }
         }
