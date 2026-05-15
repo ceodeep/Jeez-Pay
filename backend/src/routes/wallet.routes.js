@@ -1215,5 +1215,74 @@ function calculateSwapQuote(rateRow, amount) {
     receiveAmount,
   };
 }
+// =====================================
+// CRYPTO DEPOSIT ADDRESS
+// GET /wallet/crypto/deposit-address?token=USDT&network=TRON
+// =====================================
+router.get("/crypto/deposit-address", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const token = String(req.query.token || "USDT").trim().toUpperCase();
+    const network = String(req.query.network || "TRON").trim().toUpperCase();
+
+    if (token !== "USDT" || network !== "TRON") {
+      return res.status(400).json({
+        message: "Only USDT on TRON is supported right now",
+      });
+    }
+
+    const { data: existing, error: existingErr } = await supabase
+      .from("crypto_deposit_addresses")
+      .select("address, network, token, created_at")
+      .eq("user_id", userId)
+      .eq("network", network)
+      .eq("token", token)
+      .maybeSingle();
+
+    if (existingErr) {
+      console.error("[deposit-address] lookup error:", existingErr);
+      return res.status(500).json({ message: "Failed to load deposit address" });
+    }
+
+    if (existing) {
+      return res.json({
+        network,
+        token,
+        address: existing.address,
+        createdAt: existing.created_at,
+      });
+    }
+
+    const account = await createTronAccount();
+    const encryptedPrivateKey = encryptPrivateKey(account.privateKey);
+
+    const { data: created, error: createErr } = await supabase
+      .from("crypto_deposit_addresses")
+      .insert({
+        user_id: userId,
+        network,
+        token,
+        address: account.address,
+        encrypted_private_key: encryptedPrivateKey,
+      })
+      .select("address, network, token, created_at")
+      .single();
+
+    if (createErr) {
+      console.error("[deposit-address] create error:", createErr);
+      return res.status(500).json({ message: "Failed to create deposit address" });
+    }
+
+    return res.json({
+      network,
+      token,
+      address: created.address,
+      createdAt: created.created_at,
+    });
+  } catch (err) {
+    console.error("[deposit-address] crash:", err);
+    return res.status(500).json({ message: "Failed to prepare deposit address" });
+  }
+});
 
 module.exports = router;
