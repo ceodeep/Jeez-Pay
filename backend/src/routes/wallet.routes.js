@@ -1307,4 +1307,55 @@ router.post("/crypto/scan-deposits", authMiddleware, async (req, res) => {
   }
 });
 
+// =====================================
+// CRYPTO DEPOSIT HISTORY
+// GET /wallet/crypto/deposits?token=USDT&network=TRON
+// =====================================
+router.get("/crypto/deposits", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const token = String(req.query.token || "USDT").trim().toUpperCase();
+    const network = String(req.query.network || "TRON").trim().toUpperCase();
+
+    if (token !== "USDT" || network !== "TRON") {
+      return res.status(400).json({
+        message: "Only USDT on TRON is supported right now",
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("crypto_deposits")
+      .select(`
+        id,
+        network,
+        token,
+        tx_hash,
+        from_address,
+        to_address,
+        amount,
+        confirmations,
+        status,
+        credited_at,
+        created_at
+      `)
+      .eq("user_id", userId)
+      .eq("network", network)
+      .eq("token", token)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("[crypto-deposits] fetch error:", error);
+      return res.status(500).json({ message: "Failed to fetch deposits" });
+    }
+
+    return res.json({
+      deposits: data || [],
+    });
+  } catch (err) {
+    console.error("[crypto-deposits] crash:", err);
+    return res.status(500).json({ message: "Failed to fetch deposits" });
+  }
+});
+
 module.exports = router;
