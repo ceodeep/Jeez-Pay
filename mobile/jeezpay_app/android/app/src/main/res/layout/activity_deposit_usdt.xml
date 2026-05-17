@@ -113,6 +113,18 @@
                     android:textColor="@android:color/white"
                     android:textStyle="bold"
                     app:cornerRadius="14dp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDepositHistory"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:layout_marginTop="10dp"
+                    android:text="View Deposit History"
+                    android:textAllCaps="false"
+                    android:textColor="@color/paypal_blue"
+                    app:backgroundTint="@android:color/transparent"
+                    app:strokeColor="@color/paypal_blue"
+                    app:strokeWidth="1dp"
+                    app:cornerRadius="14dp" />
 
                 <TextView
                     android:id="@+id/tvStatus"

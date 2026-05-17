@@ -87,3 +87,21 @@ data class CryptoDepositAddressResponse(
     val address: String? = null,
     val createdAt: String? = null
 )
+
+data class CryptoDepositsResponse(
+    val deposits: List<CryptoDepositDto> = emptyList()
+)
+
+data class CryptoDepositDto(
+    val id: String? = null,
+    val network: String? = null,
+    val token: String? = null,
+    val tx_hash: String? = null,
+    val from_address: String? = null,
+    val to_address: String? = null,
+    val amount: Double? = null,
+    val confirmations: Int? = null,
+    val status: String? = null,
+    val credited_at: String? = null,
+    val created_at: String? = null
+)

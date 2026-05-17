@@ -18,6 +18,7 @@ import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
 import com.jeezpay.app.repository.WalletRepository
 import kotlinx.coroutines.launch
+import android.content.Intent
 
 class DepositUsdtActivity : BaseFintechActivity() {
 
@@ -28,6 +29,7 @@ class DepositUsdtActivity : BaseFintechActivity() {
     private lateinit var tvAddress: TextView
     private lateinit var btnCopyAddress: MaterialButton
     private lateinit var tvStatus: TextView
+    private lateinit var btnDepositHistory: MaterialButton
 
     private var currentAddress: String = ""
 
@@ -39,6 +41,7 @@ class DepositUsdtActivity : BaseFintechActivity() {
         ivQrCode = findViewById(R.id.ivQrCode)
         tvAddress = findViewById(R.id.tvAddress)
         btnCopyAddress = findViewById(R.id.btnCopyAddress)
+        btnDepositHistory = findViewById(R.id.btnDepositHistory)
         tvStatus = findViewById(R.id.tvStatus)
 
         btnBack.setOnClickListener { finish() }
@@ -51,6 +54,9 @@ class DepositUsdtActivity : BaseFintechActivity() {
 
             copyToClipboard("JeezPay USDT TRC20 address", currentAddress)
             toast("Address copied")
+        }
+        btnDepositHistory.setOnClickListener {
+            startActivity(Intent(this, CryptoDepositsActivity::class.java))
         }
 
         loadDepositAddress()

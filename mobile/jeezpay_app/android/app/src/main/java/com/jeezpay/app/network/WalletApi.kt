@@ -14,6 +14,7 @@ import com.jeezpay.app.network.dto.SwapConfirmResponse
 import com.jeezpay.app.network.dto.SwapPreviewRequest
 import com.jeezpay.app.network.dto.SwapPreviewResponse
 import com.jeezpay.app.network.dto.CryptoDepositAddressResponse
+import com.jeezpay.app.network.dto.CryptoDepositsResponse
 
 
 interface WalletApi {
@@ -52,5 +53,11 @@ interface WalletApi {
         @Query("token") token: String = "USDT",
         @Query("network") network: String = "TRON"
     ): CryptoDepositAddressResponse
+
+    @GET("wallet/crypto/deposits")
+    suspend fun cryptoDeposits(
+        @Query("token") token: String = "USDT",
+        @Query("network") network: String = "TRON"
+    ): CryptoDepositsResponse
 
 }

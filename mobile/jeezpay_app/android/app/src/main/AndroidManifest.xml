@@ -81,6 +81,7 @@
         <activity android:name=".SwapReceiptActivity" />
         <activity android:name=".TransactionsActivity" />
         <activity android:name=".DepositUsdtActivity" />
+        <activity android:name=".CryptoDepositsActivity" />
 
         <activity
             android:name=".PortraitCaptureActivity"
