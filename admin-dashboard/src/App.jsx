@@ -99,6 +99,10 @@ function AppShell({ onLogout }) {
   const [withdrawStatusFilter, setWithdrawStatusFilter] = useState("all");
   const [withdrawSearch, setWithdrawSearch] = useState("");
   const [withdrawActionLoadingId, setWithdrawActionLoadingId] = useState("");
+  const [serviceRequests, setServiceRequests] = useState([]);
+const [serviceRequestsLoading, setServiceRequestsLoading] = useState(false);
+const [serviceStatusFilter, setServiceStatusFilter] = useState("all");
+const [serviceActionLoadingId, setServiceActionLoadingId] = useState("");
 
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
   const [userDetailsLoading, setUserDetailsLoading] = useState(false);
@@ -182,6 +186,7 @@ const [referralRewardForm, setReferralRewardForm] = useState({
       users: "users.view",
       transactions: "transactions.view",
       withdrawals: "transactions.view",
+      serviceRequests: "transactions.view",
       auditLogs: "audit_logs.view",
       walletView: "wallets.view",
       wallet: "wallets.adjust",
@@ -496,6 +501,84 @@ async function loadReferralRewardHistory() {
       setWithdrawActionLoadingId("");
     }
   }
+
+  async function loadServiceRequests() {
+  setServiceRequestsLoading(true);
+  setMessage("");
+
+  try {
+    const url =
+      serviceStatusFilter !== "all"
+        ? `/admin/service-requests?status=${encodeURIComponent(serviceStatusFilter)}`
+        : "/admin/service-requests";
+
+    const res = await api.get(url);
+    setServiceRequests(res.data?.requests || []);
+  } catch (err) {
+    setMessage(
+      err?.response?.data?.message || "Failed to load service requests"
+    );
+  } finally {
+    setServiceRequestsLoading(false);
+  }
+}
+
+async function completeServiceRequest(requestId) {
+  if (!requestId) return;
+
+  const adminNote =
+    window.prompt("Completion note:", "Completed manually by JeezPay support") || "";
+
+  try {
+    setServiceActionLoadingId(requestId);
+
+    await api.patch(`/admin/service-requests/${requestId}/complete`, {
+      adminNote,
+    });
+
+    setMessage("Service request completed successfully");
+    await loadServiceRequests();
+    await loadTransactions();
+    await loadAuditLogs();
+  } catch (err) {
+    setMessage(
+      err?.response?.data?.message || "Failed to complete service request"
+    );
+  } finally {
+    setServiceActionLoadingId("");
+  }
+}
+
+async function rejectServiceRequest(requestId) {
+  if (!requestId) return;
+
+  const adminNote =
+    window.prompt("Rejection reason:", "Unable to process this request") || "";
+
+  if (!adminNote.trim()) {
+    setMessage("Rejection reason is required");
+    return;
+  }
+
+  try {
+    setServiceActionLoadingId(requestId);
+
+    await api.patch(`/admin/service-requests/${requestId}/reject`, {
+      adminNote,
+    });
+
+    setMessage("Service request rejected and refunded");
+    await loadServiceRequests();
+    await loadTransactions();
+    await loadAuditLogs();
+  } catch (err) {
+    setMessage(
+      err?.response?.data?.message || "Failed to reject service request"
+    );
+  } finally {
+    setServiceActionLoadingId("");
+  }
+}
 
   async function approveKyc(userId) {
     try {
@@ -859,6 +942,7 @@ async function loadReferralRewardHistory() {
       "users",
       "transactions",
       "withdrawals",
+      "serviceRequests",
       "auditLogs",
       "referralRewards",
       "walletView",
@@ -884,6 +968,7 @@ async function loadReferralRewardHistory() {
     if (page === "users") loadUsers();
     if (page === "transactions") loadTransactions();
     if (page === "withdrawals") loadWithdrawals();
+    if (page === "serviceRequests") loadServiceRequests();
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
     if (page === "currencySettings") loadCurrencySettings();
@@ -891,7 +976,7 @@ async function loadReferralRewardHistory() {
   loadReferralRewardSettings();
   loadReferralRewardHistory();
 }
-  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter, withdrawStatusFilter]);
+  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter, withdrawStatusFilter, serviceStatusFilter, auditActionFilter]);
   const kycCounts = {
     all: kycs.length,
     pending: kycs.filter((k) => k.status === "pending").length,
@@ -997,6 +1082,7 @@ async function loadReferralRewardHistory() {
               ["users", "Users"],
               ["transactions", "Transactions"],
               ["withdrawals", "Withdrawals"],
+              ["serviceRequests", "Service Requests"],
               ["auditLogs", "Audit Logs"],
               ["walletView", "Wallet View"],
               ["wallet", "Wallet Adjust"],
@@ -1063,6 +1149,7 @@ async function loadReferralRewardHistory() {
                 {page === "users" && "Users"}
                 {page === "transactions" && "Transactions"}
                 {page === "withdrawals" && "Withdrawals"}
+                {page === "serviceRequests" && "Service Requests"}
                 {page === "auditLogs" && "Audit Logs"}
                 {page === "walletView" && "Wallet View"}
                 {page === "wallet" && "Wallet Adjustment"}
@@ -2262,6 +2349,181 @@ async function loadReferralRewardHistory() {
               )}
             </div>
           )}
+
+          {page === "serviceRequests" && (
+  <div>
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        marginBottom: 16,
+        flexWrap: "wrap",
+        alignItems: "center",
+      }}
+    >
+      <button
+        onClick={loadServiceRequests}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: "none",
+          background: "#0f172a",
+          color: "#fff",
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Refresh
+      </button>
+
+      {["all", "pending", "completed", "rejected"].map((status) => (
+        <button
+          key={status}
+          onClick={() => setServiceStatusFilter(status)}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "none",
+            cursor: "pointer",
+            background:
+              serviceStatusFilter === status ? "#0f172a" : "#e2e8f0",
+            color: serviceStatusFilter === status ? "#fff" : "#0f172a",
+            fontWeight: 600,
+            textTransform: "capitalize",
+          }}
+        >
+          {status}
+        </button>
+      ))}
+    </div>
+
+    {serviceRequestsLoading ? (
+      <p>Loading...</p>
+    ) : serviceRequests.length === 0 ? (
+      <div
+        style={{
+          background: "#fff",
+          padding: 24,
+          borderRadius: 16,
+          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+          color: "#64748b",
+        }}
+      >
+        No service requests found.
+      </div>
+    ) : (
+      <div style={{ display: "grid", gap: 12 }}>
+        {serviceRequests.map((item) => {
+          const isPending =
+            String(item.status || "").toLowerCase() === "pending";
+
+          return (
+            <div
+              key={item.id}
+              style={{
+                background: "#fff",
+                padding: 18,
+                borderRadius: 16,
+                boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>
+                  {String(item.service_type || "service")
+                    .replaceAll("_", " ")
+                    .toUpperCase()}{" "}
+                  • {renderMoney(item.amount)} {item.currency}
+                </div>
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    marginTop: 6,
+                    lineHeight: 1.7,
+                    fontSize: 14,
+                  }}
+                >
+                  <div>Provider: {item.provider || "-"}</div>
+                  <div>Customer Reference: {item.customer_reference || "-"}</div>
+                  <div>User ID: {item.user_id || "-"}</div>
+                  <div>Wallet ID: {item.wallet_id || "-"}</div>
+                  <div>Note: {item.note || "-"}</div>
+                  <div>Admin Note: {item.admin_note || "-"}</div>
+                  <div>Transaction Ref: {item.transaction_reference || "-"}</div>
+                  <div>Created: {formatDate(item.created_at)}</div>
+                  <div>Completed: {formatDate(item.completed_at)}</div>
+                  <div>Rejected: {formatDate(item.rejected_at)}</div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <StatusBadge value={item.status} />
+
+                {isPending && hasPermission("wallets.adjust") && (
+                  <>
+                    <button
+                      onClick={() => completeServiceRequest(item.id)}
+                      disabled={serviceActionLoadingId === item.id}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "none",
+                        background: "#dcfce7",
+                        color: "#166534",
+                        cursor:
+                          serviceActionLoadingId === item.id
+                            ? "not-allowed"
+                            : "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {serviceActionLoadingId === item.id
+                        ? "Processing..."
+                        : "Complete"}
+                    </button>
+
+                    <button
+                      onClick={() => rejectServiceRequest(item.id)}
+                      disabled={serviceActionLoadingId === item.id}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "none",
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        cursor:
+                          serviceActionLoadingId === item.id
+                            ? "not-allowed"
+                            : "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {serviceActionLoadingId === item.id
+                        ? "Processing..."
+                        : "Reject + Refund"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+)}
 
           {page === "walletView" && (
             <div style={{ display: "grid", gap: 16, maxWidth: 920 }}>
