@@ -82,6 +82,9 @@
         <activity android:name=".TransactionsActivity" />
         <activity android:name=".DepositUsdtActivity" />
         <activity android:name=".CryptoDepositsActivity" />
+        <activity android:name=".ServicesActivity" />
+        <activity android:name=".ServiceRequestActivity" />
+        <activity android:name=".ServiceRequestsActivity" />
 
         <activity
             android:name=".PortraitCaptureActivity"

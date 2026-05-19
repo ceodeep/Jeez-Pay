@@ -57,6 +57,9 @@ object ApiClient {
     val walletApi: WalletApi by lazy {
         retrofit.create(WalletApi::class.java)
     }
+    val servicesApi: ServicesApi by lazy {
+        retrofit.create(ServicesApi::class.java)
+    }
     val kycApi: KycApi by lazy {
         retrofit.create(KycApi::class.java)
     }

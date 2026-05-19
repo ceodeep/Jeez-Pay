@@ -378,9 +378,9 @@
                                     android:includeFontPadding="false"/>
                             </LinearLayout>
 
-                            <!-- P2P -->
+                            <!-- Bills & Services -->
                             <LinearLayout
-                                android:id="@+id/btnP2P"
+                                android:id="@+id/btnBill"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_columnWeight="1"
@@ -399,16 +399,16 @@
                                         android:layout_width="24dp"
                                         android:layout_height="24dp"
                                         android:layout_gravity="center"
-                                        android:src="@drawable/ic_people"
+                                        android:src="@drawable/ic_bill"
                                         app:tint="@color/paypal_blue"
-                                        android:contentDescription="P2P"/>
+                                        android:contentDescription="Bills &amp; Services"/>
                                 </FrameLayout>
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="6dp"
-                                    android:text="P2P"
+                                    android:text="Bills &amp; Services"
                                     android:textSize="12sp"
                                     android:textColor="@color/text_secondary"
                                     android:fontFamily="sans-serif-medium"

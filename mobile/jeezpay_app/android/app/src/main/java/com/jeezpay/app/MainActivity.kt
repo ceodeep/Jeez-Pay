@@ -437,6 +437,7 @@ class MainActivity : BaseFintechActivity() {
         val btnReferral = findViewById<View>(R.id.btnReferral)
         val btnSwap = findViewById<View>(R.id.btnSwap)
         val btnDeposit = findViewById<View>(R.id.btnDeposit)
+        val btnBill = findViewById<View>(R.id.btnBill)
 
         btnDeposit.setOnClickListener {
             startActivity(Intent(this, DepositUsdtActivity::class.java))
@@ -454,6 +455,9 @@ class MainActivity : BaseFintechActivity() {
         }
         btnReceive.setOnClickListener {
             startActivity(Intent(this, ReceiveQrActivity::class.java))
+        }
+        findViewById<View>(R.id.btnBill).setOnClickListener {
+            startActivity(Intent(this, ServicesActivity::class.java))
         }
     }
 

@@ -2846,4 +2846,239 @@ router.post(
 );
 
 
+// =====================================
+// ADMIN: SERVICE REQUESTS LIST
+// GET /admin/service-requests?status=pending
+// =====================================
+router.get("/service-requests", requireAdmin, async (req, res) => {
+  try {
+    const status = String(req.query.status || "").trim().toLowerCase();
+
+    let query = supabase
+      .from("service_requests")
+      .select(`
+        id,
+        user_id,
+        wallet_id,
+        service_type,
+        provider,
+        customer_reference,
+        currency,
+        amount,
+        status,
+        note,
+        admin_note,
+        transaction_reference,
+        created_at,
+        completed_at,
+        rejected_at,
+        completed_by,
+        rejected_by
+      `)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (status) {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("[admin service requests] fetch error:", error);
+      return res.status(500).json({ message: "Failed to fetch service requests" });
+    }
+
+    return res.json({
+      requests: data || [],
+    });
+  } catch (err) {
+    console.error("[admin service requests] crash:", err);
+    return res.status(500).json({ message: "Failed to fetch service requests" });
+  }
+});
+
+// =====================================
+// ADMIN: COMPLETE SERVICE REQUEST
+// PATCH /admin/service-requests/:id/complete
+// Body: { adminNote }
+// =====================================
+router.patch("/service-requests/:id/complete", requireAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.userId;
+    const requestId = req.params.id;
+    const adminNote = String(req.body.adminNote || "").trim() || null;
+
+    const { data: existing, error: lookupErr } = await supabase
+      .from("service_requests")
+      .select("id, status")
+      .eq("id", requestId)
+      .maybeSingle();
+
+    if (lookupErr) {
+      console.error("[complete service request] lookup error:", lookupErr);
+      return res.status(500).json({ message: "Request lookup failed" });
+    }
+
+    if (!existing) {
+      return res.status(404).json({ message: "Service request not found" });
+    }
+
+    if (existing.status !== "pending") {
+      return res.status(400).json({ message: "Only pending requests can be completed" });
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from("service_requests")
+      .update({
+        status: "completed",
+        admin_note: adminNote,
+        completed_at: new Date().toISOString(),
+        completed_by: adminId,
+      })
+      .eq("id", requestId)
+      .select(`
+        id,
+        service_type,
+        provider,
+        customer_reference,
+        currency,
+        amount,
+        status,
+        admin_note,
+        transaction_reference,
+        completed_at
+      `)
+      .single();
+
+    if (updateErr) {
+      console.error("[complete service request] update error:", updateErr);
+      return res.status(500).json({ message: "Failed to complete request" });
+    }
+
+    return res.json({
+      message: "Service request completed",
+      request: updated,
+    });
+  } catch (err) {
+    console.error("[complete service request] crash:", err);
+    return res.status(500).json({ message: "Failed to complete request" });
+  }
+});
+
+// =====================================
+// ADMIN: REJECT SERVICE REQUEST + REFUND
+// PATCH /admin/service-requests/:id/reject
+// Body: { adminNote }
+// =====================================
+router.patch("/service-requests/:id/reject", requireAdmin, async (req, res) => {
+  try {
+    const adminId = req.user.userId;
+    const requestId = req.params.id;
+    const adminNote = String(req.body.adminNote || "").trim() || "Request rejected";
+
+    const { data: existing, error: lookupErr } = await supabase
+      .from("service_requests")
+      .select(`
+        id,
+        user_id,
+        wallet_id,
+        currency,
+        amount,
+        status,
+        transaction_reference
+      `)
+      .eq("id", requestId)
+      .maybeSingle();
+
+    if (lookupErr) {
+      console.error("[reject service request] lookup error:", lookupErr);
+      return res.status(500).json({ message: "Request lookup failed" });
+    }
+
+    if (!existing) {
+      return res.status(404).json({ message: "Service request not found" });
+    }
+
+    if (existing.status !== "pending") {
+      return res.status(400).json({ message: "Only pending requests can be rejected" });
+    }
+
+    const { data: wallet, error: walletErr } = await supabase
+      .from("wallets")
+      .select("id, balance")
+      .eq("id", existing.wallet_id)
+      .maybeSingle();
+
+    if (walletErr || !wallet) {
+      console.error("[reject service request] wallet lookup error:", walletErr);
+      return res.status(500).json({ message: "Wallet lookup failed" });
+    }
+
+    const refundAmount = Number(existing.amount || 0);
+    const newBalance = Number(wallet.balance || 0) + refundAmount;
+
+    const { error: refundErr } = await supabase
+      .from("wallets")
+      .update({ balance: newBalance })
+      .eq("id", wallet.id);
+
+    if (refundErr) {
+      console.error("[reject service request] refund error:", refundErr);
+      return res.status(500).json({ message: "Refund failed" });
+    }
+
+    const refundReference = `REF-${Date.now()}`;
+
+    const { error: txErr } = await supabase.from("transactions").insert({
+      wallet_id: wallet.id,
+      type: "credit",
+      amount: refundAmount,
+      description: "Service request refund",
+      reference: refundReference,
+    });
+
+    if (txErr) {
+      console.error("[reject service request] refund transaction error:", txErr);
+    }
+
+    const { data: updated, error: updateErr } = await supabase
+      .from("service_requests")
+      .update({
+        status: "rejected",
+        admin_note: adminNote,
+        rejected_at: new Date().toISOString(),
+        rejected_by: adminId,
+      })
+      .eq("id", requestId)
+      .select(`
+        id,
+        service_type,
+        provider,
+        customer_reference,
+        currency,
+        amount,
+        status,
+        admin_note,
+        transaction_reference,
+        rejected_at
+      `)
+      .single();
+
+    if (updateErr) {
+      console.error("[reject service request] update error:", updateErr);
+      return res.status(500).json({ message: "Request rejected but status update failed" });
+    }
+
+    return res.json({
+      message: "Service request rejected and refunded",
+      refundReference,
+      request: updated,
+    });
+  } catch (err) {
+    console.error("[reject service request] crash:", err);
+    return res.status(500).json({ message: "Failed to reject request" });
+  }
+});
+
 module.exports = router;

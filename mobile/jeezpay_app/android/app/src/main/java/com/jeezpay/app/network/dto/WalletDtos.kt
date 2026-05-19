@@ -105,3 +105,38 @@ data class CryptoDepositDto(
     val credited_at: String? = null,
     val created_at: String? = null
 )
+
+data class ServiceRequestCreateRequest(
+    val serviceType: String,
+    val provider: String?,
+    val customerReference: String,
+    val currency: String,
+    val amount: Double,
+    val note: String?,
+    val pin: String
+)
+
+data class ServiceRequestCreateResponse(
+    val message: String?,
+    val request: ServiceRequestDto?
+)
+
+data class ServiceRequestsResponse(
+    val requests: List<ServiceRequestDto> = emptyList()
+)
+
+data class ServiceRequestDto(
+    val id: String? = null,
+    val service_type: String? = null,
+    val provider: String? = null,
+    val customer_reference: String? = null,
+    val currency: String? = null,
+    val amount: Double? = null,
+    val status: String? = null,
+    val note: String? = null,
+    val admin_note: String? = null,
+    val transaction_reference: String? = null,
+    val created_at: String? = null,
+    val completed_at: String? = null,
+    val rejected_at: String? = null
+)
