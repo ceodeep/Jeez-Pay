@@ -1280,73 +1280,46 @@ router.get(
       const userId = user.id;
 
       const [
-        userRes,
-        walletsRes,
-        kycRes,
-        txRes,
-      ] = await Promise.all([
-        supabase
-          .from("users")
-          .select(`
-            id,
-            phone,
-            fullName,
-            role,
-            account_type,
-            phone_verified,
-            is_active,
-            created_at,
-            wallet_account_number
-          `)
-          .eq("id", userId)
-          .maybeSingle(),
+  usersRes,
+  pendingKycRes,
+  txRes,
+  suspendedRes,
+  agentsRes,
+  merchantsRes,
+  pendingServiceRequestsRes,
+] = await Promise.all([
+  supabase.from("users").select("id", { count: "exact", head: true }),
 
-        supabase
-          .from("wallets")
-          .select(`
-            id,
-            user_id,
-            currency,
-            balance
-          `)
-          .eq("user_id", userId)
-          .order("currency", { ascending: true }),
+  supabase
+    .from("kyc_profiles")
+    .select("user_id", { count: "exact", head: true })
+    .eq("status", "pending"),
 
-        supabase
-          .from("kyc_profiles")
-          .select(`
-            user_id,
-            fullName,
-            dob,
-            address,
-            id_path,
-            selfie_path,
-            status,
-            created_at,
-            updated_at
-          `)
-          .eq("user_id", userId)
-          .maybeSingle(),
+  supabase
+    .from("transactions")
+    .select("amount, created_at")
+    .gte("created_at", todayStart.toISOString()),
 
-        supabase
-          .from("transactions")
-          .select(`
-            id,
-            wallet_id,
-            type,
-            amount,
-            description,
-            reference,
-            created_at,
-            wallets!inner (
-              user_id,
-              currency
-            )
-          `)
-          .eq("wallets.user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(20),
-      ]);
+  supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", false),
+
+  supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "agent"),
+
+  supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "merchant"),
+
+  supabase
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending"),
+]);
 
       if (userRes.error) {
         console.error("admin/user/details user error:", userRes.error);
@@ -1367,6 +1340,14 @@ router.get(
         console.error("admin/user/details transactions error:", txRes.error);
         return res.status(500).json({ message: "Failed to fetch user transactions" });
       }
+
+      if (pendingServiceRequestsRes.error) {
+  console.error(
+    "dashboard stats pending service requests error:",
+    pendingServiceRequestsRes.error
+  );
+  return res.status(500).json({ message: "Failed to load dashboard stats" });
+}
 
       const profile = userRes.data;
       if (!profile) {
@@ -1520,6 +1501,7 @@ router.get(
         stats: {
           totalUsers: usersRes.count || 0,
           pendingKyc: pendingKycRes.count || 0,
+          pendingServiceRequests: pendingServiceRequestsRes.count || 0,
           suspendedUsers: suspendedRes.count || 0,
           totalTransactionsToday: todayTransactions.length,
           totalVolumeToday,
@@ -2848,7 +2830,7 @@ router.post(
 
 // =====================================
 // ADMIN: SERVICE REQUESTS LIST
-// GET /admin/service-requests?status=pending
+// GET /admin/service-requests?status=pending&search=abc&serviceType=starlink
 // =====================================
 router.get(
   "/service-requests",
@@ -2858,6 +2840,8 @@ router.get(
   async (req, res) => {
     try {
       const status = String(req.query.status || "").trim().toLowerCase();
+      const search = String(req.query.search || "").trim();
+      const serviceType = String(req.query.serviceType || "").trim().toLowerCase();
 
       let query = supabase
         .from("service_requests")
@@ -2881,10 +2865,26 @@ router.get(
           rejected_by
         `)
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(150);
 
       if (status) {
         query = query.eq("status", status);
+      }
+
+      if (serviceType && serviceType !== "all") {
+        query = query.eq("service_type", serviceType);
+      }
+
+      if (search) {
+        query = query.or(
+          [
+            `provider.ilike.%${search}%`,
+            `customer_reference.ilike.%${search}%`,
+            `transaction_reference.ilike.%${search}%`,
+            `user_id.eq.${search}`,
+            `wallet_id.eq.${search}`,
+          ].join(",")
+        );
       }
 
       const { data, error } = await query;
