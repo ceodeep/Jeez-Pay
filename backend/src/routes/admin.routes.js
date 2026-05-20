@@ -2921,12 +2921,27 @@ router.patch(
   async (req, res) => {
     try {
       const adminId = req.user.userId;
+      const adminInfo = req.adminUser;
       const requestId = req.params.id;
       const adminNote = String(req.body.adminNote || "").trim() || null;
 
       const { data: existing, error: lookupErr } = await supabase
         .from("service_requests")
-        .select("id, status")
+        .select(`
+          id,
+          user_id,
+          wallet_id,
+          service_type,
+          provider,
+          customer_reference,
+          currency,
+          amount,
+          status,
+          note,
+          admin_note,
+          transaction_reference,
+          created_at
+        `)
         .eq("id", requestId)
         .maybeSingle();
 
@@ -2956,15 +2971,20 @@ router.patch(
         .eq("id", requestId)
         .select(`
           id,
+          user_id,
+          wallet_id,
           service_type,
           provider,
           customer_reference,
           currency,
           amount,
           status,
+          note,
           admin_note,
           transaction_reference,
-          completed_at
+          created_at,
+          completed_at,
+          completed_by
         `)
         .single();
 
@@ -2974,6 +2994,32 @@ router.patch(
           message: "Failed to complete request",
         });
       }
+
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "SERVICE_REQUEST_COMPLETED",
+        targetType: "service_request",
+        targetId: existing.id,
+        targetDisplay: `${existing.service_type || "service"} • ${existing.amount} ${existing.currency}`,
+        oldValue: {
+          status: existing.status,
+          admin_note: existing.admin_note,
+        },
+        newValue: {
+          status: "completed",
+          admin_note: adminNote,
+          service_type: existing.service_type,
+          provider: existing.provider,
+          customer_reference: existing.customer_reference,
+          amount: Number(existing.amount || 0),
+          currency: existing.currency,
+          user_id: existing.user_id,
+          wallet_id: existing.wallet_id,
+          transaction_reference: existing.transaction_reference,
+        },
+        req,
+      });
 
       return res.json({
         message: "Service request completed",
@@ -3001,6 +3047,7 @@ router.patch(
   async (req, res) => {
     try {
       const adminId = req.user.userId;
+      const adminInfo = req.adminUser;
       const requestId = req.params.id;
       const adminNote =
         String(req.body.adminNote || "").trim() || "Request rejected";
@@ -3011,10 +3058,16 @@ router.patch(
           id,
           user_id,
           wallet_id,
+          service_type,
+          provider,
+          customer_reference,
           currency,
           amount,
           status,
-          transaction_reference
+          note,
+          admin_note,
+          transaction_reference,
+          created_at
         `)
         .eq("id", requestId)
         .maybeSingle();
@@ -3045,8 +3098,9 @@ router.patch(
         return res.status(500).json({ message: "Wallet lookup failed" });
       }
 
+      const oldBalance = Number(wallet.balance || 0);
       const refundAmount = Number(existing.amount || 0);
-      const newBalance = Number(wallet.balance || 0) + refundAmount;
+      const newBalance = oldBalance + refundAmount;
 
       const { error: refundErr } = await supabase
         .from("wallets")
@@ -3060,13 +3114,17 @@ router.patch(
 
       const refundReference = `REF-${Date.now()}`;
 
-      const { error: txErr } = await supabase.from("transactions").insert({
-        wallet_id: wallet.id,
-        type: "credit",
-        amount: refundAmount,
-        description: "Service request refund",
-        reference: refundReference,
-      });
+      const { data: refundTx, error: txErr } = await supabase
+        .from("transactions")
+        .insert({
+          wallet_id: wallet.id,
+          type: "credit",
+          amount: refundAmount,
+          description: "Service request refund",
+          reference: refundReference,
+        })
+        .select()
+        .single();
 
       if (txErr) {
         console.error("[reject service request] refund transaction error:", txErr);
@@ -3083,15 +3141,20 @@ router.patch(
         .eq("id", requestId)
         .select(`
           id,
+          user_id,
+          wallet_id,
           service_type,
           provider,
           customer_reference,
           currency,
           amount,
           status,
+          note,
           admin_note,
           transaction_reference,
-          rejected_at
+          created_at,
+          rejected_at,
+          rejected_by
         `)
         .single();
 
@@ -3101,6 +3164,37 @@ router.patch(
           message: "Request rejected but status update failed",
         });
       }
+
+      await logAdminAction({
+        adminId,
+        adminPhone: adminInfo?.phone || null,
+        action: "SERVICE_REQUEST_REJECTED_REFUNDED",
+        targetType: "service_request",
+        targetId: existing.id,
+        targetDisplay: `${existing.service_type || "service"} • ${existing.amount} ${existing.currency}`,
+        oldValue: {
+          status: existing.status,
+          walletBalance: oldBalance,
+          admin_note: existing.admin_note,
+        },
+        newValue: {
+          status: "rejected",
+          admin_note: adminNote,
+          refundAmount,
+          refundReference,
+          refundTransactionId: refundTx?.id || null,
+          walletBalance: newBalance,
+          service_type: existing.service_type,
+          provider: existing.provider,
+          customer_reference: existing.customer_reference,
+          amount: Number(existing.amount || 0),
+          currency: existing.currency,
+          user_id: existing.user_id,
+          wallet_id: existing.wallet_id,
+          transaction_reference: existing.transaction_reference,
+        },
+        req,
+      });
 
       return res.json({
         message: "Service request rejected and refunded",

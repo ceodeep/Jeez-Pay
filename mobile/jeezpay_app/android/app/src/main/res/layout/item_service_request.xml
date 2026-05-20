@@ -3,16 +3,18 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
+    android:layout_marginBottom="12dp"
     android:backgroundTint="@color/card_white"
-    app:cardCornerRadius="18dp"
-    app:cardElevation="2dp">
+    app:cardCornerRadius="20dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#E1E8F2"
+    app:strokeWidth="1dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="18dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -25,22 +27,22 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Starlink"
+                android:text="Starlink Subscription"
                 android:textColor="@color/text_primary"
-                android:textSize="17sp"
+                android:textSize="18sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:background="@drawable/currency_pill_bg"
-                android:paddingStart="10dp"
-                android:paddingTop="5dp"
-                android:paddingEnd="10dp"
-                android:paddingBottom="5dp"
+                android:background="@drawable/bg_status_pending"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
                 android:text="Pending"
-                android:textColor="@color/paypal_blue"
+                android:textColor="#B26A00"
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -49,11 +51,20 @@
             android:id="@+id/tvServiceAmount"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="1.00 USDT"
+            android:layout_marginTop="12dp"
+            android:text="100 SSP"
             android:textColor="@color/text_primary"
-            android:textSize="15sp"
+            android:textSize="17sp"
             android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvServiceProvider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Provider: Starlink"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/tvServiceReference"
@@ -62,15 +73,25 @@
             android:layout_marginTop="6dp"
             android:text="Customer: -"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvAdminNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="Note: -"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/tvTransactionReference"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="8dp"
             android:text="Reference: -"
-            android:textColor="@color/text_secondary"
+            android:textColor="#94A3B8"
             android:textSize="12sp" />
 
         <TextView
@@ -79,7 +100,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="5dp"
             android:text="-"
-            android:textColor="@color/text_secondary"
+            android:textColor="#94A3B8"
             android:textSize="12sp" />
 
     </LinearLayout>
