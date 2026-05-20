@@ -102,6 +102,8 @@ function AppShell({ onLogout }) {
   const [serviceRequests, setServiceRequests] = useState([]);
 const [serviceRequestsLoading, setServiceRequestsLoading] = useState(false);
 const [serviceStatusFilter, setServiceStatusFilter] = useState("all");
+const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
+const [serviceSearch, setServiceSearch] = useState("");
 const [serviceActionLoadingId, setServiceActionLoadingId] = useState("");
 
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
@@ -144,6 +146,7 @@ const [referralRewardForm, setReferralRewardForm] = useState({
   const [stats, setStats] = useState({
     totalUsers: 0,
     pendingKyc: 0,
+    pendingServiceRequests: 0,
     suspendedUsers: 0,
     totalTransactionsToday: 0,
     totalVolumeToday: 0,
@@ -289,6 +292,7 @@ async function loadReferralRewardHistory() {
         res.data.stats || {
           totalUsers: 0,
           pendingKyc: 0,
+          pendingServiceRequests: 0,
           suspendedUsers: 0,
           totalTransactionsToday: 0,
           totalVolumeToday: 0,
@@ -507,9 +511,23 @@ async function loadReferralRewardHistory() {
   setMessage("");
 
   try {
+    const params = [];
+
+    if (serviceStatusFilter !== "all") {
+      params.push(`status=${encodeURIComponent(serviceStatusFilter)}`);
+    }
+
+    if (serviceTypeFilter !== "all") {
+      params.push(`serviceType=${encodeURIComponent(serviceTypeFilter)}`);
+    }
+
+    if (serviceSearch.trim()) {
+      params.push(`search=${encodeURIComponent(serviceSearch.trim())}`);
+    }
+
     const url =
-      serviceStatusFilter !== "all"
-        ? `/admin/service-requests?status=${encodeURIComponent(serviceStatusFilter)}`
+      params.length > 0
+        ? `/admin/service-requests?${params.join("&")}`
         : "/admin/service-requests";
 
     const res = await api.get(url);
@@ -976,7 +994,7 @@ async function rejectServiceRequest(requestId) {
   loadReferralRewardSettings();
   loadReferralRewardHistory();
 }
-  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter, withdrawStatusFilter, serviceStatusFilter, auditActionFilter]);
+  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter, withdrawStatusFilter, serviceStatusFilter, serviceTypeFilter, serviceSearch, auditActionFilter]);
   const kycCounts = {
     all: kycs.length,
     pending: kycs.filter((k) => k.status === "pending").length,
@@ -1043,6 +1061,13 @@ async function rejectServiceRequest(requestId) {
     setWithdrawStatusFilter("all");
     loadWithdrawals();
   }
+
+  function clearServiceSearch() {
+  setServiceSearch("");
+  setServiceStatusFilter("all");
+  setServiceTypeFilter("all");
+  loadServiceRequests();
+}
 
     function handlePageChange(nextPage) {
     if (!canAccessPage(nextPage)) {
@@ -1188,20 +1213,24 @@ async function rejectServiceRequest(requestId) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
                 gap: 16,
               }}
             >
               <Card title="Total Users" value={String(stats.totalUsers)} />
-              <Card title="Pending KYC" value={String(stats.pendingKyc)} />
-              <Card
-                title="Suspended Users"
-                value={String(stats.suspendedUsers)}
-              />
-              <Card
-                title="Transactions Today"
-                value={String(stats.totalTransactionsToday)}
-              />
+<Card title="Pending KYC" value={String(stats.pendingKyc)} />
+<Card
+  title="Pending Services"
+  value={String(stats.pendingServiceRequests || 0)}
+/>
+<Card
+  title="Suspended Users"
+  value={String(stats.suspendedUsers)}
+/>
+<Card
+  title="Transactions Today"
+  value={String(stats.totalTransactionsToday)}
+/>
             </div>
           )}
 
@@ -2353,50 +2382,101 @@ async function rejectServiceRequest(requestId) {
           {page === "serviceRequests" && (
   <div>
     <div
+  style={{
+    display: "flex",
+    gap: 10,
+    marginBottom: 16,
+    flexWrap: "wrap",
+    alignItems: "center",
+  }}
+>
+  <input
+    placeholder="Search provider / customer / reference / user ID"
+    value={serviceSearch}
+    onChange={(e) => setServiceSearch(e.target.value)}
+    onKeyDown={(e) => {
+      if (e.key === "Enter") loadServiceRequests();
+    }}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid #cbd5e1",
+      background: "#fff",
+      fontSize: 14,
+      minWidth: 320,
+    }}
+  />
+
+  <button
+    onClick={loadServiceRequests}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 10,
+      border: "none",
+      background: "#0f172a",
+      color: "#fff",
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    Search
+  </button>
+
+  <button
+    onClick={clearServiceSearch}
+    style={{
+      padding: "10px 14px",
+      borderRadius: 10,
+      border: "1px solid #cbd5e1",
+      background: "#fff",
+      color: "#0f172a",
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    Clear
+  </button>
+
+  {["all", "pending", "completed", "rejected"].map((status) => (
+    <button
+      key={status}
+      onClick={() => setServiceStatusFilter(status)}
       style={{
-        display: "flex",
-        gap: 10,
-        marginBottom: 16,
-        flexWrap: "wrap",
-        alignItems: "center",
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: "none",
+        cursor: "pointer",
+        background:
+          serviceStatusFilter === status ? "#0f172a" : "#e2e8f0",
+        color: serviceStatusFilter === status ? "#fff" : "#0f172a",
+        fontWeight: 600,
+        textTransform: "capitalize",
       }}
     >
-      <button
-        onClick={loadServiceRequests}
-        style={{
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: "none",
-          background: "#0f172a",
-          color: "#fff",
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        Refresh
-      </button>
+      {status}
+    </button>
+  ))}
 
-      {["all", "pending", "completed", "rejected"].map((status) => (
-        <button
-          key={status}
-          onClick={() => setServiceStatusFilter(status)}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "none",
-            cursor: "pointer",
-            background:
-              serviceStatusFilter === status ? "#0f172a" : "#e2e8f0",
-            color: serviceStatusFilter === status ? "#fff" : "#0f172a",
-            fontWeight: 600,
-            textTransform: "capitalize",
-          }}
-        >
-          {status}
-        </button>
-      ))}
-    </div>
-
+  <select
+    value={serviceTypeFilter}
+    onChange={(e) => setServiceTypeFilter(e.target.value)}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid #cbd5e1",
+      background: "#fff",
+      fontSize: 14,
+      fontWeight: 600,
+    }}
+  >
+    <option value="all">All services</option>
+    <option value="starlink">Starlink</option>
+    <option value="telecom">Telecom</option>
+    <option value="electricity">Electricity</option>
+    <option value="internet">Internet</option>
+    <option value="other">Other</option>
+  </select>
+</div>
     {serviceRequestsLoading ? (
       <p>Loading...</p>
     ) : serviceRequests.length === 0 ? (
