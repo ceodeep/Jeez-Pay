@@ -1436,35 +1436,47 @@ router.get(
       todayStart.setHours(0, 0, 0, 0);
 
       const [
-        usersRes,
-        pendingKycRes,
-        txRes,
-        suspendedRes,
-        agentsRes,
-        merchantsRes,
-      ] = await Promise.all([
-        supabase.from("users").select("id", { count: "exact", head: true }),
-        supabase
-          .from("kyc_profiles")
-          .select("user_id", { count: "exact", head: true })
-          .eq("status", "pending"),
-        supabase
-          .from("transactions")
-          .select("amount, created_at")
-          .gte("created_at", todayStart.toISOString()),
-        supabase
-          .from("users")
-          .select("id", { count: "exact", head: true })
-          .eq("is_active", false),
-        supabase
-          .from("users")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "agent"),
-        supabase
-          .from("users")
-          .select("id", { count: "exact", head: true })
-          .eq("role", "merchant"),
-      ]);
+  usersRes,
+  pendingKycRes,
+  txRes,
+  suspendedRes,
+  agentsRes,
+  merchantsRes,
+  pendingServiceRequestsRes,
+] = await Promise.all([
+  supabase.from("users").select("id", { count: "exact", head: true }),
+
+  supabase
+    .from("kyc_profiles")
+    .select("user_id", { count: "exact", head: true })
+    .eq("status", "pending"),
+
+  supabase
+    .from("transactions")
+    .select("amount, created_at")
+    .gte("created_at", todayStart.toISOString()),
+
+  supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("is_active", false),
+
+  supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "agent"),
+
+  supabase
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "merchant"),
+
+  supabase
+    .from("service_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "pending"),
+]);
+
 
       if (usersRes.error) {
         console.error("dashboard stats users error:", usersRes.error);
