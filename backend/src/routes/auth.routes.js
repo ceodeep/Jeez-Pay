@@ -149,40 +149,69 @@ async function createAndSendOtp(email, purpose) {
   await sendEmailOTP(email, code);
 }
 
-async function verifyOtpCode(phone, purpose, code) {
-  const { data, error } = await supabase
+async function verifyOtpCode(email, purpose, code) {
+  const normalizedCode = String(code || "").trim();
+
+  if (!normalizedCode) {
+    return {
+      ok: false,
+      status: 400,
+      message: "OTP is required",
+    };
+  }
+
+  const { data: otpRow, error } = await supabase
     .from("otp_codes")
     .select("*")
-    .eq("phone", phone)
+    .eq("email", email)
     .eq("purpose", purpose)
-    .eq("code", code)
-    .order("created_at", { ascending: false })
-    .limit(1)
     .maybeSingle();
 
   if (error) {
-    throw error;
+    console.error("verifyOtpCode lookup error:", error);
+
+    return {
+      ok: false,
+      status: 500,
+      message: "OTP lookup failed",
+    };
   }
 
-  if (!data) {
-    return { ok: false, status: 401, message: "Invalid OTP" };
+  if (!otpRow) {
+    return {
+      ok: false,
+      status: 401,
+      message: "Invalid OTP",
+    };
   }
 
-  if (new Date(data.expires_at) < new Date()) {
-    await supabase.from("otp_codes").delete().eq("id", data.id);
-    return { ok: false, status: 400, message: "OTP expired" };
+  const now = Date.now();
+  const expires = new Date(otpRow.expires_at).getTime();
+
+  if (now > expires) {
+    return {
+      ok: false,
+      status: 401,
+      message: "OTP expired",
+    };
   }
 
-  const { error: deleteErr } = await supabase
+  if (String(otpRow.code).trim() !== normalizedCode) {
+    return {
+      ok: false,
+      status: 401,
+      message: "Invalid OTP",
+    };
+  }
+
+  await supabase
     .from("otp_codes")
     .delete()
-    .eq("id", data.id);
+    .eq("id", otpRow.id);
 
-  if (deleteErr) {
-    throw deleteErr;
-  }
-
-  return { ok: true };
+  return {
+    ok: true,
+  };
 }
 
 async function processReferralReward({ refereeUserId, triggerEvent }) {
