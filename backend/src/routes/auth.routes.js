@@ -91,33 +91,57 @@ async function seedWalletsForUser(userId) {
   }
 }
 
-async function createAndSendOtp(phone, purpose) {
-  const code = USE_MOCK_OTP ? MOCK_OTP : generateOTP();
+async function createAndSendOtp(email, purpose) {
+  const normalizedEmail = normalizeEmail(email);
+  const code = USE_MOCK_EMAIL_OTP ? MOCK_EMAIL_OTP : generateOTP();
+
   const expiresAt = new Date(
     Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
   ).toISOString();
 
-  await supabase
-    .from("otp_codes")
-    .delete()
-    .eq("phone", phone)
-    .eq("purpose", purpose);
-
-  await supabase.from("otp_codes").insert({
-    phone,
+  console.log("[createAndSendOtp] creating:", {
+    email: normalizedEmail,
     purpose,
     code,
-    expires_at: expiresAt,
+    expiresAt,
   });
 
-  if (USE_MOCK_OTP) {
-    console.log("🧪 MOCK OTP MODE ENABLED");
-    console.log(`📲 Mock OTP for ${phone} (${purpose}): ${code}`);
-    console.log("📵 WhatsApp skipped (mock mode)");
+  const { error: deleteErr } = await supabase
+    .from("otp_codes")
+    .delete()
+    .eq("email", normalizedEmail)
+    .eq("purpose", purpose);
+
+  if (deleteErr) {
+    console.error("[createAndSendOtp] delete error:", deleteErr);
+    throw deleteErr;
+  }
+
+  const { data: insertedOtp, error: insertErr } = await supabase
+    .from("otp_codes")
+    .insert({
+      email: normalizedEmail,
+      purpose,
+      code,
+      expires_at: expiresAt,
+    })
+    .select("id, email, phone, purpose, code, expires_at")
+    .single();
+
+  if (insertErr) {
+    console.error("[createAndSendOtp] insert error:", insertErr);
+    throw insertErr;
+  }
+
+  console.log("[createAndSendOtp] inserted:", insertedOtp);
+
+  if (USE_MOCK_EMAIL_OTP) {
+    console.log("🧪 MOCK EMAIL OTP MODE ENABLED");
+    console.log(`📧 Mock OTP for ${normalizedEmail} (${purpose}): ${code}`);
     return;
   }
 
-  await sendWhatsAppOTP(phone, code);
+  await sendEmailOTP(normalizedEmail, code);
 }
 
 async function createAndSendOtp(email, purpose) {
