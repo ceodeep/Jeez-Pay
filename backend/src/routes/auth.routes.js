@@ -150,68 +150,49 @@ async function createAndSendOtp(email, purpose) {
 }
 
 async function verifyOtpCode(email, purpose, code) {
+  const normalizedEmail = normalizeEmail(email);
   const normalizedCode = String(code || "").trim();
 
-  if (!normalizedCode) {
-    return {
-      ok: false,
-      status: 400,
-      message: "OTP is required",
-    };
-  }
+  console.log("[verifyOtpCode] input:", {
+    email: normalizedEmail,
+    purpose,
+    code: normalizedCode,
+  });
 
-  const { data: otpRow, error } = await supabase
+  const { data: rows, error } = await supabase
     .from("otp_codes")
-    .select("*")
-    .eq("email", email)
+    .select("id, email, phone, purpose, code, expires_at")
     .eq("purpose", purpose)
-    .maybeSingle();
+    .order("created_at", { ascending: false })
+    .limit(10);
 
   if (error) {
-    console.error("verifyOtpCode lookup error:", error);
-
-    return {
-      ok: false,
-      status: 500,
-      message: "OTP lookup failed",
-    };
+    console.error("[verifyOtpCode] lookup error:", error);
+    return { ok: false, status: 500, message: "OTP lookup failed" };
   }
+
+  console.log("[verifyOtpCode] latest otp rows:", rows);
+
+  const otpRow = (rows || []).find((row) => {
+    return (
+      normalizeEmail(row.email) === normalizedEmail &&
+      String(row.code || "").trim() === normalizedCode
+    );
+  });
 
   if (!otpRow) {
-    return {
-      ok: false,
-      status: 401,
-      message: "Invalid OTP",
-    };
+    return { ok: false, status: 401, message: "Invalid OTP" };
   }
 
-  const now = Date.now();
   const expires = new Date(otpRow.expires_at).getTime();
 
-  if (now > expires) {
-    return {
-      ok: false,
-      status: 401,
-      message: "OTP expired",
-    };
+  if (Date.now() > expires) {
+    return { ok: false, status: 401, message: "OTP expired" };
   }
 
-  if (String(otpRow.code).trim() !== normalizedCode) {
-    return {
-      ok: false,
-      status: 401,
-      message: "Invalid OTP",
-    };
-  }
+  await supabase.from("otp_codes").delete().eq("id", otpRow.id);
 
-  await supabase
-    .from("otp_codes")
-    .delete()
-    .eq("id", otpRow.id);
-
-  return {
-    ok: true,
-  };
+  return { ok: true };
 }
 
 async function processReferralReward({ refereeUserId, triggerEvent }) {
