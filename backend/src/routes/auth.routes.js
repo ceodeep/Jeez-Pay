@@ -6,11 +6,10 @@ const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
 const { generateOTP } = require("../utils/otp");
-const {
-  sendWhatsAppOTP,
-  USE_MOCK_OTP,
-  MOCK_OTP,
-} = require("../services/whatsapp.service");
+const { sendEmailOTP } = require("../services/email.service");
+
+const USE_MOCK_EMAIL_OTP = true;
+const MOCK_EMAIL_OTP = "123456";
 const bcrypt = require("bcrypt");
 
 // You can keep your currencies here
@@ -28,6 +27,9 @@ function normalizePhone(raw) {
   }
 
   return "+" + digits;
+}
+function normalizeEmail(raw) {
+  return String(raw || "").trim().toLowerCase();
 }
 
 function mapAccountTypeToRole(accountType) {
@@ -116,6 +118,35 @@ async function createAndSendOtp(phone, purpose) {
   }
 
   await sendWhatsAppOTP(phone, code);
+}
+
+async function createAndSendOtp(email, purpose) {
+  const code = USE_MOCK_EMAIL_OTP ? MOCK_EMAIL_OTP : generateOTP();
+
+  const expiresAt = new Date(
+    Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
+  ).toISOString();
+
+  await supabase
+    .from("otp_codes")
+    .delete()
+    .eq("email", email)
+    .eq("purpose", purpose);
+
+  await supabase.from("otp_codes").insert({
+    email,
+    purpose,
+    code,
+    expires_at: expiresAt,
+  });
+
+  if (USE_MOCK_EMAIL_OTP) {
+    console.log("🧪 MOCK EMAIL OTP MODE ENABLED");
+    console.log(`📧 Mock OTP for ${email} (${purpose}): ${code}`);
+    return;
+  }
+
+  await sendEmailOTP(email, code);
 }
 
 async function verifyOtpCode(phone, purpose, code) {
@@ -389,10 +420,12 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
 
 // =====================================
 // SIGNUP OTP REQUEST
+// Email OTP verification, phone is still saved as contact/account number
 // =====================================
 router.post("/signup/request-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
+    const email = normalizeEmail(req.body.email);
     const fullName = String(req.body.fullName || "").trim();
     const password = String(req.body.password || "");
     const accountType = String(req.body.accountType || "").trim();
@@ -400,10 +433,32 @@ router.post("/signup/request-otp", async (req, res) => {
     const termsAccepted = !!req.body.termsAccepted;
     const referralCode = normalizeReferralCode(req.body.referralCode);
 
-    if (!phone || !fullName || !password || !accountType || !countryCode) {
-      return res.status(400).json({
-        message: "phone, fullName, password, accountType and countryCode are required",
-      });
+    if (!fullName) {
+      return res.status(400).json({ message: "Full name is required" });
+    }
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    if (!phone) {
+      return res.status(400).json({ message: "Phone is required" });
+    }
+
+    if (!password) {
+      return res.status(400).json({ message: "Password is required" });
+    }
+
+    if (!accountType) {
+      return res.status(400).json({ message: "Account type is required" });
+    }
+
+    if (!countryCode) {
+      return res.status(400).json({ message: "Country code is required" });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Enter a valid email address" });
     }
 
     if (password.length < 8) {
@@ -418,27 +473,44 @@ router.post("/signup/request-otp", async (req, res) => {
       });
     }
 
-    const { data: existingUser, error: fetchErr } = await supabase
+    const { data: existingByEmail, error: emailLookupErr } = await supabase
       .from("users")
-      .select("id, phone_verified")
-      .eq("phone", phone)
+      .select("id, email, email_verified")
+      .eq("email", email)
       .maybeSingle();
 
-    if (fetchErr) {
-      console.error("signup/request-otp user lookup error:", fetchErr);
+    if (emailLookupErr) {
+      console.error("signup/request-otp email lookup error:", emailLookupErr);
       return res.status(500).json({ message: "User lookup failed" });
     }
 
-    if (existingUser && existingUser.phone_verified) {
+    if (existingByEmail && existingByEmail.email_verified) {
       return res.status(409).json({
-        message: "Account already exists. Please login.",
+        message: "Account already exists with this email. Please login.",
+      });
+    }
+
+    const { data: existingByPhone, error: phoneLookupErr } = await supabase
+      .from("users")
+      .select("id, phone, email_verified")
+      .eq("phone", phone)
+      .maybeSingle();
+
+    if (phoneLookupErr) {
+      console.error("signup/request-otp phone lookup error:", phoneLookupErr);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (existingByPhone && existingByPhone.email_verified) {
+      return res.status(409).json({
+        message: "Account already exists with this phone. Please login.",
       });
     }
 
     if (referralCode) {
       const { data: referrer, error: referrerErr } = await supabase
         .from("users")
-        .select("id, phone, referral_code")
+        .select("id, phone, email, referral_code")
         .eq("referral_code", referralCode)
         .maybeSingle();
 
@@ -451,19 +523,21 @@ router.post("/signup/request-otp", async (req, res) => {
         return res.status(400).json({ message: "Invalid referral code" });
       }
 
-      if (referrer.phone === phone) {
-        return res.status(400).json({ message: "You cannot use your own referral code" });
+      if (referrer.phone === phone || referrer.email === email) {
+        return res.status(400).json({
+          message: "You cannot use your own referral code",
+        });
       }
     }
 
-    await createAndSendOtp(phone, "signup");
+    await createAndSendOtp(email, "signup");
 
     return res.json({
-      message: "OTP sent",
+      message: "Verification code sent to your email",
     });
   } catch (err) {
     console.error("signup/request-otp crash:", err);
-    return res.status(500).json({ message: "Failed to send OTP" });
+    return res.status(500).json({ message: "Failed to send verification code" });
   }
 });
 
@@ -474,6 +548,7 @@ router.post("/signup/verify-otp", async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
     const fullName = String(req.body.fullName || "").trim();
+    const email = normalizeEmail(req.body.email);
     const otp = String(req.body.otp || "").trim();
     const password = String(req.body.password || "");
     const accountType = String(req.body.accountType || "").trim();
@@ -486,6 +561,10 @@ router.post("/signup/verify-otp", async (req, res) => {
         message: "phone, fullName, otp, password, accountType and countryCode are required",
       });
     }
+
+    if (!email) {
+  return res.status(400).json({ message: "Email is required" });
+}
 
     if (!termsAccepted) {
       return res.status(400).json({
@@ -1208,7 +1287,7 @@ router.post("/forgot-password/request-otp", async (req, res) => {
     await createAndSendOtp(phone, "forgot_password");
 
     return res.json({
-      message: "OTP sent",
+      message: "Verification code sent to your email",
     });
   } catch (err) {
     console.error("forgot-password/request-otp crash:", err);

@@ -689,7 +689,7 @@
                 <ImageView
                     android:layout_width="22dp"
                     android:layout_height="22dp"
-                    android:src="@drawable/ic_send"
+                    android:src="@drawable/ic_logout"
                     app:tint="@android:color/holo_red_dark" />
 
                 <TextView

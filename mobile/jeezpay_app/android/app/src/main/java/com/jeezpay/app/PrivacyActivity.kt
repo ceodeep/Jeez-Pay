@@ -1,6 +1,7 @@
 package com.jeezpay.app
 
 import android.os.Bundle
+import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
@@ -12,27 +13,54 @@ class PrivacyActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.tvTitle).text = "Privacy Policy"
         findViewById<TextView>(R.id.tvInfoSubtitle).text =
-            "How JeezPay handles, protects, and uses your personal information."
+            "How JeezPay collects, protects, and uses your information."
 
         findViewById<TextView>(R.id.tvContent).text = """
-Data we collect
+Last updated: May 2026
 
-We collect the information needed to create your account, verify your identity, process transactions, and protect your wallet.
+JeezPay respects your privacy. This Privacy Policy explains what information we collect, how we use it, and how we protect it.
 
-How we use it
+1. Information We Collect
+We may collect your name, phone number, account type, country code, referral code, login details, wallet activity, transaction history, service requests, device information, and KYC information where required.
 
-Your information is used to keep your account secure, prevent fraud, verify KYC, and provide JeezPay services.
+2. KYC and Identity Data
+When identity verification is required, JeezPay may collect documents, images, personal details, and verification status. This information is used for compliance, fraud prevention, and account security.
 
-Data protection
+3. Wallet and Transaction Data
+We collect wallet balances, deposits, transfers, swaps, service payments, transaction references, blockchain deposit records, and related activity needed to operate JeezPay services.
 
-We use secure storage, access control, and encryption practices to protect sensitive account and transaction data.
+4. How We Use Your Information
+Your information is used to create and secure your account, process transactions, verify identity, prevent fraud, provide support, manage service requests, improve the app, and comply with legal or regulatory obligations.
 
-Data sharing
+5. Security
+We use reasonable technical and organizational safeguards, including access controls, secure backend systems, encrypted connections where available, and restricted admin permissions. You are responsible for protecting your password, PIN, OTPs, and device access.
 
-JeezPay does not sell your personal information. We only share information when required for compliance, fraud prevention, or service operation.
-""".trimIndent()
+6. Data Sharing
+JeezPay does not sell your personal information. We may share information with service providers, compliance partners, payment or telecom providers, blockchain infrastructure providers, fraud prevention tools, or authorities when required by law or necessary to provide services.
 
-        findViewById<android.view.View>(R.id.btnBack).setOnClickListener {
+7. Blockchain Transactions
+Blockchain transactions may be publicly visible on the relevant blockchain network. JeezPay cannot remove or alter blockchain records once they are confirmed.
+
+8. Data Retention
+We keep information for as long as needed to provide services, comply with legal obligations, resolve disputes, prevent fraud, and maintain accurate financial records.
+
+9. Account Security
+If you believe your account, password, PIN, or device has been compromised, contact JeezPay support immediately and change your credentials where possible.
+
+10. User Rights
+Depending on applicable laws, you may request correction, review, or deletion of certain personal information. Some records may need to be retained for compliance, security, or financial reporting.
+
+11. Children
+JeezPay is not intended for children or users who are not legally permitted to use financial services in their jurisdiction.
+
+12. Updates to This Policy
+We may update this Privacy Policy from time to time. Continued use of JeezPay means you accept the updated policy.
+
+13. Contact
+For privacy or support questions, contact JeezPay through the official support channels provided in the app.
+        """.trimIndent()
+
+        findViewById<View>(R.id.btnBack).setOnClickListener {
             finish()
         }
     }

@@ -28,6 +28,14 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import android.view.View
+import com.jeezpay.app.network.ApiClient
+import android.graphics.Color
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
+import android.text.style.ForegroundColorSpan
+
 
 class AuthActivity : BaseFintechActivity() {
 
@@ -36,7 +44,9 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private lateinit var session: SessionManager
-    private val repo = AuthRepository()
+    private val repo: AuthRepository by lazy {
+        AuthRepository()
+    }
 
     private lateinit var flipper: ViewFlipper
 
@@ -62,6 +72,7 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var otpBox6: TextView
     private lateinit var otpBoxesRow: LinearLayout
     private lateinit var btnVerify: MaterialButton
+    private lateinit var etSignupEmail: EditText
 
     // PIN set
     private lateinit var btnBackPin: TextView
@@ -114,6 +125,7 @@ class AuthActivity : BaseFintechActivity() {
 
     private data class PendingSignup(
         val fullName: String,
+        val email: String,
         val phone: String,
         val password: String,
         val accountType: String,
@@ -143,6 +155,7 @@ class AuthActivity : BaseFintechActivity() {
         initBlockingLoader()
 
         session = SessionManager(this)
+        ApiClient.init(session)
 
         bindViews()
         setupCountryCodeDropdown()
@@ -156,10 +169,66 @@ class AuthActivity : BaseFintechActivity() {
         setupCreateAccountScreen()
         setupAccountCreatedScreen()
 
+
         flipper.inAnimation =
             android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_in)
         flipper.outAnimation =
             android.view.animation.AnimationUtils.loadAnimation(this, android.R.anim.fade_out)
+        val tvTermsText = findViewById<TextView>(R.id.tvTermsText)
+
+        val spannable = SpannableString(
+            "I agree to the Terms & Conditions and Privacy Policy"
+        )
+
+        val termsStart = spannable.indexOf("Terms")
+        val termsEnd = termsStart + "Terms & Conditions".length
+
+        val privacyStart = spannable.indexOf("Privacy")
+        val privacyEnd = privacyStart + "Privacy Policy".length
+
+        val termsClickable = object : ClickableSpan() {
+            override fun onClick(widget: View) {
+                startActivity(Intent(this@AuthActivity, TermsActivity::class.java))
+            }
+        }
+
+        val privacyClickable = object : ClickableSpan() {
+            override fun onClick(widget: View) {
+                startActivity(Intent(this@AuthActivity, PrivacyActivity::class.java))
+            }
+        }
+
+        spannable.setSpan(
+            termsClickable,
+            termsStart,
+            termsEnd,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        spannable.setSpan(
+            privacyClickable,
+            privacyStart,
+            privacyEnd,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        spannable.setSpan(
+            ForegroundColorSpan(getColor(R.color.paypal_blue)),
+            termsStart,
+            termsEnd,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        spannable.setSpan(
+            ForegroundColorSpan(getColor(R.color.paypal_blue)),
+            privacyStart,
+            privacyEnd,
+            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+
+        tvTermsText.text = spannable
+        tvTermsText.movementMethod = LinkMovementMethod.getInstance()
+        tvTermsText.highlightColor = Color.TRANSPARENT
     }
 
     private fun bindViews() {
@@ -186,6 +255,7 @@ class AuthActivity : BaseFintechActivity() {
         etOtp = findViewById(R.id.etOtp)
         btnVerify = findViewById(R.id.btnVerify)
         btnBiometricUnlock = findViewById(R.id.btnBiometricUnlock)
+        etSignupEmail = findViewById(R.id.etSignupEmail)
 
         btnBackPin = findViewById(R.id.btnBackPin)
         etPin = findViewById(R.id.etPin)
@@ -1055,6 +1125,7 @@ class AuthActivity : BaseFintechActivity() {
 
         btnCreateAccount.setOnClickListener {
             val fullName = etSignupFullName.text.toString().trim()
+            val email = etSignupEmail.text.toString().trim().lowercase()
             val phone = buildSignupFullPhone()
             val password = etSignupPassword.text.toString().trim()
             val confirm = etSignupConfirmPassword.text.toString().trim()
@@ -1067,6 +1138,10 @@ class AuthActivity : BaseFintechActivity() {
                 Toast.makeText(this, "Enter your full name", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                Toast.makeText(this, "Enter a valid email", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
             if (password != confirm) {
                 Toast.makeText(this, "Passwords do not match", Toast.LENGTH_SHORT).show()
@@ -1077,6 +1152,7 @@ class AuthActivity : BaseFintechActivity() {
 
             pendingSignup = PendingSignup(
                 fullName = fullName,
+                email = email,
                 phone = phone,
                 password = password,
                 accountType = accountType,
