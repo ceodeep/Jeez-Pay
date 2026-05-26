@@ -556,15 +556,20 @@ router.post("/signup/verify-otp", async (req, res) => {
     const termsAccepted = !!req.body.termsAccepted;
     const referralCode = normalizeReferralCode(req.body.referralCode);
 
-    if (!phone || !fullName || !otp || !password || !accountType || !countryCode) {
+    if (
+      !phone ||
+      !fullName ||
+      !email ||
+      !otp ||
+      !password ||
+      !accountType ||
+      !countryCode
+    ) {
       return res.status(400).json({
-        message: "phone, fullName, otp, password, accountType and countryCode are required",
+        message:
+          "phone, fullName, email, otp, password, accountType and countryCode are required",
       });
     }
-
-    if (!email) {
-  return res.status(400).json({ message: "Email is required" });
-}
 
     if (!termsAccepted) {
       return res.status(400).json({
@@ -578,9 +583,13 @@ router.post("/signup/verify-otp", async (req, res) => {
       });
     }
 
-    const otpCheck = await verifyOtpCode(phone, "signup", otp);
+    // VERIFY OTP USING EMAIL
+    const otpCheck = await verifyOtpCode(email, "signup", otp);
+
     if (!otpCheck.ok) {
-      return res.status(otpCheck.status).json({ message: otpCheck.message });
+      return res.status(otpCheck.status).json({
+        message: otpCheck.message,
+      });
     }
 
     let referrer = null;
@@ -588,71 +597,138 @@ router.post("/signup/verify-otp", async (req, res) => {
     if (referralCode) {
       const { data: referrerData, error: referrerErr } = await supabase
         .from("users")
-        .select("id, phone, referral_code")
+        .select("id, phone, email, referral_code")
         .eq("referral_code", referralCode)
         .maybeSingle();
 
       if (referrerErr) {
-        console.error("signup/verify-otp referral lookup error:", referrerErr);
-        return res.status(500).json({ message: "Referral lookup failed" });
+        console.error(
+          "signup/verify-otp referral lookup error:",
+          referrerErr
+        );
+
+        return res.status(500).json({
+          message: "Referral lookup failed",
+        });
       }
 
       if (!referrerData) {
-        return res.status(400).json({ message: "Invalid referral code" });
+        return res.status(400).json({
+          message: "Invalid referral code",
+        });
       }
 
-      if (referrerData.phone === phone) {
-        return res.status(400).json({ message: "You cannot use your own referral code" });
+      if (
+        referrerData.phone === phone ||
+        referrerData.email === email
+      ) {
+        return res.status(400).json({
+          message: "You cannot use your own referral code",
+        });
       }
 
       referrer = referrerData;
     }
 
-    const { data: existingUser, error: fetchErr } = await supabase
-      .from("users")
-      .select("*")
-      .eq("phone", phone)
-      .maybeSingle();
+    // CHECK EXISTING USER BY EMAIL
+    const { data: existingByEmail, error: emailLookupErr } =
+      await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .maybeSingle();
 
-    if (fetchErr) {
-      console.error("signup/verify-otp user lookup error:", fetchErr);
-      return res.status(500).json({ message: "User lookup failed" });
+    if (emailLookupErr) {
+      console.error(
+        "signup/verify-otp email lookup error:",
+        emailLookupErr
+      );
+
+      return res.status(500).json({
+        message: "User lookup failed",
+      });
     }
 
-    if (existingUser && existingUser.phone_verified) {
+    if (existingByEmail && existingByEmail.email_verified) {
+      return res.status(409).json({
+        message: "Account already exists. Please login.",
+      });
+    }
+
+    // CHECK EXISTING USER BY PHONE
+    const { data: existingByPhone, error: phoneLookupErr } =
+      await supabase
+        .from("users")
+        .select("*")
+        .eq("phone", phone)
+        .maybeSingle();
+
+    if (phoneLookupErr) {
+      console.error(
+        "signup/verify-otp phone lookup error:",
+        phoneLookupErr
+      );
+
+      return res.status(500).json({
+        message: "User lookup failed",
+      });
+    }
+
+    if (existingByPhone && existingByPhone.email_verified) {
       return res.status(409).json({
         message: "Account already exists. Please login.",
       });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+
     const role = mapAccountTypeToRole(accountType);
 
-    let user = existingUser;
+    let user = existingByEmail || existingByPhone;
 
+    // CREATE USER
     if (!user) {
       const { data: newUser, error: createErr } = await supabase
         .from("users")
         .insert([
           {
             phone,
+            email,
             fullName,
             password_hash: passwordHash,
+
+            // TEMPORARY
             phone_verified: true,
+
+            email_verified: true,
+
             account_type: accountType,
             country_code: countryCode,
             terms_accepted: termsAccepted,
             role,
-            referral_code: await generateUniqueReferralCode(fullName, phone),
-            referred_by_user_id: referrer?.id || null,
+
+            referral_code:
+              await generateUniqueReferralCode(
+                fullName,
+                phone
+              ),
+
+            referred_by_user_id:
+              referrer?.id || null,
           },
         ])
         .select()
         .single();
 
       if (createErr) {
-        console.error("signup/verify-otp create error:", createErr);
-        return res.status(500).json({ message: "User creation failed" });
+        console.error(
+          "signup/verify-otp create error:",
+          createErr
+        );
+
+        return res.status(500).json({
+          message: "User creation failed",
+        });
       }
 
       user = newUser;
@@ -660,117 +736,173 @@ router.post("/signup/verify-otp", async (req, res) => {
       try {
         await seedWalletsForUser(user.id);
       } catch (seedErr) {
-        console.error("signup/verify-otp wallet seed error:", seedErr);
-        return res.status(500).json({ message: "Wallet seeding failed" });
+        console.error(
+          "signup/verify-otp wallet seed error:",
+          seedErr
+        );
+
+        return res.status(500).json({
+          message: "Wallet seeding failed",
+        });
       }
     } else {
-      const { data: updatedUser, error: updateErr } = await supabase
-        .from("users")
-        .update({
-          fullName,
-          password_hash: passwordHash,
-          phone_verified: true,
-          account_type: accountType,
-          country_code: countryCode,
-          terms_accepted: termsAccepted,
-          role,
-          referred_by_user_id: user.referred_by_user_id || referrer?.id || null,
-        })
-        .eq("id", user.id)
-        .select()
-        .single();
+      // UPDATE EXISTING USER
+      const { data: updatedUser, error: updateErr } =
+        await supabase
+          .from("users")
+          .update({
+            phone,
+            email,
+            fullName,
+            password_hash: passwordHash,
+
+            phone_verified: true,
+            email_verified: true,
+
+            account_type: accountType,
+            country_code: countryCode,
+            terms_accepted: termsAccepted,
+            role,
+
+            referred_by_user_id:
+              user.referred_by_user_id ||
+              referrer?.id ||
+              null,
+          })
+          .eq("id", user.id)
+          .select()
+          .single();
 
       if (updateErr) {
-        console.error("signup/verify-otp update error:", updateErr);
-        return res.status(500).json({ message: "User update failed" });
+        console.error(
+          "signup/verify-otp update error:",
+          updateErr
+        );
+
+        return res.status(500).json({
+          message: "User update failed",
+        });
       }
 
       user = updatedUser;
 
-      const { data: existingWallets, error: walletsErr } = await supabase
-        .from("wallets")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1);
+      const { data: existingWallets, error: walletsErr } =
+        await supabase
+          .from("wallets")
+          .select("id")
+          .eq("user_id", user.id)
+          .limit(1);
 
       if (walletsErr) {
-        console.error("signup/verify-otp wallet lookup error:", walletsErr);
-        return res.status(500).json({ message: "Wallet lookup failed" });
+        console.error(
+          "signup/verify-otp wallet lookup error:",
+          walletsErr
+        );
+
+        return res.status(500).json({
+          message: "Wallet lookup failed",
+        });
       }
 
       if (!existingWallets || existingWallets.length === 0) {
         try {
           await seedWalletsForUser(user.id);
         } catch (seedErr) {
-          console.error("signup/verify-otp wallet seed error:", seedErr);
-          return res.status(500).json({ message: "Wallet seeding failed" });
+          console.error(
+            "signup/verify-otp wallet seed error:",
+            seedErr
+          );
+
+          return res.status(500).json({
+            message: "Wallet seeding failed",
+          });
         }
       }
     }
 
     let referralReward = null;
 
-try {
-  referralReward = await processReferralReward({
-    refereeUserId: user.id,
-    triggerEvent: "signup_verified",
-  });
-} catch (rewardErr) {
-  console.error("signup referral reward failed:", rewardErr);
-}
+    try {
+      referralReward = await processReferralReward({
+        refereeUserId: user.id,
+        triggerEvent: "signup_verified",
+      });
+    } catch (rewardErr) {
+      console.error(
+        "signup referral reward failed:",
+        rewardErr
+      );
+    }
 
-console.log("SIGNUP REFERRAL REWARD RESULT:", referralReward);
+    console.log(
+      "SIGNUP REFERRAL REWARD RESULT:",
+      referralReward
+    );
 
     const deviceName =
-  req.headers["x-device-name"] ||
-  req.body.deviceName ||
-  "Unknown device";
+      req.headers["x-device-name"] ||
+      req.body.deviceName ||
+      "Unknown device";
 
-const appPlatform =
-  req.headers["x-app-platform"] ||
-  req.body.appPlatform ||
-  "android";
+    const appPlatform =
+      req.headers["x-app-platform"] ||
+      req.body.appPlatform ||
+      "android";
 
-const userAgent = req.headers["user-agent"] || "";
-const ipAddress =
-  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-  req.socket?.remoteAddress ||
-  null;
+    const userAgent =
+      req.headers["user-agent"] || "";
 
-const { data: sessionRow, error: sessionErr } = await supabase
-  .from("user_sessions")
-  .insert({
-    user_id: user.id,
-    device_name: deviceName,
-    device_type: "mobile",
-    app_platform: appPlatform,
-    ip_address: ipAddress,
-    user_agent: userAgent,
-  })
-  .select("id")
-  .single();
+    const ipAddress =
+      req.headers["x-forwarded-for"]
+        ?.split(",")[0]
+        ?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
 
-if (sessionErr || !sessionRow) {
-  console.error("[login] session create error:", sessionErr);
-  return res.status(500).json({ message: "Failed to create session" });
-}
+    const { data: sessionRow, error: sessionErr } =
+      await supabase
+        .from("user_sessions")
+        .insert({
+          user_id: user.id,
+          device_name: deviceName,
+          device_type: "mobile",
+          app_platform: appPlatform,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+        })
+        .select("id")
+        .single();
 
-const token = generateToken({
-  userId: user.id,
-  phone: user.phone,
-  sessionId: sessionRow.id,
-});
+    if (sessionErr || !sessionRow) {
+      console.error(
+        "[signup] session create error:",
+        sessionErr
+      );
+
+      return res.status(500).json({
+        message: "Failed to create session",
+      });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+      sessionId: sessionRow.id,
+    });
 
     return res.json({
       message: "Account created successfully",
       token,
       hasPin: !!user.pin_hash,
       isNewUser: true,
-      referralReward
+      referralReward,
     });
   } catch (err) {
     console.error("signup/verify-otp crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
+
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 });
 

@@ -500,6 +500,7 @@ class AuthActivity : BaseFintechActivity() {
 
                     signupVerifyOtp(
                         fullName = signup.fullName,
+                        email = signup.email,
                         phone = signup.phone,
                         otp = otp,
                         password = signup.password,
@@ -836,6 +837,7 @@ class AuthActivity : BaseFintechActivity() {
 
     private fun signupRequestOtp(
         fullName: String,
+        email: String,
         phone: String,
         password: String,
         accountType: String,
@@ -850,6 +852,7 @@ class AuthActivity : BaseFintechActivity() {
             when (
                 val result = repo.signupRequestOtpSafe(
                     fullName = fullName,
+                    email = email,
                     phone = phone,
                     password = password,
                     accountType = accountType,
@@ -860,9 +863,16 @@ class AuthActivity : BaseFintechActivity() {
             ) {
                 is ApiResult.Success -> {
                     val res = result.data
+
                     withContext(Dispatchers.Main) {
                         setMaterialButtonLoading(btnCreateAccount, false, "Create account")
-                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+
+                        Toast.makeText(
+                            this@AuthActivity,
+                            res.message,
+                            Toast.LENGTH_SHORT
+                        ).show()
+
                         onSuccess()
                     }
                 }
@@ -870,9 +880,11 @@ class AuthActivity : BaseFintechActivity() {
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
                         setMaterialButtonLoading(btnCreateAccount, false, "Create account")
+
                         handleAuthError(result.error) {
                             signupRequestOtp(
                                 fullName,
+                                email,
                                 phone,
                                 password,
                                 accountType,
@@ -890,6 +902,7 @@ class AuthActivity : BaseFintechActivity() {
 
     private fun signupVerifyOtp(
         fullName: String,
+        email: String,
         phone: String,
         otp: String,
         password: String,
@@ -905,6 +918,7 @@ class AuthActivity : BaseFintechActivity() {
             when (
                 val result = repo.signupVerifyOtpSafe(
                     fullName = fullName,
+                    email = email,
                     phone = phone,
                     otp = otp,
                     password = password,
@@ -916,9 +930,16 @@ class AuthActivity : BaseFintechActivity() {
             ) {
                 is ApiResult.Success -> {
                     val res = result.data
+
                     withContext(Dispatchers.Main) {
                         setFullScreenLoading(false)
-                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
+
+                        Toast.makeText(
+                            this@AuthActivity,
+                            res.message,
+                            Toast.LENGTH_SHORT
+                        ).show()
+
                         onSuccess(res.token, res.hasPin)
                     }
                 }
@@ -926,9 +947,11 @@ class AuthActivity : BaseFintechActivity() {
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
                         setFullScreenLoading(false)
+
                         handleAuthError(result.error) {
                             signupVerifyOtp(
                                 fullName,
+                                email,
                                 phone,
                                 otp,
                                 password,
@@ -1163,6 +1186,7 @@ class AuthActivity : BaseFintechActivity() {
 
             signupRequestOtp(
                 fullName = fullName,
+                email = email,
                 phone = phone,
                 password = password,
                 accountType = accountType,
@@ -1171,7 +1195,7 @@ class AuthActivity : BaseFintechActivity() {
                 referralCode = referralCode
             ) {
                 flipper.displayedChild = 1
-                tvOtpHint.text = "Enter the code sent to $phone"
+                tvOtpHint.text = "Enter the verification code sent to $email"
                 etOtp.text?.clear()
             }
         }

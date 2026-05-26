@@ -51,6 +51,7 @@ class AuthRepository {
 
     suspend fun signupRequestOtp(
         fullName: String,
+        email: String,
         phone: String,
         password: String,
         accountType: String,
@@ -61,6 +62,7 @@ class AuthRepository {
         return api.signupRequestOtp(
             SignupRequestOtpRequest(
                 fullName = fullName,
+                email = email,
                 phone = phone,
                 password = password,
                 accountType = accountType,
@@ -73,6 +75,7 @@ class AuthRepository {
 
     suspend fun signupVerifyOtp(
         fullName: String,
+        email: String,
         phone: String,
         otp: String,
         password: String,
@@ -84,6 +87,7 @@ class AuthRepository {
         return api.signupVerifyOtp(
             SignupVerifyOtpRequest(
                 fullName = fullName,
+                email = email,
                 phone = phone,
                 otp = otp,
                 password = password,
@@ -94,6 +98,7 @@ class AuthRepository {
             )
         )
     }
+
 
     suspend fun setPin(pin: String): SetPinResponse {
         return api.setPin(SetPinRequest(pin))
@@ -154,6 +159,7 @@ class AuthRepository {
 
     suspend fun signupRequestOtpSafe(
         fullName: String,
+        email: String,
         phone: String,
         password: String,
         accountType: String,
@@ -165,6 +171,7 @@ class AuthRepository {
             api.signupRequestOtp(
                 SignupRequestOtpRequest(
                     fullName = fullName,
+                    email = email,
                     phone = phone,
                     password = password,
                     accountType = accountType,
@@ -178,6 +185,7 @@ class AuthRepository {
 
     suspend fun signupVerifyOtpSafe(
         fullName: String,
+        email: String,
         phone: String,
         otp: String,
         password: String,
@@ -190,6 +198,7 @@ class AuthRepository {
             api.signupVerifyOtp(
                 SignupVerifyOtpRequest(
                     fullName = fullName,
+                    email = email,
                     phone = phone,
                     otp = otp,
                     password = password,
