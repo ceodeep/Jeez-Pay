@@ -144,34 +144,7 @@ async function createAndSendOtp(email, purpose) {
   await sendEmailOTP(normalizedEmail, code);
 }
 
-async function createAndSendOtp(email, purpose) {
-  const code = USE_MOCK_EMAIL_OTP ? MOCK_EMAIL_OTP : generateOTP();
 
-  const expiresAt = new Date(
-    Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
-  ).toISOString();
-
-  await supabase
-    .from("otp_codes")
-    .delete()
-    .eq("email", email)
-    .eq("purpose", purpose);
-
-  await supabase.from("otp_codes").insert({
-    email,
-    purpose,
-    code,
-    expires_at: expiresAt,
-  });
-
-  if (USE_MOCK_EMAIL_OTP) {
-    console.log("🧪 MOCK EMAIL OTP MODE ENABLED");
-    console.log(`📧 Mock OTP for ${email} (${purpose}): ${code}`);
-    return;
-  }
-
-  await sendEmailOTP(email, code);
-}
 
 async function verifyOtpCode(email, purpose, code) {
   const normalizedEmail = normalizeEmail(email);
