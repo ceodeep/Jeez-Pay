@@ -8,7 +8,7 @@ const authMiddleware = require("../middlewares/auth.middleware");
 const { generateOTP } = require("../utils/otp");
 const { sendEmailOTP } = require("../services/email.service");
 
-const USE_MOCK_EMAIL_OTP = true;
+const USE_MOCK_EMAIL_OTP = false;
 const MOCK_EMAIL_OTP = "123456";
 const bcrypt = require("bcrypt");
 
