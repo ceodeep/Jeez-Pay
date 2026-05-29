@@ -126,8 +126,8 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private var otpFlowMode: OtpFlowMode = OtpFlowMode.SIGNUP
-    private var pendingForgotPasswordPhone: String? = null
-    private var pendingForgotPasswordNewPassword: String? = null
+    private var pendingForgotPasswordIdentifier: String? = null
+
 
     private data class PendingSignup(
         val fullName: String,
@@ -313,45 +313,27 @@ class AuthActivity : BaseFintechActivity() {
 
     private fun setupExtraClicks() {
         tvForgotPassword.setOnClickListener {
-            val fullPhone = buildFullPhone()
+            val rawInput = etPhone.text.toString().trim()
 
-            if (etPhone.text.toString().trim().length < 6) {
-                Toast.makeText(this, "Enter your phone number first", Toast.LENGTH_SHORT).show()
+            val identifier = if (loginModeEmail) {
+                rawInput.lowercase()
+            } else {
+                buildFullPhone()
+            }
+
+            if (rawInput.length < 6) {
+                Toast.makeText(this, "Enter your email or phone first", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            val input = EditText(this).apply {
-                hint = "Enter new password"
-                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            otpFlowMode = OtpFlowMode.FORGOT_PASSWORD
+            pendingForgotPasswordIdentifier = identifier
+
+            forgotPasswordRequestOtp(identifier) {
+                flipper.displayedChild = 1
+                tvOtpHint.text = "Enter the verification code sent to your email"
+                etOtp.text?.clear()
             }
-
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Reset Password")
-                .setView(input)
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Continue") { _, _ ->
-                    val newPassword = input.text.toString().trim()
-
-                    if (newPassword.length < 8) {
-                        Toast.makeText(
-                            this,
-                            "Password must be at least 8 characters",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@setPositiveButton
-                    }
-
-                    otpFlowMode = OtpFlowMode.FORGOT_PASSWORD
-                    pendingForgotPasswordPhone = fullPhone
-                    pendingForgotPasswordNewPassword = newPassword
-
-                    forgotPasswordRequestOtp(fullPhone) {
-                        flipper.displayedChild = 1
-                        tvOtpHint.text = "Enter the code sent to $fullPhone"
-                        etOtp.text?.clear()
-                    }
-                }
-                .show()
         }
 
         createAccountRow.setOnClickListener {
@@ -558,39 +540,21 @@ class AuthActivity : BaseFintechActivity() {
                 }
 
                 OtpFlowMode.FORGOT_PASSWORD -> {
-                    val phone = pendingForgotPasswordPhone
-                    val newPassword = pendingForgotPasswordNewPassword
-
-                    if (phone.isNullOrBlank() || newPassword.isNullOrBlank()) {
-                        Toast.makeText(
-                            this,
-                            "Reset request expired. Please try again.",
-                            Toast.LENGTH_LONG
-                        ).show()
+                    val identifier = pendingForgotPasswordIdentifier ?: run {
+                        Toast.makeText(this, "Reset request expired. Please try again.", Toast.LENGTH_LONG).show()
                         flipper.displayedChild = 0
                         return@setOnClickListener
                     }
 
-                    forgotPasswordVerifyOtp(
-                        phone = phone,
-                        otp = otp,
-                        newPassword = newPassword
-                    ) { token, hasPin ->
-                        session.saveToken(token)
-                        session.savePhone(phone)
-
-                        pendingForgotPasswordPhone = null
-                        pendingForgotPasswordNewPassword = null
-
-                        if (hasPin) {
-                            flipper.displayedChild = 3
-                        } else {
-                            flipper.displayedChild = 2
-                        }
-
-                        etOtp.text?.clear()
-                        renderOtpBoxes("")
+                    val intent = Intent(this, ResetPasswordActivity::class.java).apply {
+                        putExtra("identifier", identifier)
+                        putExtra("otp", otp)
                     }
+
+                    startActivity(intent)
+
+                    etOtp.text?.clear()
+                    renderOtpBoxes("")
                 }
 
                 OtpFlowMode.FORGOT_PIN -> {
@@ -1247,9 +1211,9 @@ class AuthActivity : BaseFintechActivity() {
         }
     }
 
-    private fun forgotPasswordRequestOtp(phone: String, onSuccess: () -> Unit) {
+    private fun forgotPasswordRequestOtp(identifier: String, onSuccess: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            when (val result = repo.forgotPasswordRequestOtpSafe(phone)) {
+            when (val result = repo.forgotPasswordRequestOtpSafe(identifier)) {
                 is ApiResult.Success -> {
                     val res = result.data
                     withContext(Dispatchers.Main) {
@@ -1261,7 +1225,7 @@ class AuthActivity : BaseFintechActivity() {
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
                         handleAuthError(result.error) {
-                            forgotPasswordRequestOtp(phone, onSuccess)
+                            forgotPasswordRequestOtp(identifier, onSuccess)
                         }
                     }
                 }
@@ -1270,13 +1234,13 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun forgotPasswordVerifyOtp(
-        phone: String,
+        identifier: String,
         otp: String,
         newPassword: String,
         onSuccess: (token: String, hasPin: Boolean) -> Unit
     ) {
         CoroutineScope(Dispatchers.IO).launch {
-            when (val result = repo.forgotPasswordVerifyOtpSafe(phone, otp, newPassword)) {
+            when (val result = repo.forgotPasswordVerifyOtpSafe(identifier, otp, newPassword)) {
                 is ApiResult.Success -> {
                     val res = result.data
                     withContext(Dispatchers.Main) {
@@ -1288,7 +1252,7 @@ class AuthActivity : BaseFintechActivity() {
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
                         handleAuthError(result.error) {
-                            forgotPasswordVerifyOtp(phone, otp, newPassword, onSuccess)
+                            forgotPasswordVerifyOtp(identifier, otp, newPassword, onSuccess)
                         }
                     }
                 }

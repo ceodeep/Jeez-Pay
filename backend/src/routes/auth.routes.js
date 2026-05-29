@@ -1450,7 +1450,7 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
 
     if (!rawIdentifier || !otp || !newPassword) {
       return res.status(400).json({
-        message: "Email/phone, OTP and newPassword are required",
+        message: "Email/phone, OTP and new password are required",
       });
     }
 
@@ -1484,7 +1484,8 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
 
     if (!user.email) {
       return res.status(400).json({
-        message: "No email is linked to this account",
+        message:
+          "This account has no email linked. Please reset using phone OTP when available.",
       });
     }
 
@@ -1573,16 +1574,27 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
 // =====================================
 router.post("/forgot-pin/request-otp", async (req, res) => {
   try {
-    const phone = normalizePhone(req.body.phone);
+    const rawIdentifier = String(
+      req.body.identifier || req.body.email || req.body.phone || ""
+    ).trim();
 
-    if (!phone) {
-      return res.status(400).json({ message: "Phone is required" });
+    if (!rawIdentifier) {
+      return res.status(400).json({
+        message: "Email or phone is required",
+      });
     }
+
+    const isEmail = rawIdentifier.includes("@");
+    const identifier = isEmail
+      ? normalizeEmail(rawIdentifier)
+      : normalizePhone(rawIdentifier);
+
+    const lookupColumn = isEmail ? "email" : "phone";
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone")
-      .eq("phone", phone)
+      .select("id, phone, email, email_verified, phone_verified")
+      .eq(lookupColumn, identifier)
       .maybeSingle();
 
     if (error) {
@@ -1594,10 +1606,23 @@ router.post("/forgot-pin/request-otp", async (req, res) => {
       return res.status(404).json({ message: "Account not found" });
     }
 
-    await createAndSendOtp(phone, "forgot_pin");
+    if (!user.email) {
+      return res.status(400).json({
+        message:
+          "This account has no email linked. Please reset PIN using phone OTP when available.",
+      });
+    }
+
+    if (!user.email_verified && !user.phone_verified) {
+      return res.status(403).json({
+        message: "Account is not verified",
+      });
+    }
+
+    await createAndSendOtp(user.email, "forgot_pin");
 
     return res.json({
-      message: "OTP sent",
+      message: "Verification code sent to your email",
     });
   } catch (err) {
     console.error("forgot-pin/request-otp crash:", err);
@@ -1610,24 +1635,29 @@ router.post("/forgot-pin/request-otp", async (req, res) => {
 // =====================================
 router.post("/forgot-pin/verify-otp", async (req, res) => {
   try {
-    const phone = normalizePhone(req.body.phone);
+    const rawIdentifier = String(
+      req.body.identifier || req.body.email || req.body.phone || ""
+    ).trim();
+
     const otp = String(req.body.otp || "").trim();
 
-    if (!phone || !otp) {
+    if (!rawIdentifier || !otp) {
       return res.status(400).json({
-        message: "phone and otp are required",
+        message: "Email/phone and OTP are required",
       });
     }
 
-    const otpCheck = await verifyOtpCode(phone, "forgot_pin", otp);
-    if (!otpCheck.ok) {
-      return res.status(otpCheck.status).json({ message: otpCheck.message });
-    }
+    const isEmail = rawIdentifier.includes("@");
+    const identifier = isEmail
+      ? normalizeEmail(rawIdentifier)
+      : normalizePhone(rawIdentifier);
+
+    const lookupColumn = isEmail ? "email" : "phone";
 
     const { data: user, error: fetchErr } = await supabase
       .from("users")
-      .select("id, phone")
-      .eq("phone", phone)
+      .select("id, phone, email")
+      .eq(lookupColumn, identifier)
       .maybeSingle();
 
     if (fetchErr) {
@@ -1637,6 +1667,21 @@ router.post("/forgot-pin/verify-otp", async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "Account not found" });
+    }
+
+    if (!user.email) {
+      return res.status(400).json({
+        message:
+          "This account has no email linked. Please reset PIN using phone OTP when available.",
+      });
+    }
+
+    const otpCheck = await verifyOtpCode(user.email, "forgot_pin", otp);
+
+    if (!otpCheck.ok) {
+      return res.status(otpCheck.status).json({
+        message: otpCheck.message,
+      });
     }
 
     const { error: updateErr } = await supabase
@@ -1654,44 +1699,46 @@ router.post("/forgot-pin/verify-otp", async (req, res) => {
     }
 
     const deviceName =
-  req.headers["x-device-name"] ||
-  req.body.deviceName ||
-  "Unknown device";
+      req.headers["x-device-name"] ||
+      req.body.deviceName ||
+      "Unknown device";
 
-const appPlatform =
-  req.headers["x-app-platform"] ||
-  req.body.appPlatform ||
-  "android";
+    const appPlatform =
+      req.headers["x-app-platform"] ||
+      req.body.appPlatform ||
+      "android";
 
-const userAgent = req.headers["user-agent"] || "";
-const ipAddress =
-  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-  req.socket?.remoteAddress ||
-  null;
+    const userAgent = req.headers["user-agent"] || "";
 
-const { data: sessionRow, error: sessionErr } = await supabase
-  .from("user_sessions")
-  .insert({
-    user_id: user.id,
-    device_name: deviceName,
-    device_type: "mobile",
-    app_platform: appPlatform,
-    ip_address: ipAddress,
-    user_agent: userAgent,
-  })
-  .select("id")
-  .single();
+    const ipAddress =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
 
-if (sessionErr || !sessionRow) {
-  console.error("[login] session create error:", sessionErr);
-  return res.status(500).json({ message: "Failed to create session" });
-}
+    const { data: sessionRow, error: sessionErr } = await supabase
+      .from("user_sessions")
+      .insert({
+        user_id: user.id,
+        device_name: deviceName,
+        device_type: "mobile",
+        app_platform: appPlatform,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+      })
+      .select("id")
+      .single();
 
-const token = generateToken({
-  userId: user.id,
-  phone: user.phone,
-  sessionId: sessionRow.id,
-});
+    if (sessionErr || !sessionRow) {
+      console.error("[forgot-pin] session create error:", sessionErr);
+      return res.status(500).json({ message: "Failed to create session" });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+      email: user.email,
+      sessionId: sessionRow.id,
+    });
 
     return res.json({
       message: "PIN reset successfully",

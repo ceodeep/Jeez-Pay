@@ -88,6 +88,7 @@
         <activity android:name=".ServiceRequestActivity" />
         <activity android:name=".ServiceRequestsActivity" />
         <activity android:name=".CrashReportActivity" />
+        <activity android:name=".ResetPasswordActivity" android:exported="false" />
 
         <activity
             android:name=".PortraitCaptureActivity"
