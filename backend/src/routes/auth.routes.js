@@ -1381,16 +1381,27 @@ router.get("/me", authMiddleware, async (req, res) => {
 // =====================================
 router.post("/forgot-password/request-otp", async (req, res) => {
   try {
-    const phone = normalizePhone(req.body.phone);
+    const rawIdentifier = String(
+      req.body.identifier || req.body.email || req.body.phone || ""
+    ).trim();
 
-    if (!phone) {
-      return res.status(400).json({ message: "Phone is required" });
+    if (!rawIdentifier) {
+      return res.status(400).json({
+        message: "Email or phone is required",
+      });
     }
+
+    const isEmail = rawIdentifier.includes("@");
+    const identifier = isEmail
+      ? normalizeEmail(rawIdentifier)
+      : normalizePhone(rawIdentifier);
+
+    const lookupColumn = isEmail ? "email" : "phone";
 
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone")
-      .eq("phone", phone)
+      .select("id, phone, email, email_verified, phone_verified")
+      .eq(lookupColumn, identifier)
       .maybeSingle();
 
     if (error) {
@@ -1402,7 +1413,19 @@ router.post("/forgot-password/request-otp", async (req, res) => {
       return res.status(404).json({ message: "Account not found" });
     }
 
-    await createAndSendOtp(phone, "forgot_password");
+    if (!user.email) {
+      return res.status(400).json({
+        message: "No email is linked to this account",
+      });
+    }
+
+    if (!user.email_verified && !user.phone_verified) {
+      return res.status(403).json({
+        message: "Account is not verified",
+      });
+    }
+
+    await createAndSendOtp(user.email, "forgot_password");
 
     return res.json({
       message: "Verification code sent to your email",
@@ -1418,13 +1441,16 @@ router.post("/forgot-password/request-otp", async (req, res) => {
 // =====================================
 router.post("/forgot-password/verify-otp", async (req, res) => {
   try {
-    const phone = normalizePhone(req.body.phone);
+    const rawIdentifier = String(
+      req.body.identifier || req.body.email || req.body.phone || ""
+    ).trim();
+
     const otp = String(req.body.otp || "").trim();
     const newPassword = String(req.body.newPassword || "");
 
-    if (!phone || !otp || !newPassword) {
+    if (!rawIdentifier || !otp || !newPassword) {
       return res.status(400).json({
-        message: "phone, otp and newPassword are required",
+        message: "Email/phone, OTP and newPassword are required",
       });
     }
 
@@ -1434,15 +1460,17 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
       });
     }
 
-    const otpCheck = await verifyOtpCode(phone, "forgot_password", otp);
-    if (!otpCheck.ok) {
-      return res.status(otpCheck.status).json({ message: otpCheck.message });
-    }
+    const isEmail = rawIdentifier.includes("@");
+    const identifier = isEmail
+      ? normalizeEmail(rawIdentifier)
+      : normalizePhone(rawIdentifier);
+
+    const lookupColumn = isEmail ? "email" : "phone";
 
     const { data: user, error: fetchErr } = await supabase
       .from("users")
-      .select("id, phone, pin_hash")
-      .eq("phone", phone)
+      .select("id, phone, email, pin_hash")
+      .eq(lookupColumn, identifier)
       .maybeSingle();
 
     if (fetchErr) {
@@ -1454,6 +1482,20 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
       return res.status(404).json({ message: "Account not found" });
     }
 
+    if (!user.email) {
+      return res.status(400).json({
+        message: "No email is linked to this account",
+      });
+    }
+
+    const otpCheck = await verifyOtpCode(user.email, "forgot_password", otp);
+
+    if (!otpCheck.ok) {
+      return res.status(otpCheck.status).json({
+        message: otpCheck.message,
+      });
+    }
+
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     const { error: updateErr } = await supabase
@@ -1463,48 +1505,54 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
 
     if (updateErr) {
       console.error("forgot-password/verify-otp update error:", updateErr);
-      return res.status(500).json({ message: "Failed to reset password" });
+      return res.status(500).json({
+        message: "Failed to reset password",
+      });
     }
 
     const deviceName =
-  req.headers["x-device-name"] ||
-  req.body.deviceName ||
-  "Unknown device";
+      req.headers["x-device-name"] ||
+      req.body.deviceName ||
+      "Unknown device";
 
-const appPlatform =
-  req.headers["x-app-platform"] ||
-  req.body.appPlatform ||
-  "android";
+    const appPlatform =
+      req.headers["x-app-platform"] ||
+      req.body.appPlatform ||
+      "android";
 
-const userAgent = req.headers["user-agent"] || "";
-const ipAddress =
-  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-  req.socket?.remoteAddress ||
-  null;
+    const userAgent = req.headers["user-agent"] || "";
 
-const { data: sessionRow, error: sessionErr } = await supabase
-  .from("user_sessions")
-  .insert({
-    user_id: user.id,
-    device_name: deviceName,
-    device_type: "mobile",
-    app_platform: appPlatform,
-    ip_address: ipAddress,
-    user_agent: userAgent,
-  })
-  .select("id")
-  .single();
+    const ipAddress =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
 
-if (sessionErr || !sessionRow) {
-  console.error("[login] session create error:", sessionErr);
-  return res.status(500).json({ message: "Failed to create session" });
-}
+    const { data: sessionRow, error: sessionErr } = await supabase
+      .from("user_sessions")
+      .insert({
+        user_id: user.id,
+        device_name: deviceName,
+        device_type: "mobile",
+        app_platform: appPlatform,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+      })
+      .select("id")
+      .single();
 
-const token = generateToken({
-  userId: user.id,
-  phone: user.phone,
-  sessionId: sessionRow.id,
-});
+    if (sessionErr || !sessionRow) {
+      console.error("[forgot-password] session create error:", sessionErr);
+      return res.status(500).json({
+        message: "Failed to create session",
+      });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+      email: user.email,
+      sessionId: sessionRow.id,
+    });
 
     return res.json({
       message: "Password reset successfully",
@@ -1514,7 +1562,9 @@ const token = generateToken({
     });
   } catch (err) {
     console.error("forgot-password/verify-otp crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({
+      message: "Internal server error",
+    });
   }
 });
 
