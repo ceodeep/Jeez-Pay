@@ -130,6 +130,7 @@ data class MeResponse(
 data class MeUser(
     val id: String?,
     val phone: String?,
+    val email: String?,
     val fullName: String?,
     val avatar_key: String?,
     val referral_code: String?,
@@ -138,6 +139,7 @@ data class MeUser(
     val account_type: String?,
     val country_code: String?,
     val phone_verified: Boolean?,
+    val email_verified: Boolean?,
     val wallet_account_number: Long?,
     val terms_accepted: Boolean?
 )

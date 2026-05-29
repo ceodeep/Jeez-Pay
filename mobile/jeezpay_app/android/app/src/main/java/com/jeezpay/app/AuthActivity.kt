@@ -36,7 +36,7 @@ import android.text.Spanned
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
-
+import android.os.CountDownTimer
 
 class AuthActivity : BaseFintechActivity() {
 
@@ -79,6 +79,9 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var otpBoxesRow: LinearLayout
     private lateinit var btnVerify: MaterialButton
     private lateinit var etSignupEmail: EditText
+    private var otpCooldownSeconds = 60
+    private var otpCooldownTimer: CountDownTimer? = null
+    private lateinit var tvResendOtp: TextView
 
     // PIN set
     private lateinit var btnBackPin: TextView
@@ -265,6 +268,7 @@ class AuthActivity : BaseFintechActivity() {
         otpBoxesRow = findViewById(R.id.otpBoxesRow)
         btnBackOtp = findViewById(R.id.btnBackOtp)
         tvOtpHint = findViewById(R.id.tvOtpHint)
+        tvResendOtp = findViewById(R.id.tvResendOtp)
         etOtp = findViewById(R.id.etOtp)
         btnVerify = findViewById(R.id.btnVerify)
         btnBiometricUnlock = findViewById(R.id.btnBiometricUnlock)
@@ -595,6 +599,66 @@ class AuthActivity : BaseFintechActivity() {
         }
 
         renderOtpBoxes("")
+
+        tvResendOtp.setOnClickListener {
+
+            if (!tvResendOtp.isEnabled) return@setOnClickListener
+
+            when (otpFlowMode) {
+
+                OtpFlowMode.SIGNUP -> {
+                    pendingSignup?.let { signup ->
+
+                        signupRequestOtp(
+                            fullName = signup.fullName,
+                            email = signup.email,
+                            phone = signup.phone,
+                            password = signup.password,
+                            accountType = signup.accountType,
+                            countryCode = signup.countryCode,
+                            termsAccepted = signup.termsAccepted,
+                            referralCode = signup.referralCode
+                        ) {
+                            Toast.makeText(
+                                this,
+                                "Verification code resent",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            startOtpCooldown()
+                        }
+                    }
+                }
+
+                OtpFlowMode.FORGOT_PASSWORD -> {
+                    pendingForgotPasswordIdentifier?.let { identifier ->
+                        forgotPasswordRequestOtp(identifier) {
+                            Toast.makeText(
+                                this,
+                                "Verification code resent",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            startOtpCooldown()
+                        }
+                    }
+                }
+
+                OtpFlowMode.FORGOT_PIN -> {
+                    pendingForgotPinIdentifier?.let { identifier ->
+                        forgotPinRequestOtp(identifier) {
+                            Toast.makeText(
+                                this,
+                                "Verification code resent",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
+                            startOtpCooldown()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun setupPinSetScreen() {
@@ -780,6 +844,7 @@ class AuthActivity : BaseFintechActivity() {
             forgotPinRequestOtp(identifier) {
                 otpFlowMode = OtpFlowMode.FORGOT_PIN
                 pendingForgotPinIdentifier = identifier
+                startOtpCooldown()
                 flipper.displayedChild = 1
                 tvOtpHint.text = "Enter the verification code sent to your email"
                 etOtp.text?.clear()
@@ -1190,6 +1255,7 @@ class AuthActivity : BaseFintechActivity() {
                 termsAccepted = termsAccepted,
                 referralCode = referralCode
             ) {
+                startOtpCooldown()
                 flipper.displayedChild = 1
                 tvOtpHint.text = "Enter the verification code sent to $email"
                 etOtp.text?.clear()
@@ -1511,5 +1577,34 @@ class AuthActivity : BaseFintechActivity() {
 
         etPhone.setSelection(etPhone.text?.length ?: 0)
         updateLoginButtonState()
+    }
+
+    private fun startOtpCooldown() {
+
+        otpCooldownTimer?.cancel()
+
+        tvResendOtp.isEnabled = false
+
+        otpCooldownTimer = object : CountDownTimer(60000, 1000) {
+
+            override fun onTick(millisUntilFinished: Long) {
+                val seconds = (millisUntilFinished / 1000).toInt()
+
+                tvResendOtp.text = "Resend OTP (${seconds}s)"
+                tvResendOtp.alpha = 0.6f
+            }
+
+            override fun onFinish() {
+                tvResendOtp.text = "Resend OTP"
+                tvResendOtp.alpha = 1f
+                tvResendOtp.isEnabled = true
+            }
+        }
+
+        otpCooldownTimer?.start()
+    }
+    override fun onDestroy() {
+        otpCooldownTimer?.cancel()
+        super.onDestroy()
     }
 }

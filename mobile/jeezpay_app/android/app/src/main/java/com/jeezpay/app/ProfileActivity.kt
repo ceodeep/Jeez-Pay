@@ -599,6 +599,11 @@ class ProfileActivity : AppCompatActivity() {
                 is ApiResult.Success -> {
                     val user = result.data.user
 
+                    binding.tvUserEmail.text = user?.email?.takeIf { it.isNotBlank() } ?: "No email available"
+
+                    binding.tvEmailVerifiedBadge.text =
+                        if (user?.email_verified == true) "Email verified" else "Email not verified"
+
                     val backendAvatarKey = user?.avatar_key?.trim().orEmpty()
 
                     if (backendAvatarKey.isNotBlank() && avatarOptions.any { it.first == backendAvatarKey }) {
