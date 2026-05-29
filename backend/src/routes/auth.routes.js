@@ -7,9 +7,6 @@ const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
 const { generateOTP } = require("../utils/otp");
 const { sendEmailOTP } = require("../services/email.service");
-
-const USE_MOCK_EMAIL_OTP = false;
-const MOCK_EMAIL_OTP = "123456";
 const bcrypt = require("bcrypt");
 
 // You can keep your currencies here
@@ -93,18 +90,13 @@ async function seedWalletsForUser(userId) {
 
 async function createAndSendOtp(email, purpose) {
   const normalizedEmail = normalizeEmail(email);
-  const code = USE_MOCK_EMAIL_OTP ? MOCK_EMAIL_OTP : generateOTP();
+  const code = generateOTP();
 
   const expiresAt = new Date(
     Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
   ).toISOString();
 
-  console.log("[createAndSendOtp] creating:", {
-    email: normalizedEmail,
-    purpose,
-    code,
-    expiresAt,
-  });
+  
 
   const { error: deleteErr } = await supabase
     .from("otp_codes")
@@ -133,13 +125,6 @@ async function createAndSendOtp(email, purpose) {
     throw insertErr;
   }
 
-  console.log("[createAndSendOtp] inserted:", insertedOtp);
-
-  if (USE_MOCK_EMAIL_OTP) {
-    console.log("🧪 MOCK EMAIL OTP MODE ENABLED");
-    console.log(`📧 Mock OTP for ${normalizedEmail} (${purpose}): ${code}`);
-    return;
-  }
 
   await sendEmailOTP(normalizedEmail, code);
 }
@@ -150,11 +135,7 @@ async function verifyOtpCode(email, purpose, code) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedCode = String(code || "").trim();
 
-  console.log("[verifyOtpCode] input:", {
-    email: normalizedEmail,
-    purpose,
-    code: normalizedCode,
-  });
+  
 
   const { data: rows, error } = await supabase
     .from("otp_codes")
@@ -168,7 +149,7 @@ async function verifyOtpCode(email, purpose, code) {
     return { ok: false, status: 500, message: "OTP lookup failed" };
   }
 
-  console.log("[verifyOtpCode] latest otp rows:", rows);
+  
 
   const otpRow = (rows || []).find((row) => {
     return (
@@ -193,7 +174,7 @@ async function verifyOtpCode(email, purpose, code) {
 }
 
 async function processReferralReward({ refereeUserId, triggerEvent }) {
-  console.log("[REFERRAL] start", { refereeUserId, triggerEvent });
+
 
   const { data: settings, error: settingsErr } = await supabase
     .from("referral_reward_settings")
@@ -207,7 +188,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     throw settingsErr;
   }
 
-  console.log("[REFERRAL] settings", settings);
+
 
   if (!settings || !settings.enabled) {
     return { status: "skipped", reason: "referral rewards disabled" };
@@ -238,7 +219,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     throw refereeErr;
   }
 
-  console.log("[REFERRAL] referee", referee);
+
 
   if (!referee || !referee.referred_by_user_id) {
     return { status: "skipped", reason: "user was not referred" };
@@ -259,7 +240,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     throw existingRewardErr;
   }
 
-  console.log("[REFERRAL] existingReward", existingReward);
+  
 
   if (existingReward) {
     return {
@@ -284,10 +265,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
       throw countErr;
     }
 
-    console.log("[REFERRAL] reward count", {
-      count,
-      maxRewardsPerUser,
-    });
+    
 
     if ((count || 0) >= maxRewardsPerUser) {
       return { status: "skipped", reason: "max rewards reached" };
@@ -314,7 +292,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     throw rewardInsertErr;
   }
 
-  console.log("[REFERRAL] inserted reward", reward);
+ 
 
   let { data: wallet, error: walletErr } = await supabase
     .from("wallets")
@@ -328,7 +306,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     throw walletErr;
   }
 
-  console.log("[REFERRAL] wallet before", wallet);
+ 
 
   if (!wallet) {
     const created = await supabase
@@ -343,19 +321,13 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     }
 
     wallet = created.data;
-    console.log("[REFERRAL] wallet created", wallet);
+    
   }
 
   const oldBalance = Number(wallet.balance || 0);
   const newBalance = oldBalance + rewardAmount;
 
-  console.log("[REFERRAL] updating wallet", {
-    walletId: wallet.id,
-    oldBalance,
-    newBalance,
-    rewardAmount,
-    currency,
-  });
+  
 
   const { error: walletUpdateErr } = await supabase
     .from("wallets")
@@ -369,11 +341,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
 
   const reference = Date.now();
 
-  console.log("[REFERRAL] inserting transaction", {
-    walletId: wallet.id,
-    rewardAmount,
-    reference,
-  });
+  
 
   const { data: tx, error: txErr } = await supabase
     .from("transactions")
@@ -394,9 +362,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     throw txErr;
   }
 
-  console.log("[REFERRAL] inserted transaction", tx);
-
-  console.log("[REFERRAL] updating reward to rewarded", reward.id);
+ 
 
   const { data: updatedReward, error: rewardUpdateErr } = await supabase
     .from("referral_rewards")
@@ -413,7 +379,7 @@ async function processReferralReward({ refereeUserId, triggerEvent }) {
     throw rewardUpdateErr;
   }
 
-  console.log("[REFERRAL] rewarded successfully", updatedReward);
+  
 
   return {
     status: "rewarded",
@@ -841,10 +807,7 @@ router.post("/signup/verify-otp", async (req, res) => {
       );
     }
 
-    console.log(
-      "SIGNUP REFERRAL REWARD RESULT:",
-      referralReward
-    );
+    
 
     const deviceName =
       req.headers["x-device-name"] ||
