@@ -1230,6 +1230,140 @@ router.post("/change-password", authMiddleware, async (req, res) => {
   }
 });
 
+router.post("/change-email/request-otp", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const newEmail = normalizeEmail(req.body.newEmail);
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (!newEmail) {
+      return res.status(400).json({ message: "New email is required" });
+    }
+
+    const { data: currentUser, error: currentErr } = await supabase
+      .from("users")
+      .select("id, email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (currentErr) {
+      console.error("[change-email/request-otp] current user lookup error:", currentErr);
+      return res.status(500).json({ message: "User lookup failed" });
+    }
+
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (currentUser.email === newEmail) {
+      return res.status(400).json({
+        message: "New email must be different from current email",
+      });
+    }
+
+    const { data: existingUser, error: existingErr } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", newEmail)
+      .maybeSingle();
+
+    if (existingErr) {
+      console.error("[change-email/request-otp] existing email lookup error:", existingErr);
+      return res.status(500).json({ message: "Email lookup failed" });
+    }
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "This email is already used by another account",
+      });
+    }
+
+    await createAndSendOtp(newEmail, "change_email");
+
+    return res.json({
+      message: "Verification code sent to your new email",
+    });
+  } catch (err) {
+    console.error("[change-email/request-otp] crash:", err);
+    return res.status(500).json({ message: "Failed to send verification code" });
+  }
+});
+
+router.post("/change-email/verify-otp", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const newEmail = normalizeEmail(req.body.newEmail);
+    const otp = String(req.body.otp || "").trim();
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (!newEmail || !otp) {
+      return res.status(400).json({
+        message: "New email and OTP are required",
+      });
+    }
+
+    const otpCheck = await verifyOtpCode(newEmail, "change_email", otp);
+
+    if (!otpCheck.ok) {
+      return res.status(otpCheck.status).json({
+        message: otpCheck.message,
+      });
+    }
+
+    const { data: existingUser, error: existingErr } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", newEmail)
+      .neq("id", userId)
+      .maybeSingle();
+
+    if (existingErr) {
+      console.error("[change-email/verify-otp] existing email lookup error:", existingErr);
+      return res.status(500).json({ message: "Email lookup failed" });
+    }
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "This email is already used by another account",
+      });
+    }
+
+    const { data: updatedUser, error: updateErr } = await supabase
+      .from("users")
+      .update({
+        email: newEmail,
+        email_verified: true,
+      })
+      .eq("id", userId)
+      .select("id, email")
+      .maybeSingle();
+
+    if (updateErr) {
+      console.error("[change-email/verify-otp] update error:", updateErr);
+      return res.status(500).json({ message: "Failed to change email" });
+    }
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.json({
+      message: "Email changed successfully",
+      email: updatedUser.email,
+      emailVerified: true,
+    });
+  } catch (err) {
+    console.error("[change-email/verify-otp] crash:", err);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // =====================================
 // VERIFY PIN
 // =====================================
