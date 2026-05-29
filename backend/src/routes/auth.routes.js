@@ -965,6 +965,16 @@ router.post("/login", async (req, res) => {
       sessionId: sessionRow.id,
     });
 
+    if (user.email) {
+  sendNewLoginAlert(
+    user.email,
+    deviceName,
+    ipAddress
+  ).catch(err =>
+    console.error("new login alert email failed:", err)
+  );
+}
+
     return res.json({
       message: "Authenticated",
       token,
@@ -1142,6 +1152,19 @@ router.post("/change-pin", authMiddleware, async (req, res) => {
       .select("id, pin_hash")
       .maybeSingle();
 
+      const { data: userInfo } = await supabase
+  .from("users")
+  .select("email")
+  .eq("id", userId)
+  .maybeSingle();
+
+if (userInfo?.email) {
+  sendPinResetAlert(userInfo.email)
+    .catch(err =>
+      console.error("change-pin alert email failed:", err)
+    );
+}
+
     if (updateErr) {
       console.error("[change-pin] update error:", updateErr);
       return res.status(500).json({ message: "Failed to change PIN" });
@@ -1233,6 +1256,19 @@ router.post("/change-password", authMiddleware, async (req, res) => {
         password_updated_at: new Date().toISOString(),
       })
       .eq("id", userId);
+
+      const { data: userInfo } = await supabase
+  .from("users")
+  .select("email")
+  .eq("id", userId)
+  .maybeSingle();
+
+if (userInfo?.email) {
+  sendPasswordResetAlert(userInfo.email)
+    .catch(err =>
+      console.error("change-password alert email failed:", err)
+    );
+}
 
     if (updateErr) {
       console.error("[change-password] update error:", updateErr);
@@ -1500,6 +1536,11 @@ router.post("/forgot-password/verify-otp", async (req, res) => {
         message: "Failed to reset password",
       });
     }
+    try {
+  await sendPasswordResetAlert(user.email);
+} catch (e) {
+  console.error("password reset alert email failed:", e);
+}
 
     const deviceName =
       req.headers["x-device-name"] ||
@@ -1687,6 +1728,11 @@ router.post("/forgot-pin/verify-otp", async (req, res) => {
       console.error("forgot-pin/verify-otp update error:", updateErr);
       return res.status(500).json({ message: "Failed to reset PIN" });
     }
+    try {
+  await sendPinResetAlert(user.email);
+} catch (e) {
+  console.error("pin reset alert email failed:", e);
+}
 
     const deviceName =
       req.headers["x-device-name"] ||
