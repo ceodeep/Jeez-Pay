@@ -1054,37 +1054,23 @@ router.post("/change-pin", authMiddleware, async (req, res) => {
     const currentPin = String(req.body?.currentPin ?? "").trim();
     const newPin = String(req.body?.newPin ?? "").trim();
 
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized (no userId)" });
-    }
+    if (!userId) return res.status(401).json({ message: "Unauthorized (no userId)" });
 
     if (!/^\d{4}$/.test(currentPin) || !/^\d{4}$/.test(newPin)) {
-      return res.status(400).json({
-        message: "PIN must be exactly 4 digits",
-      });
+      return res.status(400).json({ message: "PIN must be exactly 4 digits" });
     }
 
     if (currentPin === newPin) {
-      return res.status(400).json({
-        message: "New PIN must be different from current PIN",
-      });
+      return res.status(400).json({ message: "New PIN must be different from current PIN" });
     }
 
-    if (
-      newPin === "0000" ||
-      newPin === "1111" ||
-      newPin === "1234" ||
-      newPin === "4321" ||
-      /^(\d)\1{3}$/.test(newPin)
-    ) {
-      return res.status(400).json({
-        message: "Choose a stronger PIN",
-      });
+    if (["0000", "1111", "1234", "4321"].includes(newPin) || /^(\d)\1{3}$/.test(newPin)) {
+      return res.status(400).json({ message: "Choose a stronger PIN" });
     }
 
     const { data: user, error: fetchErr } = await supabase
       .from("users")
-      .select("id, pin_hash, pin_failed_attempts, pin_locked_until")
+      .select("id, pin_hash, pin_failed_attempts, pin_locked_until, email")
       .eq("id", userId)
       .maybeSingle();
 
@@ -1093,24 +1079,16 @@ router.post("/change-pin", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "User lookup failed" });
     }
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     if (!user.pin_hash) {
-      return res.status(400).json({
-        message: "No PIN is set for this account",
-      });
+      return res.status(400).json({ message: "No PIN is set for this account" });
     }
 
-    if (user.pin_locked_until) {
-      const lockedUntil = new Date(user.pin_locked_until);
-
-      if (lockedUntil > new Date()) {
-        return res.status(423).json({
-          message: "PIN is temporarily locked. Please try again later.",
-        });
-      }
+    if (user.pin_locked_until && new Date(user.pin_locked_until) > new Date()) {
+      return res.status(423).json({
+        message: "PIN is temporarily locked. Please try again later.",
+      });
     }
 
     const currentPinMatches = await bcrypt.compare(currentPin, user.pin_hash);
@@ -1118,25 +1096,16 @@ router.post("/change-pin", authMiddleware, async (req, res) => {
     if (!currentPinMatches) {
       const failedAttempts = Number(user.pin_failed_attempts || 0) + 1;
 
-      const updates = {
-        pin_failed_attempts: failedAttempts,
-      };
+      const updates = { pin_failed_attempts: failedAttempts };
 
       if (failedAttempts >= 5) {
-        const lockUntil = new Date(Date.now() + 10 * 60 * 1000);
-
         updates.pin_failed_attempts = 0;
-        updates.pin_locked_until = lockUntil.toISOString();
+        updates.pin_locked_until = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       }
 
-      await supabase
-        .from("users")
-        .update(updates)
-        .eq("id", userId);
+      await supabase.from("users").update(updates).eq("id", userId);
 
-      return res.status(400).json({
-        message: "Current PIN is incorrect",
-      });
+      return res.status(400).json({ message: "Current PIN is incorrect" });
     }
 
     const newPinHash = await bcrypt.hash(newPin, 10);
@@ -1152,26 +1121,17 @@ router.post("/change-pin", authMiddleware, async (req, res) => {
       .select("id, pin_hash")
       .maybeSingle();
 
-      const { data: userInfo } = await supabase
-  .from("users")
-  .select("email")
-  .eq("id", userId)
-  .maybeSingle();
-
-if (userInfo?.email) {
-  sendPinResetAlert(userInfo.email)
-    .catch(err =>
-      console.error("change-pin alert email failed:", err)
-    );
-}
-
     if (updateErr) {
       console.error("[change-pin] update error:", updateErr);
       return res.status(500).json({ message: "Failed to change PIN" });
     }
 
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+    if (!updatedUser) return res.status(404).json({ message: "User not found" });
+
+    if (user.email) {
+      sendPinResetAlert(user.email).catch((err) =>
+        console.error("change-pin alert email failed:", err)
+      );
     }
 
     return res.json({
@@ -1193,9 +1153,7 @@ router.post("/change-password", authMiddleware, async (req, res) => {
     const currentPassword = String(req.body?.currentPassword ?? "").trim();
     const newPassword = String(req.body?.newPassword ?? "").trim();
 
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
@@ -1217,7 +1175,7 @@ router.post("/change-password", authMiddleware, async (req, res) => {
 
     const { data: user, error: fetchErr } = await supabase
       .from("users")
-      .select("id, password_hash")
+      .select("id, password_hash, email")
       .eq("id", userId)
       .maybeSingle();
 
@@ -1226,9 +1184,7 @@ router.post("/change-password", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "User lookup failed" });
     }
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     if (!user.password_hash) {
       return res.status(400).json({
@@ -1236,10 +1192,7 @@ router.post("/change-password", authMiddleware, async (req, res) => {
       });
     }
 
-    const passwordMatches = await bcrypt.compare(
-      currentPassword,
-      user.password_hash
-    );
+    const passwordMatches = await bcrypt.compare(currentPassword, user.password_hash);
 
     if (!passwordMatches) {
       return res.status(400).json({
@@ -1257,22 +1210,15 @@ router.post("/change-password", authMiddleware, async (req, res) => {
       })
       .eq("id", userId);
 
-      const { data: userInfo } = await supabase
-  .from("users")
-  .select("email")
-  .eq("id", userId)
-  .maybeSingle();
-
-if (userInfo?.email) {
-  sendPasswordResetAlert(userInfo.email)
-    .catch(err =>
-      console.error("change-password alert email failed:", err)
-    );
-}
-
     if (updateErr) {
       console.error("[change-password] update error:", updateErr);
       return res.status(500).json({ message: "Failed to change password" });
+    }
+
+    if (user.email) {
+      sendPasswordResetAlert(user.email).catch((err) =>
+        console.error("change-password alert email failed:", err)
+      );
     }
 
     return res.json({
