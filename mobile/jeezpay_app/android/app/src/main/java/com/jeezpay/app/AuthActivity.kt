@@ -1,5 +1,6 @@
 package com.jeezpay.app
 
+
 import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
@@ -321,10 +322,10 @@ class AuthActivity : BaseFintechActivity() {
                 .setPositiveButton("Continue") { _, _ ->
                     val newPassword = input.text.toString().trim()
 
-                    if (newPassword.length < 4) {
+                    if (newPassword.length < 8) {
                         Toast.makeText(
                             this,
-                            "Password must be at least 4 characters",
+                            "Password must be at least 8 characters",
                             Toast.LENGTH_SHORT
                         ).show()
                         return@setPositiveButton
@@ -426,17 +427,29 @@ class AuthActivity : BaseFintechActivity() {
         })
 
         btnContinue.setOnClickListener {
-            val fullPhone = buildFullPhone()
+            val rawInput = etPhone.text.toString().trim()
+
+            val identifier = if (rawInput.contains("@")) {
+                rawInput.lowercase()
+            } else {
+                buildFullPhone()
+            }
+
             val password = etLoginPassword.text.toString().trim()
+
+            if (rawInput.isBlank()) {
+                Toast.makeText(this, "Enter your email or phone number", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
 
             if (password.isBlank()) {
                 Toast.makeText(this, "Enter your password", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            login(fullPhone, password) { token, hasPin ->
+            login(identifier, password) { token, hasPin ->
                 session.saveToken(token)
-                session.savePhone(fullPhone)
+                session.savePhone(identifier)
 
                 if (hasPin) {
                     flipper.displayedChild = 3

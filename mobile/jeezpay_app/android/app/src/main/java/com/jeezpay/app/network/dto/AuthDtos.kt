@@ -3,7 +3,7 @@ package com.jeezpay.app.network.dto
 // -------- LOGIN --------
 
 data class LoginRequest(
-    val phone: String,
+    val identifier: String,
     val password: String,
     val deviceName: String? = null,
     val appPlatform: String? = "android"

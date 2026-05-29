@@ -881,19 +881,31 @@ router.post("/signup/verify-otp", async (req, res) => {
 // =====================================
 router.post("/login", async (req, res) => {
   try {
-    const phone = normalizePhone(req.body.phone);
+    const rawIdentifier = String(
+      req.body.identifier || req.body.email || req.body.phone || ""
+    ).trim();
+
     const password = String(req.body.password || "");
 
-    if (!phone || !password) {
+    if (!rawIdentifier || !password) {
       return res.status(400).json({
-        message: "phone and password are required",
+        message: "Email/phone and password are required",
       });
     }
 
+    const isEmail = rawIdentifier.includes("@");
+    const identifier = isEmail
+      ? normalizeEmail(rawIdentifier)
+      : normalizePhone(rawIdentifier);
+
+    const lookupColumn = isEmail ? "email" : "phone";
+
     const { data: user, error } = await supabase
       .from("users")
-      .select("id, phone, password_hash, pin_hash, role, phone_verified, is_active")
-      .eq("phone", phone)
+      .select(
+        "id, phone, email, password_hash, pin_hash, role, phone_verified, email_verified, is_active"
+      )
+      .eq(lookupColumn, identifier)
       .maybeSingle();
 
     if (error) {
@@ -905,8 +917,10 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    if (!user.phone_verified) {
-      return res.status(403).json({ message: "Phone number is not verified" });
+    if (!user.email_verified) {
+      return res.status(403).json({
+        message: "Email address is not verified",
+      });
     }
 
     if (user.is_active === false) {
@@ -920,44 +934,46 @@ router.post("/login", async (req, res) => {
     }
 
     const deviceName =
-  req.headers["x-device-name"] ||
-  req.body.deviceName ||
-  "Unknown device";
+      req.headers["x-device-name"] ||
+      req.body.deviceName ||
+      "Unknown device";
 
-const appPlatform =
-  req.headers["x-app-platform"] ||
-  req.body.appPlatform ||
-  "android";
+    const appPlatform =
+      req.headers["x-app-platform"] ||
+      req.body.appPlatform ||
+      "android";
 
-const userAgent = req.headers["user-agent"] || "";
-const ipAddress =
-  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-  req.socket?.remoteAddress ||
-  null;
+    const userAgent = req.headers["user-agent"] || "";
 
-const { data: sessionRow, error: sessionErr } = await supabase
-  .from("user_sessions")
-  .insert({
-    user_id: user.id,
-    device_name: deviceName,
-    device_type: "mobile",
-    app_platform: appPlatform,
-    ip_address: ipAddress,
-    user_agent: userAgent,
-  })
-  .select("id")
-  .single();
+    const ipAddress =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null;
 
-if (sessionErr || !sessionRow) {
-  console.error("[login] session create error:", sessionErr);
-  return res.status(500).json({ message: "Failed to create session" });
-}
+    const { data: sessionRow, error: sessionErr } = await supabase
+      .from("user_sessions")
+      .insert({
+        user_id: user.id,
+        device_name: deviceName,
+        device_type: "mobile",
+        app_platform: appPlatform,
+        ip_address: ipAddress,
+        user_agent: userAgent,
+      })
+      .select("id")
+      .single();
 
-const token = generateToken({
-  userId: user.id,
-  phone: user.phone,
-  sessionId: sessionRow.id,
-});
+    if (sessionErr || !sessionRow) {
+      console.error("[login] session create error:", sessionErr);
+      return res.status(500).json({ message: "Failed to create session" });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      phone: user.phone,
+      email: user.email,
+      sessionId: sessionRow.id,
+    });
 
     return res.json({
       message: "Authenticated",

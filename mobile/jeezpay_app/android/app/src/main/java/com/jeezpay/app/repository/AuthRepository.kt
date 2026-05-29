@@ -38,10 +38,10 @@ class AuthRepository {
 
     private val api = ApiClient.authApi
 
-    suspend fun login(phone: String, password: String): LoginResponse {
+    suspend fun login(identifier: String, password: String): LoginResponse {
         return api.login(
             LoginRequest(
-                phone = phone,
+                identifier = identifier,
                 password = password,
                 deviceName = getDeviceName(),
                 appPlatform = "android"
@@ -146,10 +146,10 @@ class AuthRepository {
         )
     }
 
-    suspend fun loginSafe(phone: String, password: String): ApiResult<LoginResponse> {
+    suspend fun loginSafe(identifier: String, password: String): ApiResult<LoginResponse> {
         return safeApiCall {
             api.login(LoginRequest(
-                phone = phone,
+                identifier = identifier,
                 password = password,
                 deviceName = getDeviceName(),
                 appPlatform = "android"

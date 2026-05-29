@@ -129,7 +129,7 @@
                         android:layout_marginStart="12dp"
                         android:layout_weight="1"
                         android:background="@drawable/bg_auth_input_box"
-                        android:hint="Phone"
+                        android:hint="Email or Phone number"
                         android:inputType="phone"
                         android:paddingStart="18dp"
                         android:paddingEnd="18dp"
