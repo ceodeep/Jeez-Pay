@@ -96,8 +96,6 @@ async function createAndSendOtp(email, purpose) {
     Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
   ).toISOString();
 
-  
-
   const { error: deleteErr } = await supabase
     .from("otp_codes")
     .delete()
@@ -109,22 +107,17 @@ async function createAndSendOtp(email, purpose) {
     throw deleteErr;
   }
 
-  const { data: insertedOtp, error: insertErr } = await supabase
-    .from("otp_codes")
-    .insert({
-      email: normalizedEmail,
-      purpose,
-      code,
-      expires_at: expiresAt,
-    })
-    .select("id, email, phone, purpose, code, expires_at")
-    .single();
+  const { error: insertErr } = await supabase.from("otp_codes").insert({
+    email: normalizedEmail,
+    purpose,
+    code,
+    expires_at: expiresAt,
+  });
 
   if (insertErr) {
     console.error("[createAndSendOtp] insert error:", insertErr);
     throw insertErr;
   }
-
 
   await sendEmailOTP(normalizedEmail, code);
 }
@@ -135,36 +128,31 @@ async function verifyOtpCode(email, purpose, code) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedCode = String(code || "").trim();
 
-  
+  if (!normalizedEmail || !normalizedCode) {
+    return { ok: false, status: 400, message: "OTP is required" };
+  }
 
-  const { data: rows, error } = await supabase
+  const { data: otpRow, error } = await supabase
     .from("otp_codes")
-    .select("id, email, phone, purpose, code, expires_at")
+    .select("id, email, purpose, code, expires_at")
+    .eq("email", normalizedEmail)
     .eq("purpose", purpose)
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .maybeSingle();
 
   if (error) {
     console.error("[verifyOtpCode] lookup error:", error);
     return { ok: false, status: 500, message: "OTP lookup failed" };
   }
 
-  
-
-  const otpRow = (rows || []).find((row) => {
-    return (
-      normalizeEmail(row.email) === normalizedEmail &&
-      String(row.code || "").trim() === normalizedCode
-    );
-  });
-
   if (!otpRow) {
     return { ok: false, status: 401, message: "Invalid OTP" };
   }
 
-  const expires = new Date(otpRow.expires_at).getTime();
+  if (String(otpRow.code || "").trim() !== normalizedCode) {
+    return { ok: false, status: 401, message: "Invalid OTP" };
+  }
 
-  if (Date.now() > expires) {
+  if (Date.now() > new Date(otpRow.expires_at).getTime()) {
     return { ok: false, status: 401, message: "OTP expired" };
   }
 

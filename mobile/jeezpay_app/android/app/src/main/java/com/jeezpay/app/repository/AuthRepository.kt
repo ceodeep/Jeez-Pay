@@ -135,12 +135,12 @@ class AuthRepository {
     }
 
     suspend fun forgotPinVerifyOtp(
-        phone: String,
+        identifier: String,
         otp: String
     ): ForgotPinVerifyOtpResponse {
         return api.forgotPinVerifyOtp(
             ForgotPinVerifyOtpRequest(
-                phone = phone,
+                identifier = identifier,
                 otp = otp
             )
         )
@@ -241,20 +241,24 @@ class AuthRepository {
         }
     }
 
-    suspend fun forgotPinRequestOtpSafe(phone: String): ApiResult<ForgotPinRequestOtpResponse> {
+    suspend fun forgotPinRequestOtpSafe(
+        identifier: String
+    ): ApiResult<ForgotPinRequestOtpResponse> {
         return safeApiCall {
-            api.forgotPinRequestOtp(ForgotPinRequestOtpRequest(phone))
+            api.forgotPinRequestOtp(
+                ForgotPinRequestOtpRequest(identifier = identifier)
+            )
         }
     }
 
     suspend fun forgotPinVerifyOtpSafe(
-        phone: String,
+        identifier: String,
         otp: String
     ): ApiResult<ForgotPinVerifyOtpResponse> {
         return safeApiCall {
             api.forgotPinVerifyOtp(
                 ForgotPinVerifyOtpRequest(
-                    phone = phone,
+                    identifier = identifier,
                     otp = otp
                 )
             )

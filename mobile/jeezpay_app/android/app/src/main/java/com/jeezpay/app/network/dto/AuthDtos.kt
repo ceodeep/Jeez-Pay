@@ -94,7 +94,7 @@ data class ForgotPasswordVerifyOtpResponse(
 )
 
 data class ForgotPinRequestOtpRequest(
-    val phone: String
+    val identifier: String
 )
 
 data class ForgotPinRequestOtpResponse(
@@ -102,7 +102,7 @@ data class ForgotPinRequestOtpResponse(
 )
 
 data class ForgotPinVerifyOtpRequest(
-    val phone: String,
+    val identifier: String,
     val otp: String
 )
 

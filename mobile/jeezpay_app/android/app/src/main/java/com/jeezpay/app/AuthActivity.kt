@@ -127,6 +127,8 @@ class AuthActivity : BaseFintechActivity() {
 
     private var otpFlowMode: OtpFlowMode = OtpFlowMode.SIGNUP
     private var pendingForgotPasswordIdentifier: String? = null
+    private var pendingForgotPinIdentifier: String? = null
+
 
 
     private data class PendingSignup(
@@ -558,9 +560,9 @@ class AuthActivity : BaseFintechActivity() {
                 }
 
                 OtpFlowMode.FORGOT_PIN -> {
-                    val phone = session.getPhone()
+                    val identifier = pendingForgotPinIdentifier ?: session.getPhone()
 
-                    if (phone.isNullOrBlank()) {
+                    if (identifier.isNullOrBlank()) {
                         Toast.makeText(
                             this,
                             "PIN reset request expired. Please login again.",
@@ -571,12 +573,13 @@ class AuthActivity : BaseFintechActivity() {
                     }
 
                     forgotPinVerifyOtp(
-                        phone = phone,
-                        otp = otp
+                        identifier = identifier,
+                        otp = otp,
                     ) { token, hasPin ->
                         session.saveToken(token)
-                        session.savePhone(phone)
+                        session.savePhone(identifier)
                         session.clearPin()
+                        pendingForgotPinIdentifier = null
 
                         if (hasPin) {
                             flipper.displayedChild = 3
@@ -765,24 +768,20 @@ class AuthActivity : BaseFintechActivity() {
         setupBiometricUnlock()
 
         tvForgotPin.setOnClickListener {
-            val phone = session.getPhone()
+            val identifier = session.getPhone()
 
-            if (phone.isNullOrBlank()) {
-                Toast.makeText(
-                    this,
-                    "Session expired. Please login again.",
-                    Toast.LENGTH_SHORT
-                ).show()
-
+            if (identifier.isNullOrBlank()) {
+                Toast.makeText(this, "Session expired. Please login again.", Toast.LENGTH_SHORT).show()
                 session.clearAll()
                 flipper.displayedChild = 0
                 return@setOnClickListener
             }
 
-            forgotPinRequestOtp(phone) {
+            forgotPinRequestOtp(identifier) {
                 otpFlowMode = OtpFlowMode.FORGOT_PIN
+                pendingForgotPinIdentifier = identifier
                 flipper.displayedChild = 1
-                tvOtpHint.text = "Enter the code sent to $phone"
+                tvOtpHint.text = "Enter the verification code sent to your email"
                 etOtp.text?.clear()
             }
         }
@@ -1260,9 +1259,9 @@ class AuthActivity : BaseFintechActivity() {
         }
     }
 
-    private fun forgotPinRequestOtp(phone: String, onSuccess: () -> Unit) {
+    private fun forgotPinRequestOtp(identifier: String, onSuccess: () -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
-            when (val result = repo.forgotPinRequestOtpSafe(phone)) {
+            when (val result = repo.forgotPinRequestOtpSafe(identifier)) {
                 is ApiResult.Success -> {
                     val res = result.data
                     withContext(Dispatchers.Main) {
@@ -1274,7 +1273,7 @@ class AuthActivity : BaseFintechActivity() {
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
                         handleAuthError(result.error) {
-                            forgotPinRequestOtp(phone, onSuccess)
+                            forgotPinRequestOtp(identifier, onSuccess)
                         }
                     }
                 }
@@ -1283,12 +1282,12 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun forgotPinVerifyOtp(
-        phone: String,
+        identifier: String,
         otp: String,
         onSuccess: (token: String, hasPin: Boolean) -> Unit
     ) {
         CoroutineScope(Dispatchers.IO).launch {
-            when (val result = repo.forgotPinVerifyOtpSafe(phone, otp)) {
+            when (val result = repo.forgotPinVerifyOtpSafe(identifier, otp)) {
                 is ApiResult.Success -> {
                     val res = result.data
                     withContext(Dispatchers.Main) {
@@ -1300,7 +1299,7 @@ class AuthActivity : BaseFintechActivity() {
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
                         handleAuthError(result.error) {
-                            forgotPinVerifyOtp(phone, otp, onSuccess)
+                            forgotPinVerifyOtp(identifier, otp, onSuccess)
                         }
                     }
                 }
