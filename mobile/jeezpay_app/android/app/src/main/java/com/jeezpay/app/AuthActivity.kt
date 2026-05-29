@@ -53,6 +53,7 @@ class AuthActivity : BaseFintechActivity() {
 
     // Login screen
     private lateinit var etPhone: EditText
+    private lateinit var tvPhoneLabel: TextView
     private lateinit var btnContinue: MaterialButton
     private lateinit var actCountryCode: AutoCompleteTextView
     private lateinit var createAccountRow: LinearLayout
@@ -60,6 +61,10 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var passwordBox: LinearLayout
     private lateinit var etLoginPassword: EditText
     private lateinit var ivLoginEye: ImageView
+    private var loginModeEmail = true
+    private lateinit var countryCodeBox: LinearLayout
+    private lateinit var btnLoginEmailMode: TextView
+    private lateinit var btnLoginPhoneMode: TextView
 
     // OTP screen
     private lateinit var btnBackOtp: TextView
@@ -235,6 +240,7 @@ class AuthActivity : BaseFintechActivity() {
     private fun bindViews() {
         flipper = findViewById(R.id.authFlipper)
 
+        tvPhoneLabel = findViewById(R.id.tvPhoneLabel)
         etPhone = findViewById(R.id.etPhone)
         btnContinue = findViewById(R.id.btnContinue)
         actCountryCode = findViewById(R.id.actCountryCode)
@@ -243,6 +249,10 @@ class AuthActivity : BaseFintechActivity() {
         passwordBox = findViewById(R.id.passwordBox)
         etLoginPassword = findViewById(R.id.etLoginPassword)
         ivLoginEye = findViewById(R.id.ivLoginEye)
+        countryCodeBox = findViewById(R.id.countryCodeBox)
+        btnLoginEmailMode = findViewById(R.id.btnLoginEmailMode)
+        btnLoginPhoneMode = findViewById(R.id.btnLoginPhoneMode)
+
 
         otpBox1 = findViewById(R.id.otpBox1)
         otpBox2 = findViewById(R.id.otpBox2)
@@ -416,6 +426,15 @@ class AuthActivity : BaseFintechActivity() {
     }
 
     private fun setupPhoneScreen() {
+        applyLoginMode(true)
+
+        btnLoginEmailMode.setOnClickListener {
+            applyLoginMode(true)
+        }
+
+        btnLoginPhoneMode.setOnClickListener {
+            applyLoginMode(false)
+        }
         btnContinue.isEnabled = false
 
         etPhone.addTextChangedListener(SimpleTextWatcher {
@@ -429,7 +448,7 @@ class AuthActivity : BaseFintechActivity() {
         btnContinue.setOnClickListener {
             val rawInput = etPhone.text.toString().trim()
 
-            val identifier = if (rawInput.contains("@")) {
+            val identifier = if (loginModeEmail) {
                 rawInput.lowercase()
             } else {
                 buildFullPhone()
@@ -462,6 +481,7 @@ class AuthActivity : BaseFintechActivity() {
 
     private fun setupOtpScreen() {
         btnVerify.isEnabled = false
+
 
         fun renderOtpBoxes(code: String) {
             otpBox1.text = code.getOrNull(0)?.toString() ?: ""
@@ -1493,5 +1513,40 @@ class AuthActivity : BaseFintechActivity() {
             .build()
 
         prompt.authenticate(promptInfo)
+    }
+    private fun applyLoginMode(emailMode: Boolean) {
+        loginModeEmail = emailMode
+
+        if (emailMode) {
+            tvPhoneLabel.text = "Email Address"
+            countryCodeBox.visibility = View.GONE
+
+            etPhone.setText("")
+            etPhone.hint = "Email address"
+            etPhone.inputType =
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+
+            btnLoginEmailMode.setTextColor(Color.WHITE)
+            btnLoginEmailMode.setBackgroundResource(R.drawable.bg_auth_toggle_selected)
+
+            btnLoginPhoneMode.setTextColor(getColor(R.color.paypal_blue))
+            btnLoginPhoneMode.background = null
+        } else {
+            tvPhoneLabel.text = "Phone Number"
+            countryCodeBox.visibility = View.VISIBLE
+
+            etPhone.setText("")
+            etPhone.hint = "Phone number"
+            etPhone.inputType = InputType.TYPE_CLASS_PHONE
+
+            btnLoginPhoneMode.setTextColor(Color.WHITE)
+            btnLoginPhoneMode.setBackgroundResource(R.drawable.bg_auth_toggle_selected)
+
+            btnLoginEmailMode.setTextColor(getColor(R.color.paypal_blue))
+            btnLoginEmailMode.background = null
+        }
+
+        etPhone.setSelection(etPhone.text?.length ?: 0)
+        updateLoginButtonState()
     }
 }

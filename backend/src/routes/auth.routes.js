@@ -917,11 +917,11 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    if (!user.email_verified) {
-      return res.status(403).json({
-        message: "Email address is not verified",
-      });
-    }
+    if (!user.email_verified && !user.phone_verified) {
+  return res.status(403).json({
+    message: "Account is not verified",
+  });
+}
 
     if (user.is_active === false) {
       return res.status(403).json({ message: "Account is suspended" });
