@@ -6,7 +6,9 @@ const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
 const { generateOTP } = require("../utils/otp");
-const { sendEmailOTP } = require("../services/email.service");
+const { sendEmailOTP,sendPasswordResetAlert,
+  sendPinResetAlert,
+  sendNewLoginAlert } = require("../services/email.service");
 const bcrypt = require("bcrypt");
 
 // You can keep your currencies here
