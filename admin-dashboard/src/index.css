@@ -4,6 +4,8 @@ body,
   margin: 0;
   min-height: 100%;
   font-family: Inter, Arial, sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 * {
@@ -11,6 +13,48 @@ body,
 }
 
 input,
-button {
+button,
+select,
+textarea {
   font: inherit;
+}
+
+button {
+  transition: 0.18s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  filter: brightness(0.98);
+}
+
+button:disabled {
+  transform: none;
+  opacity: 0.65;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

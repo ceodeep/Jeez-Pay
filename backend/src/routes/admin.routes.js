@@ -11,6 +11,19 @@ const {
   getPermissionsForRole,
 } = require("../config/adminPermissions");
 
+const PROTECTED_ADMIN_ROLES = [
+  "admin",
+  "super_admin",
+  "finance_admin",
+  "kyc_officer",
+  "support_agent",
+  "auditor",
+];
+
+function isProtectedAdminRole(role) {
+  return PROTECTED_ADMIN_ROLES.includes(String(role || "").trim());
+}
+
 // ---------- helper: admin only ----------
 
 
@@ -442,6 +455,12 @@ router.post(
         return res.status(404).json({ message: "KYC record not found" });
       }
 
+      if (existing.status === "approved") {
+  return res.status(400).json({
+    message: "KYC is already approved",
+  });
+}
+
       const { data, error } = await supabase
         .from("kyc_profiles")
         .update({
@@ -530,6 +549,12 @@ router.post(
     if (!existing) {
       return res.status(404).json({ message: "KYC record not found" });
     }
+
+    if (existing.status === "rejected") {
+  return res.status(400).json({
+    message: "KYC is already rejected",
+  });
+}
 
     const { data, error } = await supabase
       .from("kyc_profiles")
@@ -731,6 +756,12 @@ router.post(
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (isProtectedAdminRole(existing.role)) {
+  return res.status(403).json({
+    message: "Admin accounts cannot be suspended from this endpoint",
+  });
+}
+
     const { data, error } = await supabase
       .from("users")
       .update({ is_active: false })
@@ -925,6 +956,12 @@ router.post(
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (isProtectedAdminRole(existing.role)) {
+  return res.status(403).json({
+    message: "Admin accounts cannot be managed from this endpoint",
+  });
+}
+
     const { data, error } = await supabase
       .from("users")
       .update({ is_active: true })
@@ -1013,9 +1050,11 @@ router.post(
         return res.status(400).json({ message: "Cannot adjust wallet for suspended user" });
       }
 
-      if (user.role === "admin" || user.role === "super_admin") {
-        return res.status(403).json({ message: "Admin wallets cannot be adjusted from this endpoint" });
-      }
+      if (isProtectedAdminRole(user.role)) {
+  return res.status(403).json({
+    message: "Admin wallets cannot be adjusted from this endpoint",
+  });
+}
 
       const userId = user.id;
 
@@ -2794,6 +2833,9 @@ router.post(
       }
 
       const newBalance = wallet.balance - reqData.amount;
+      const adminInfo = req.adminUser;
+
+
 
       await supabase
         .from("wallets")
@@ -2816,6 +2858,26 @@ router.post(
         })
         .eq("id", id);
 
+        await logAdminAction({
+  adminId,
+  adminPhone: adminInfo?.phone || null,
+  action: "WITHDRAWAL_APPROVED",
+  targetType: "withdrawal",
+  targetId: id,
+  targetDisplay: `${reqData.amount} ${wallet.currency || ""}`,
+  oldValue: {
+    status: reqData.status,
+    walletBalance: Number(wallet.balance || 0),
+  },
+  newValue: {
+    status: "approved",
+    walletBalance: newBalance,
+    amount: Number(reqData.amount || 0),
+    walletId: wallet.id,
+  },
+  req,
+});
+
       return res.json({ message: "Withdrawal approved" });
     } catch (err) {
       console.error(err);
@@ -2837,6 +2899,25 @@ router.post(
       const adminId = req.user.userId;
       const id = req.params.id;
 
+      const { data: reqData, error: fetchErr } = await supabase
+  .from("withdraw_requests")
+  .select("*")
+  .eq("id", id)
+  .maybeSingle();
+
+if (fetchErr) {
+  console.error("withdrawal reject lookup error:", fetchErr);
+  return res.status(500).json({ message: "Withdrawal lookup failed" });
+}
+
+if (!reqData) {
+  return res.status(404).json({ message: "Withdrawal request not found" });
+}
+
+if (reqData.status !== "pending") {
+  return res.status(400).json({ message: "Only pending withdrawals can be rejected" });
+}
+
       await supabase
         .from("withdraw_requests")
         .update({
@@ -2846,12 +2927,34 @@ router.post(
         })
         .eq("id", id);
 
+        const adminInfo = req.adminUser;
+
+await logAdminAction({
+  adminId,
+  adminPhone: adminInfo?.phone || null,
+  action: "WITHDRAWAL_REJECTED",
+  targetType: "withdrawal",
+  targetId: id,
+  targetDisplay: `${reqData.amount || ""} ${reqData.currency || ""}`,
+  oldValue: {
+    status: reqData.status,
+  },
+  newValue: {
+    status: "rejected",
+    amount: Number(reqData.amount || 0),
+    walletId: reqData.wallet_id,
+  },
+  req,
+});
+
       return res.json({ message: "Withdrawal rejected" });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ message: "Reject failed" });
     }
+    
   }
+  
 );
 
 

@@ -72,7 +72,6 @@ const MANAGEABLE_ROLES = [
   "support_agent",
   "kyc_officer",
   "finance_admin",
-  "super_admin",
   "admin",
 ];
 
