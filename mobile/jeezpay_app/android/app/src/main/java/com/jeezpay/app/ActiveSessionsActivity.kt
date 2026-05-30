@@ -121,14 +121,13 @@ class ActiveSessionsActivity : AppCompatActivity() {
     }
 
     private fun confirmRevokeSession(session: UserSessionDto) {
-        AlertDialog.Builder(this)
-            .setTitle("Remove session?")
-            .setMessage("This will log out ${session.deviceName ?: "this device"} from JeezPay.")
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Remove") { _, _ ->
-                revokeSession(session.id)
-            }
-            .show()
+        showCustomConfirmDialog(
+            message = "Remove ${session.deviceName ?: "this device"} from your JeezPay account?",
+            confirmText = "Remove",
+            cancelText = "Cancel"
+        ) {
+            revokeSession(session.id)
+        }
     }
 
     private fun revokeSession(sessionId: String) {
@@ -157,14 +156,13 @@ class ActiveSessionsActivity : AppCompatActivity() {
             return
         }
 
-        AlertDialog.Builder(this)
-            .setTitle("Logout other devices?")
-            .setMessage("This will log out $otherCount other device(s) from your JeezPay account.")
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Logout") { _, _ ->
-                logoutOtherSessions()
-            }
-            .show()
+        showCustomConfirmDialog(
+            message = "Logout $otherCount other device(s) from your JeezPay account?",
+            confirmText = "Logout",
+            cancelText = "Cancel"
+        ) {
+            logoutOtherSessions()
+        }
     }
 
     private fun logoutOtherSessions() {
@@ -212,5 +210,40 @@ class ActiveSessionsActivity : AppCompatActivity() {
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showCustomConfirmDialog(
+        message: String,
+        confirmText: String = "Confirm",
+        cancelText: String = "Cancel",
+        onConfirm: () -> Unit
+    ) {
+        val view = layoutInflater.inflate(R.layout.dialog_action_confirm, null)
+
+        val tvMessage = view.findViewById<TextView>(R.id.tvDialogMessage)
+        val btnCancel = view.findViewById<TextView>(R.id.btnCancelDialog)
+        val btnConfirm = view.findViewById<TextView>(R.id.btnConfirmDialog)
+
+        tvMessage.text = message
+        btnCancel.text = cancelText
+        btnConfirm.text = confirmText
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
+            .setCancelable(false)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnConfirm.setOnClickListener {
+            dialog.dismiss()
+            onConfirm()
+        }
+
+        dialog.show()
     }
 }
