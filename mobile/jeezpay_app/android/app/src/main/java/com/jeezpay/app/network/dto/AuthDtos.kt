@@ -198,3 +198,22 @@ data class ChangePasswordRequest(
 data class ChangePasswordResponse(
     val message: String = ""
 )
+
+data class ChangeEmailRequestOtpRequest(
+    val newEmail: String
+)
+
+data class ChangeEmailRequestOtpResponse(
+    val message: String
+)
+
+data class ChangeEmailVerifyOtpRequest(
+    val newEmail: String,
+    val otp: String
+)
+
+data class ChangeEmailVerifyOtpResponse(
+    val message: String,
+    val email: String?,
+    val emailVerified: Boolean?
+)

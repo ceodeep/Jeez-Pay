@@ -31,6 +31,10 @@ import com.jeezpay.app.network.dto.ActiveSessionsResponse
 import com.jeezpay.app.network.dto.BasicMessageResponse
 import com.jeezpay.app.network.dto.ChangePasswordRequest
 import com.jeezpay.app.network.dto.ChangePasswordResponse
+import com.jeezpay.app.network.dto.ChangeEmailRequestOtpRequest
+import com.jeezpay.app.network.dto.ChangeEmailRequestOtpResponse
+import com.jeezpay.app.network.dto.ChangeEmailVerifyOtpRequest
+import com.jeezpay.app.network.dto.ChangeEmailVerifyOtpResponse
 import android.os.Build
 
 
@@ -340,6 +344,30 @@ class AuthRepository {
                 ChangePasswordRequest(
                     currentPassword = currentPassword,
                     newPassword = newPassword
+                )
+            )
+        }
+    }
+
+    suspend fun changeEmailRequestOtpSafe(
+        newEmail: String
+    ): ApiResult<ChangeEmailRequestOtpResponse> {
+        return safeApiCall {
+            api.changeEmailRequestOtp(
+                ChangeEmailRequestOtpRequest(newEmail = newEmail)
+            )
+        }
+    }
+
+    suspend fun changeEmailVerifyOtpSafe(
+        newEmail: String,
+        otp: String
+    ): ApiResult<ChangeEmailVerifyOtpResponse> {
+        return safeApiCall {
+            api.changeEmailVerifyOtp(
+                ChangeEmailVerifyOtpRequest(
+                    newEmail = newEmail,
+                    otp = otp
                 )
             )
         }

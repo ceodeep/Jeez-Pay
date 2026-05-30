@@ -233,10 +233,7 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun populateHeader() {
-        val session = SessionManager(this)
-        val phone = session.getPhone().orEmpty()
 
-        binding.tvUserPhone.text = phone.ifBlank { "No phone available" }
 
         lifecycleScope.launch {
             when (val result = kycRepo.meSafe()) {
@@ -599,10 +596,21 @@ class ProfileActivity : AppCompatActivity() {
                 is ApiResult.Success -> {
                     val user = result.data.user
 
-                    binding.tvUserEmail.text = user?.email?.takeIf { it.isNotBlank() } ?: "No email available"
+                    val phone = user?.phone?.trim().orEmpty()
+                    val email = user?.email?.trim().orEmpty()
+                    val emailVerified = user?.email_verified == true && email.isNotBlank()
+
+                    binding.tvUserEmail.text =
+                        if (email.isBlank()) "No email available" else email
 
                     binding.tvEmailVerifiedBadge.text =
-                        if (user?.email_verified == true) "Email verified" else "Email not verified"
+                        if (emailVerified) "Email verified" else "Email not verified"
+
+                    binding.tvUserPhone.text =
+                        if (phone.isBlank()) "No phone available" else phone
+
+
+
 
                     val backendAvatarKey = user?.avatar_key?.trim().orEmpty()
 

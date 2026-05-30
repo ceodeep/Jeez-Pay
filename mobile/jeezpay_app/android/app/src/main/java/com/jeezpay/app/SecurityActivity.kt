@@ -43,6 +43,10 @@ class SecurityActivity : AppCompatActivity() {
             startActivity(Intent(this, ChangePasswordActivity::class.java))
         }
 
+        binding.rowChangeEmail.setOnClickListener {
+            startActivity(Intent(this, ChangeEmailActivity::class.java))
+        }
+
         binding.switchBiometric.setOnCheckedChangeListener { _, isChecked ->
             if (suppressBiometricSwitchCallback) return@setOnCheckedChangeListener
 
