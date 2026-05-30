@@ -28,6 +28,10 @@ import com.jeezpay.app.network.dto.MeResponse
 import com.jeezpay.app.network.dto.ReferralSummaryResponse
 import com.jeezpay.app.network.dto.ChangePasswordRequest
 import com.jeezpay.app.network.dto.ChangePasswordResponse
+import com.jeezpay.app.network.dto.ChangeEmailRequestOtpRequest
+import com.jeezpay.app.network.dto.ChangeEmailRequestOtpResponse
+import com.jeezpay.app.network.dto.ChangeEmailVerifyOtpRequest
+import com.jeezpay.app.network.dto.ChangeEmailVerifyOtpResponse
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.POST
@@ -103,6 +107,16 @@ interface AuthApi {
     suspend fun changePassword(
         @Body body: ChangePasswordRequest
     ): ChangePasswordResponse
+
+    @POST("auth/change-email/request-otp")
+    suspend fun changeEmailRequestOtp(
+        @Body body: ChangeEmailRequestOtpRequest
+    ): ChangeEmailRequestOtpResponse
+
+    @POST("auth/change-email/verify-otp")
+    suspend fun changeEmailVerifyOtp(
+        @Body body: ChangeEmailVerifyOtpRequest
+    ): ChangeEmailVerifyOtpResponse
 
 
 }
