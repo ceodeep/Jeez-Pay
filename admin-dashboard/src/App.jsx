@@ -959,7 +959,6 @@ async function rejectServiceRequest(requestId) {
       "kyc",
       "users",
       "transactions",
-      "withdrawals",
       "serviceRequests",
       "auditLogs",
       "referralRewards",
@@ -1106,7 +1105,6 @@ async function rejectServiceRequest(requestId) {
               ["kyc", "KYC Review"],
               ["users", "Users"],
               ["transactions", "Transactions"],
-              ["withdrawals", "Withdrawals"],
               ["serviceRequests", "Service Requests"],
               ["auditLogs", "Audit Logs"],
               ["walletView", "Wallet View"],
@@ -1210,29 +1208,161 @@ async function rejectServiceRequest(requestId) {
           ) : null}
 
           {page === "dashboard" && (
-            <div
+  <div style={{ display: "grid", gap: 18 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+        gap: 16,
+      }}
+    >
+      <Card title="👥 Total Users" value={String(stats.totalUsers)} />
+      <Card title="🟡 Pending KYC" value={String(stats.pendingKyc)} />
+      <Card
+        title="🧾 Pending Services"
+        value={String(stats.pendingServiceRequests || 0)}
+      />
+      <Card
+        title="⛔ Suspended Users"
+        value={String(stats.suspendedUsers)}
+      />
+      <Card
+        title="💳 Transactions Today"
+        value={String(stats.totalTransactionsToday)}
+      />
+    </div>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1.4fr 1fr",
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 18,
+          padding: 22,
+          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+          Recent Activity
+        </div>
+        <div style={{ color: "#64748b", fontSize: 14, marginBottom: 16 }}>
+          Quick operational overview for today.
+        </div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ color: "#475569", fontSize: 14 }}>
+            Transactions today: <strong>{stats.totalTransactionsToday}</strong>
+          </div>
+          <div style={{ color: "#475569", fontSize: 14 }}>
+            Volume today: <strong>{renderMoney(stats.totalVolumeToday)}</strong>
+          </div>
+          <div style={{ color: "#475569", fontSize: 14 }}>
+            Pending service requests:{" "}
+            <strong>{stats.pendingServiceRequests || 0}</strong>
+          </div>
+          <div style={{ color: "#475569", fontSize: 14 }}>
+            Pending KYC reviews: <strong>{stats.pendingKyc}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 18,
+          padding: 22,
+          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+          Admin Shortcuts
+        </div>
+        <div style={{ color: "#64748b", fontSize: 14, marginBottom: 16 }}>
+          Jump to high-priority actions.
+        </div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          {canAccessPage("kyc") && (
+            <button
+              onClick={() => setPage("kyc")}
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-                gap: 16,
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "none",
+                background: "#eff6ff",
+                color: "#1d4ed8",
+                fontWeight: 700,
+                cursor: "pointer",
+                textAlign: "left",
               }}
             >
-              <Card title="Total Users" value={String(stats.totalUsers)} />
-<Card title="Pending KYC" value={String(stats.pendingKyc)} />
-<Card
-  title="Pending Services"
-  value={String(stats.pendingServiceRequests || 0)}
-/>
-<Card
-  title="Suspended Users"
-  value={String(stats.suspendedUsers)}
-/>
-<Card
-  title="Transactions Today"
-  value={String(stats.totalTransactionsToday)}
-/>
-            </div>
+              Review KYC
+            </button>
           )}
+
+          {canAccessPage("serviceRequests") && (
+            <button
+              onClick={() => setPage("serviceRequests")}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "none",
+                background: "#f0fdf4",
+                color: "#166534",
+                fontWeight: 700,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              Service Requests
+            </button>
+          )}
+
+          {canAccessPage("transactions") && (
+            <button
+              onClick={() => setPage("transactions")}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "none",
+                background: "#fff7ed",
+                color: "#c2410c",
+                fontWeight: 700,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              View Transactions
+            </button>
+          )}
+
+          {canAccessPage("walletView") && (
+            <button
+              onClick={() => setPage("walletView")}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: "none",
+                background: "#f8fafc",
+                color: "#0f172a",
+                fontWeight: 700,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              Wallet Lookup
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
           {page === "kyc" && (
             <div>
