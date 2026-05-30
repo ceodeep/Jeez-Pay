@@ -1271,55 +1271,77 @@ router.get(
         return res.status(400).json({ message: "identifier is required" });
       }
 
-      const user = await getUserByAdminIdentifier(identifier);
+      const matchedUser = await getUserByAdminIdentifier(identifier);
 
-      if (!user) {
+      if (!matchedUser) {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const userId = user.id;
+      const userId = matchedUser.id;
 
-      const [
-  usersRes,
-  pendingKycRes,
-  txRes,
-  suspendedRes,
-  agentsRes,
-  merchantsRes,
-  pendingServiceRequestsRes,
-] = await Promise.all([
-  supabase.from("users").select("id", { count: "exact", head: true }),
+      const [userRes, walletsRes, kycRes, txRes] = await Promise.all([
+        supabase
+          .from("users")
+          .select(`
+            id,
+            phone,
+            email,
+            fullName,
+            role,
+            account_type,
+            country_code,
+            phone_verified,
+            email_verified,
+            is_active,
+            wallet_account_number,
+            referral_code,
+            referred_by_user_id,
+            created_at
+          `)
+          .eq("id", userId)
+          .maybeSingle(),
 
-  supabase
-    .from("kyc_profiles")
-    .select("user_id", { count: "exact", head: true })
-    .eq("status", "pending"),
+        supabase
+          .from("wallets")
+          .select("id, user_id, currency, balance")
+          .eq("user_id", userId)
+          .order("currency", { ascending: true }),
 
-  supabase
-    .from("transactions")
-    .select("amount, created_at")
-    .gte("created_at", todayStart.toISOString()),
+        supabase
+          .from("kyc_profiles")
+          .select(`
+            user_id,
+            fullName,
+            dob,
+            address,
+            id_path,
+            selfie_path,
+            status,
+            created_at,
+            updated_at
+          `)
+          .eq("user_id", userId)
+          .maybeSingle(),
 
-  supabase
-    .from("users")
-    .select("id", { count: "exact", head: true })
-    .eq("is_active", false),
-
-  supabase
-    .from("users")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "agent"),
-
-  supabase
-    .from("users")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "merchant"),
-
-  supabase
-    .from("service_requests")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending"),
-]);
+        supabase
+          .from("transactions")
+          .select(`
+            id,
+            wallet_id,
+            type,
+            amount,
+            description,
+            reference,
+            created_at,
+            wallets!inner (
+              user_id,
+              currency
+            )
+          `)
+          .eq("wallets.user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
 
       if (userRes.error) {
         console.error("admin/user/details user error:", userRes.error);
@@ -1341,15 +1363,8 @@ router.get(
         return res.status(500).json({ message: "Failed to fetch user transactions" });
       }
 
-      if (pendingServiceRequestsRes.error) {
-  console.error(
-    "dashboard stats pending service requests error:",
-    pendingServiceRequestsRes.error
-  );
-  return res.status(500).json({ message: "Failed to load dashboard stats" });
-}
-
       const profile = userRes.data;
+
       if (!profile) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -1384,7 +1399,7 @@ router.get(
         ),
       };
 
-            const recentTransactions = (txRes.data || []).map((tx) => ({
+      const recentTransactions = (txRes.data || []).map((tx) => ({
         id: tx.id,
         wallet_id: tx.wallet_id,
         type: tx.type,
@@ -2694,7 +2709,7 @@ router.get(
         ...rows.map((item) =>
           [
             item.user_id,
-            item.fulName,
+            item.fullName,
             item.dob,
             item.address,
             item.status,
