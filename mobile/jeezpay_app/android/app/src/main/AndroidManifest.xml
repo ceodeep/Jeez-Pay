@@ -90,6 +90,7 @@
         <activity android:name=".CrashReportActivity" />
         <activity android:name=".ResetPasswordActivity" android:exported="false" />
         <activity android:name=".ChangeEmailActivity" android:exported="false" />
+        <activity android:name=".DepositActivity" android:exported="false" />
 
         <activity
             android:name=".PortraitCaptureActivity"

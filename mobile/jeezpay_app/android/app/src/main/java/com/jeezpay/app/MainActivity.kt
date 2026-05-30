@@ -440,7 +440,7 @@ class MainActivity : BaseFintechActivity() {
         val btnBill = findViewById<View>(R.id.btnBill)
 
         btnDeposit.setOnClickListener {
-            startActivity(Intent(this, DepositUsdtActivity::class.java))
+            startActivity(Intent(this, DepositActivity::class.java))
         }
 
         btnSend.setOnClickListener {
