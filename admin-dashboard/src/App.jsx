@@ -1204,32 +1204,80 @@ async function rejectServiceRequest(requestId) {
               marginBottom: 20,
             }}
           >
-            <div>
-                            <h1 style={{ margin: 0, fontSize: 28 }}>
-                {page === "dashboard" && "Dashboard"}
-                {page === "kyc" && "KYC Review"}
-                {page === "users" && "Users"}
-                {page === "transactions" && "Transactions"}
-                {page === "withdrawals" && "Withdrawals"}
-                {page === "serviceRequests" && "Service Requests"}
-                {page === "auditLogs" && "Audit Logs"}
-                {page === "walletView" && "Wallet View"}
-                {page === "wallet" && "Wallet Adjustment"}
-                {page === "settings" && "System Settings"}
-                {page === "currencySettings" && "Currency Settings"}
-                {page === "roles" && "Roles & Permissions"}
-                {page === "referralRewards" && "Referral Rewards"}
-              </h1>
-              <p style={{ margin: "6px 0 0", color: "#64748b" }}>
-                Admin operations panel for JeezPay.
-              </p>
-                            {adminProfile ? (
-                <p style={{ margin: "8px 0 0", color: "#0f172a", fontSize: 13 }}>
-                  Signed in as {adminProfile.phone || adminProfile.id} • Role:{" "}
-                  {adminProfile.role}
-                </p>
-              ) : null}
-            </div>
+            <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 20,
+    marginBottom: 10,
+  }}
+>
+  <div>
+    <h1
+      style={{
+        margin: 0,
+        fontSize: 30,
+        fontWeight: 800,
+        color: "#0f172a",
+      }}
+    >
+      {page === "dashboard" && "Dashboard"}
+      {page === "kyc" && "KYC Review"}
+      {page === "users" && "Users"}
+      {page === "transactions" && "Transactions"}
+      {page === "serviceRequests" && "Service Requests"}
+      {page === "auditLogs" && "Audit Logs"}
+      {page === "walletView" && "Wallet View"}
+      {page === "wallet" && "Wallet Adjustment"}
+      {page === "settings" && "System Settings"}
+      {page === "currencySettings" && "Currency Settings"}
+      {page === "roles" && "Roles & Permissions"}
+      {page === "referralRewards" && "Referral Rewards"}
+    </h1>
+
+    <p
+      style={{
+        margin: "6px 0 0",
+        color: "#64748b",
+        fontSize: 14,
+      }}
+    >
+      Welcome back. Monitor JeezPay operations and platform activity.
+    </p>
+
+    {adminProfile ? (
+      <p
+        style={{
+          margin: "10px 0 0",
+          color: "#334155",
+          fontSize: 13,
+          fontWeight: 500,
+        }}
+      >
+        Signed in as{" "}
+        <strong>{adminProfile.phone || adminProfile.id}</strong>
+        {" • "}
+        Role: <strong>{adminProfile.role}</strong>
+      </p>
+    ) : null}
+  </div>
+
+  <div
+    style={{
+      background: "#ffffff",
+      borderRadius: 14,
+      padding: "10px 16px",
+      boxShadow: "0 4px 16px rgba(15,23,42,0.06)",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#15803d",
+      whiteSpace: "nowrap",
+    }}
+  >
+    🟢 System Online
+  </div>
+</div>
           </div>
 
           {message ? (
@@ -2344,209 +2392,7 @@ async function rejectServiceRequest(requestId) {
             </div>
           )}
 
-                    {page === "withdrawals" && (
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  marginBottom: 16,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  placeholder="Search user ID / wallet ID / destination"
-                  value={withdrawSearch}
-                  onChange={(e) => setWithdrawSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") loadWithdrawals();
-                  }}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: "1px solid #cbd5e1",
-                    background: "#fff",
-                    fontSize: 14,
-                    minWidth: 280,
-                  }}
-                />
-
-                <button
-                  onClick={loadWithdrawals}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "none",
-                    background: "#0f172a",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Search
-                </button>
-
-                <button
-                  onClick={clearWithdrawSearch}
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: "1px solid #cbd5e1",
-                    background: "#fff",
-                    color: "#0f172a",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Clear
-                </button>
-
-                {["all", "pending", "approved", "rejected"].map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setWithdrawStatusFilter(status)}
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                      border: "none",
-                      cursor: "pointer",
-                      background:
-                        withdrawStatusFilter === status ? "#0f172a" : "#e2e8f0",
-                      color:
-                        withdrawStatusFilter === status ? "#fff" : "#0f172a",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-
-              {withdrawalsLoading ? (
-                <p>Loading...</p>
-              ) : withdrawals.length === 0 ? (
-                <div
-                  style={{
-                    background: "#fff",
-                    padding: 24,
-                    borderRadius: 16,
-                    boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-                    color: "#64748b",
-                  }}
-                >
-                  No withdrawal requests found.
-                </div>
-              ) : (
-                <div style={{ display: "grid", gap: 12 }}>
-                  {withdrawals.map((item) => {
-                    const isPending =
-                      String(item.status || "").toLowerCase() === "pending";
-
-                    return (
-                      <div
-                        key={item.id}
-                        style={{
-                          background: "#fff",
-                          padding: 18,
-                          borderRadius: 16,
-                          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: 16,
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: 16 }}>
-                            {renderMoney(item.amount)} {item.currency}
-                          </div>
-
-                          <div
-                            style={{
-                              color: "#64748b",
-                              marginTop: 6,
-                              lineHeight: 1.7,
-                              fontSize: 14,
-                            }}
-                          >
-                            <div>User ID: {item.user_id || "-"}</div>
-                            <div>Wallet ID: {item.wallet_id || "-"}</div>
-                            <div>Method: {item.method || "-"}</div>
-                            <div>Destination: {item.destination || "-"}</div>
-                            <div>TX Hash: {item.tx_hash || "-"}</div>
-                            <div>Admin ID: {item.admin_id || "-"}</div>
-                            <div>Created: {formatDate(item.created_at)}</div>
-                            <div>
-                              Processed: {formatDate(item.processed_at)}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            flexWrap: "wrap",
-                            justifyContent: "flex-end",
-                          }}
-                        >
-                          <StatusBadge value={item.status} />
-
-                          {isPending && hasPermission("wallets.adjust") && (
-                            <>
-                              <button
-                                onClick={() => approveWithdrawal(item.id)}
-                                disabled={withdrawActionLoadingId === item.id}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: 10,
-                                  border: "none",
-                                  background: "#dcfce7",
-                                  color: "#166534",
-                                  cursor:
-                                    withdrawActionLoadingId === item.id
-                                      ? "not-allowed"
-                                      : "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {withdrawActionLoadingId === item.id
-                                  ? "Processing..."
-                                  : "Approve"}
-                              </button>
-
-                              <button
-                                onClick={() => rejectWithdrawal(item.id)}
-                                disabled={withdrawActionLoadingId === item.id}
-                                style={{
-                                  padding: "10px 12px",
-                                  borderRadius: 10,
-                                  border: "none",
-                                  background: "#fee2e2",
-                                  color: "#b91c1c",
-                                  cursor:
-                                    withdrawActionLoadingId === item.id
-                                      ? "not-allowed"
-                                      : "pointer",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {withdrawActionLoadingId === item.id
-                                  ? "Processing..."
-                                  : "Reject"}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                    
 
           {page === "serviceRequests" && (
   <div>
