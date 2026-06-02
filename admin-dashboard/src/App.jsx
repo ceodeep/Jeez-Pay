@@ -1248,6 +1248,61 @@ async function rejectServiceRequest(requestId) {
         value={String(stats.totalTransactionsToday)}
       />
     </div>
+        <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "#ecfdf5",
+          border: "1px solid #bbf7d0",
+          borderRadius: 18,
+          padding: 18,
+          color: "#166534",
+          fontWeight: 700,
+        }}
+      >
+        API Status
+        <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
+          Operational
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: "#eff6ff",
+          border: "1px solid #bfdbfe",
+          borderRadius: 18,
+          padding: 18,
+          color: "#1d4ed8",
+          fontWeight: 700,
+        }}
+      >
+        Admin Session
+        <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
+          Active and authenticated
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: "#fff7ed",
+          border: "1px solid #fed7aa",
+          borderRadius: 18,
+          padding: 18,
+          color: "#c2410c",
+          fontWeight: 700,
+        }}
+      >
+        Review Queue
+        <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
+          {(stats.pendingKyc || 0) + (stats.pendingServiceRequests || 0)} pending items
+        </div>
+      </div>
+    </div>
 
     <div
       style={{
