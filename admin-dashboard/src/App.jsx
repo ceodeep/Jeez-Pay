@@ -1808,14 +1808,76 @@ async function rejectServiceRequest(requestId) {
                       fontSize: 14,
                     }}
                   >
-                    <div>
-                      Role: {item.role} • {item.account_type || "-"}
-                    </div>
-                    <div>
-                      Phone verified: {item.phone_verified ? "yes" : "no"}
-                    </div>
-                    <div>KYC: {kycStatus}</div>
-                    <div>User ID: {item.id}</div>
+                    <div
+  style={{
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 8,
+  }}
+>
+  <span
+    style={{
+      background: "#eff6ff",
+      color: "#1d4ed8",
+      padding: "4px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 600,
+    }}
+  >
+    👤 {item.role || "user"}
+  </span>
+
+  <span
+    style={{
+      background: "#f8fafc",
+      color: "#334155",
+      padding: "4px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 600,
+    }}
+  >
+    🏦 {item.account_type || "personal"}
+  </span>
+
+  <span
+    style={{
+      background: item.phone_verified ? "#ecfdf5" : "#fef2f2",
+      color: item.phone_verified ? "#15803d" : "#dc2626",
+      padding: "4px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 600,
+    }}
+  >
+    {item.phone_verified ? "📱 Verified" : "📱 Unverified"}
+  </span>
+
+  <span
+    style={{
+      background: "#fefce8",
+      color: "#a16207",
+      padding: "4px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 600,
+    }}
+  >
+    🆔 {kycStatus}
+  </span>
+</div>
+
+<div
+  style={{
+    marginTop: 8,
+    color: "#94a3b8",
+    fontSize: 12,
+  }}
+>
+  ID: {String(item.id || "").slice(0, 8)}...
+</div>
                   </div>
                 </div>
 
