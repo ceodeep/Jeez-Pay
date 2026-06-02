@@ -1101,39 +1101,78 @@ async function rejectServiceRequest(requestId) {
 
                     <div style={{ display: "grid", gap: 10 }}>
             {[
-              ["dashboard", "Dashboard"],
-              ["kyc", "KYC Review"],
-              ["users", "Users"],
-              ["transactions", "Transactions"],
-              ["serviceRequests", "Service Requests"],
-              ["auditLogs", "Audit Logs"],
-              ["walletView", "Wallet View"],
-              ["wallet", "Wallet Adjust"],
-              ["settings", "System Settings"],
-              ["currencySettings", "Currency Settings"],
-              ["referralRewards", "Referral Rewards"],
-              ["roles", "Roles & Permissions"],
-            ]
-              .filter(([key]) => canAccessPage(key))
-              .map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => handlePageChange(key)}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    padding: "12px 14px",
-                    borderRadius: 12,
-                    border: "none",
-                    cursor: "pointer",
-                    background: page === key ? "#0f172a" : "#f1f5f9",
-                    color: page === key ? "#fff" : "#0f172a",
-                    fontWeight: 600,
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
+  {
+    title: "Overview",
+    items: [["dashboard", "Dashboard"]],
+  },
+  {
+    title: "Compliance",
+    items: [["kyc", "KYC Review"]],
+  },
+  {
+    title: "Operations",
+    items: [
+      ["users", "Users"],
+      ["transactions", "Transactions"],
+      ["serviceRequests", "Service Requests"],
+      ["walletView", "Wallet View"],
+      ["wallet", "Wallet Adjust"],
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      ["auditLogs", "Audit Logs"],
+      ["settings", "System Settings"],
+      ["currencySettings", "Currency Settings"],
+      ["referralRewards", "Referral Rewards"],
+      ["roles", "Roles & Permissions"],
+    ],
+  },
+].map((section) => {
+  const visibleItems = section.items.filter(([key]) => canAccessPage(key));
+
+  if (visibleItems.length === 0) return null;
+
+  return (
+    <div key={section.title} style={{ display: "grid", gap: 8 }}>
+      <div
+        style={{
+          marginTop: 10,
+          marginBottom: 2,
+          paddingLeft: 4,
+          fontSize: 11,
+          fontWeight: 800,
+          color: "#94a3b8",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}
+      >
+        {section.title}
+      </div>
+
+      {visibleItems.map(([key, label]) => (
+        <button
+          key={key}
+          onClick={() => handlePageChange(key)}
+          style={{
+            width: "100%",
+            textAlign: "left",
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "none",
+            cursor: "pointer",
+            background: page === key ? "#0f172a" : "#f1f5f9",
+            color: page === key ? "#fff" : "#0f172a",
+            fontWeight: 600,
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+})}
           </div>
 
           <div style={{ flex: 1 }} />
