@@ -886,6 +886,58 @@ totalDebited: Number(totalDebit),
     return res.status(500).json({ message: "Transfer failed" });
   }
 });
+router.post("/transfer-quote", authMiddleware, async (req, res) => {
+  try {
+    const currency = String(req.body.currency || "").trim().toUpperCase();
+    const amount = Number(req.body.amount || 0);
+
+    if (!currency || !amount || amount <= 0) {
+      return res.status(400).json({ message: "currency and valid amount are required" });
+    }
+
+    const settings = await getCurrencySettings(currency);
+
+    if (!settings) {
+      return res.status(400).json({ message: "Currency settings not found" });
+    }
+
+    if (!settings.is_enabled) {
+      return res.status(400).json({ message: `${currency} transfers are disabled` });
+    }
+
+    if (settings.min_transfer && amount < Number(settings.min_transfer)) {
+      return res.status(400).json({
+        message: `Minimum transfer is ${settings.min_transfer} ${currency}`,
+      });
+    }
+
+    if (settings.max_transfer && amount > Number(settings.max_transfer)) {
+      return res.status(400).json({
+        message: `Maximum transfer is ${settings.max_transfer} ${currency}`,
+      });
+    }
+
+    const percentFee = (amount * Number(settings.fee_percent || 0)) / 100;
+    const flatFee = Number(settings.flat_fee || 0);
+    const fee = percentFee + flatFee;
+    const totalDebit = amount + fee;
+
+    return res.json({
+      currency,
+      amount,
+      fee,
+      totalDebit,
+      feePercent: Number(settings.fee_percent || 0),
+      flatFee,
+      minTransfer: Number(settings.min_transfer || 0),
+      maxTransfer: Number(settings.max_transfer || 0),
+      isEnabled: Boolean(settings.is_enabled),
+    });
+  } catch (err) {
+    console.error("transfer-quote crash:", err);
+    return res.status(500).json({ message: "Failed to calculate transfer quote" });
+  }
+});
 
 /**
  * POST /wallet/agent-cash-in  (AGENT -> USER)
