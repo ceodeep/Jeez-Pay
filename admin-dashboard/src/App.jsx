@@ -94,17 +94,13 @@ function AppShell({ onLogout }) {
   const [transactions, setTransactions] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
 
-    const [withdrawals, setWithdrawals] = useState([]);
-  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
-  const [withdrawStatusFilter, setWithdrawStatusFilter] = useState("all");
-  const [withdrawSearch, setWithdrawSearch] = useState("");
-  const [withdrawActionLoadingId, setWithdrawActionLoadingId] = useState("");
-  const [serviceRequests, setServiceRequests] = useState([]);
 const [serviceRequestsLoading, setServiceRequestsLoading] = useState(false);
 const [serviceStatusFilter, setServiceStatusFilter] = useState("all");
 const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
 const [serviceSearch, setServiceSearch] = useState("");
 const [serviceActionLoadingId, setServiceActionLoadingId] = useState("");
+const [serviceRequests, setServiceRequests] = useState([]);
+
 
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
   const [userDetailsLoading, setUserDetailsLoading] = useState(false);
@@ -441,70 +437,9 @@ async function loadReferralRewardHistory() {
     }
   }
 
-    async function loadWithdrawals() {
-    setWithdrawalsLoading(true);
-    setMessage("");
+  
 
-    try {
-      const params = [];
 
-      if (withdrawStatusFilter !== "all") {
-        params.push(`status=${encodeURIComponent(withdrawStatusFilter)}`);
-      }
-
-      if (withdrawSearch.trim()) {
-        params.push(`search=${encodeURIComponent(withdrawSearch.trim())}`);
-      }
-
-      const url =
-        params.length > 0
-          ? `/admin/withdrawals?${params.join("&")}`
-          : "/admin/withdrawals";
-
-      const res = await api.get(url);
-      setWithdrawals(res.data?.withdrawals || []);
-    } catch (err) {
-      setMessage(err?.response?.data?.message || "Failed to load withdrawals");
-    } finally {
-      setWithdrawalsLoading(false);
-    }
-  }
-
-  async function approveWithdrawal(withdrawalId) {
-    if (!withdrawalId) return;
-
-    try {
-      setWithdrawActionLoadingId(withdrawalId);
-      await api.post(`/admin/withdrawals/${withdrawalId}/approve`);
-      setMessage("Withdrawal approved successfully");
-      await loadWithdrawals();
-      await loadAuditLogs();
-    } catch (err) {
-      setMessage(
-        err?.response?.data?.message || "Failed to approve withdrawal"
-      );
-    } finally {
-      setWithdrawActionLoadingId("");
-    }
-  }
-
-  async function rejectWithdrawal(withdrawalId) {
-    if (!withdrawalId) return;
-
-    try {
-      setWithdrawActionLoadingId(withdrawalId);
-      await api.post(`/admin/withdrawals/${withdrawalId}/reject`);
-      setMessage("Withdrawal rejected successfully");
-      await loadWithdrawals();
-      await loadAuditLogs();
-    } catch (err) {
-      setMessage(
-        err?.response?.data?.message || "Failed to reject withdrawal"
-      );
-    } finally {
-      setWithdrawActionLoadingId("");
-    }
-  }
 
   async function loadServiceRequests() {
   setServiceRequestsLoading(true);
@@ -984,7 +919,6 @@ async function rejectServiceRequest(requestId) {
     if (page === "kyc") loadKycs();
     if (page === "users") loadUsers();
     if (page === "transactions") loadTransactions();
-    if (page === "withdrawals") loadWithdrawals();
     if (page === "serviceRequests") loadServiceRequests();
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
@@ -993,7 +927,7 @@ async function rejectServiceRequest(requestId) {
   loadReferralRewardSettings();
   loadReferralRewardHistory();
 }
-  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter, withdrawStatusFilter, serviceStatusFilter, serviceTypeFilter, serviceSearch, auditActionFilter]);
+  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter,  serviceStatusFilter, serviceTypeFilter, serviceSearch, auditActionFilter]);
   const kycCounts = {
     all: kycs.length,
     pending: kycs.filter((k) => k.status === "pending").length,
@@ -1055,11 +989,7 @@ async function rejectServiceRequest(requestId) {
     loadAuditLogs();
   }
 
-    function clearWithdrawSearch() {
-    setWithdrawSearch("");
-    setWithdrawStatusFilter("all");
-    loadWithdrawals();
-  }
+   
 
   function clearServiceSearch() {
   setServiceSearch("");
@@ -1333,61 +1263,7 @@ async function rejectServiceRequest(requestId) {
           padding: 22,
           boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
         }}
-      ><div
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: 16,
-  }}
->
-  <div
-    style={{
-      background: "#ecfdf5",
-      border: "1px solid #bbf7d0",
-      borderRadius: 18,
-      padding: 18,
-      color: "#166534",
-      fontWeight: 700,
-    }}
-  >
-    API Status
-    <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
-      Operational
-    </div>
-  </div>
-
-  <div
-    style={{
-      background: "#eff6ff",
-      border: "1px solid #bfdbfe",
-      borderRadius: 18,
-      padding: 18,
-      color: "#1d4ed8",
-      fontWeight: 700,
-    }}
-  >
-    Admin Session
-    <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
-      Active and authenticated
-    </div>
-  </div>
-
-  <div
-    style={{
-      background: "#fff7ed",
-      border: "1px solid #fed7aa",
-      borderRadius: 18,
-      padding: 18,
-      color: "#c2410c",
-      fontWeight: 700,
-    }}
-  >
-    Review Queue
-    <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
-      {(stats.pendingKyc || 0) + (stats.pendingServiceRequests || 0)} pending items
-    </div>
-  </div>
-</div>
+      >
         <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
           Recent Activity
         </div>
@@ -1395,39 +1271,7 @@ async function rejectServiceRequest(requestId) {
           Quick operational overview for today.
         </div>
 
-        <div style={{ display: "grid", gap: 14, marginTop: 16 }}>
-  {[
-    ["🟢", "Platform online", "API and admin dashboard are operational"],
-    ["👥", `${stats.totalUsers} registered users`, "Total JeezPay accounts"],
-    ["🟡", `${stats.pendingKyc} pending KYC reviews`, "Identity checks awaiting action"],
-    [
-      "🧾",
-      `${stats.pendingServiceRequests || 0} pending service requests`,
-      "Manual service operations queue",
-    ],
-  ].map(([icon, title, subtitle]) => (
-    <div
-      key={title}
-      style={{
-        display: "flex",
-        gap: 12,
-        alignItems: "flex-start",
-        padding: 12,
-        borderRadius: 14,
-        background: "#f8fafc",
-        border: "1px solid #e2e8f0",
-      }}
-    >
-      <div style={{ fontSize: 20 }}>{icon}</div>
-      <div>
-        <div style={{ fontWeight: 800, color: "#0f172a" }}>{title}</div>
-        <div style={{ marginTop: 3, fontSize: 13, color: "#64748b" }}>
-          {subtitle}
-        </div>
-      </div>
-    </div>
-  ))}
-</div>
+        <div style={{ display: "grid", gap: 12 }}>
           <div style={{ color: "#475569", fontSize: 14 }}>
             Transactions today: <strong>{stats.totalTransactionsToday}</strong>
           </div>
