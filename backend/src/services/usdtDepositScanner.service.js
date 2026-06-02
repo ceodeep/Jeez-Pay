@@ -160,6 +160,7 @@ async function scanUsdtDeposits() {
         message: err.message || "Address scan failed",
       });
     }
+    await new Promise((resolve) => setTimeout(resolve, 1200));
   }
 
   return {
