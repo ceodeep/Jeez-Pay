@@ -1798,7 +1798,7 @@ async function rejectServiceRequest(requestId) {
               >
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>
-                    {item.phone}
+                    Account No: {item.wallet_account_number || "-"}
                   </div>
                   <div
                     style={{
