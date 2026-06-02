@@ -1395,7 +1395,39 @@ async function rejectServiceRequest(requestId) {
           Quick operational overview for today.
         </div>
 
-        <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ display: "grid", gap: 14, marginTop: 16 }}>
+  {[
+    ["🟢", "Platform online", "API and admin dashboard are operational"],
+    ["👥", `${stats.totalUsers} registered users`, "Total JeezPay accounts"],
+    ["🟡", `${stats.pendingKyc} pending KYC reviews`, "Identity checks awaiting action"],
+    [
+      "🧾",
+      `${stats.pendingServiceRequests || 0} pending service requests`,
+      "Manual service operations queue",
+    ],
+  ].map(([icon, title, subtitle]) => (
+    <div
+      key={title}
+      style={{
+        display: "flex",
+        gap: 12,
+        alignItems: "flex-start",
+        padding: 12,
+        borderRadius: 14,
+        background: "#f8fafc",
+        border: "1px solid #e2e8f0",
+      }}
+    >
+      <div style={{ fontSize: 20 }}>{icon}</div>
+      <div>
+        <div style={{ fontWeight: 800, color: "#0f172a" }}>{title}</div>
+        <div style={{ marginTop: 3, fontSize: 13, color: "#64748b" }}>
+          {subtitle}
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
           <div style={{ color: "#475569", fontSize: 14 }}>
             Transactions today: <strong>{stats.totalTransactionsToday}</strong>
           </div>
