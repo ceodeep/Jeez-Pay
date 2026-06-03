@@ -138,6 +138,20 @@ const [referralRewardForm, setReferralRewardForm] = useState({
     maxTransfer: "",
     isEnabled: true,
   });
+  const [exchangeRatesLoading, setExchangeRatesLoading] = useState(false);
+const [exchangeRates, setExchangeRates] = useState([]);
+const [selectedExchangeRate, setSelectedExchangeRate] = useState(null);
+
+const [exchangeRateForm, setExchangeRateForm] = useState({
+  fromCurrency: "USDT",
+  toCurrency: "SSP",
+  rate: "",
+  feePercent: "",
+  flatFee: "",
+  minAmount: "",
+  maxAmount: "",
+  isEnabled: true,
+});
 
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -193,6 +207,7 @@ const [referralRewardForm, setReferralRewardForm] = useState({
       settings: "settings.view",
       currencySettings: "currency_settings.view",
       roles: "users.role.update",
+      exchangeRates: "currency_settings.view",
     };
 
     const required = pagePermissions[key];
@@ -901,6 +916,7 @@ async function rejectServiceRequest(requestId) {
       "wallet",
       "settings",
       "currencySettings",
+      "exchangeRates",
       "roles",
     ];
 
@@ -1055,6 +1071,7 @@ async function rejectServiceRequest(requestId) {
       ["auditLogs", "Audit Logs"],
       ["settings", "System Settings"],
       ["currencySettings", "Currency Settings"],
+      ["exchangeRates", "Exchange Rates"],
       ["referralRewards", "Referral Rewards"],
       ["roles", "Roles & Permissions"],
     ],
@@ -1164,6 +1181,7 @@ async function rejectServiceRequest(requestId) {
       {page === "currencySettings" && "Currency Settings"}
       {page === "roles" && "Roles & Permissions"}
       {page === "referralRewards" && "Referral Rewards"}
+      {page === "exchangeRates" && "Exchange Rates"}
     </h1>
 
     <p
