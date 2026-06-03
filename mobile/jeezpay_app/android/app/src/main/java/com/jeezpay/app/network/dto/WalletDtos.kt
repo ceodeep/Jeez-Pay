@@ -140,3 +140,20 @@ data class ServiceRequestDto(
     val completed_at: String? = null,
     val rejected_at: String? = null
 )
+
+data class TransferQuoteRequest(
+    val currency: String,
+    val amount: Double
+)
+
+data class TransferQuoteResponse(
+    val currency: String? = null,
+    val amount: Double? = null,
+    val fee: Double? = null,
+    val totalDebit: Double? = null,
+    val feePercent: Double? = null,
+    val flatFee: Double? = null,
+    val minTransfer: Double? = null,
+    val maxTransfer: Double? = null,
+    val isEnabled: Boolean? = null
+)
