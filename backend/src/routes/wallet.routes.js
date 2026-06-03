@@ -322,6 +322,12 @@ router.post("/swap/preview", authMiddleware, async (req, res) => {
       });
     }
 
+    if (toCurrency === "USDT" && fromCurrency !== "USDT") {
+  return res.status(400).json({
+    message: "Swapping into USDT is not supported",
+  });
+}
+
     const rateRow = await getExchangeRate(fromCurrency, toCurrency);
 
     if (!rateRow) {
@@ -390,6 +396,11 @@ router.post("/swap/confirm", authMiddleware, async (req, res) => {
         message: "Choose two different currencies",
       });
     }
+    if (toCurrency === "USDT" && fromCurrency !== "USDT") {
+  return res.status(400).json({
+    message: "Swapping into USDT is not supported",
+  });
+}
 
     const okKyc = await requireKycApproved(userId);
     if (!okKyc) {

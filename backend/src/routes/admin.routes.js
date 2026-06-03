@@ -2462,6 +2462,120 @@ router.post(
   }
 );
 
+router.get(
+  "/exchange-rates",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("currency_settings.view"),
+  async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select(
+          "from_currency, to_currency, rate, fee_percent, flat_fee, min_amount, max_amount, is_enabled"
+        )
+        .order("from_currency", { ascending: true })
+        .order("to_currency", { ascending: true });
+
+      if (error) {
+        console.error("admin/exchange-rates error:", error);
+        return res.status(500).json({ message: "Failed to load exchange rates" });
+      }
+
+      return res.json({ rates: data || [] });
+    } catch (err) {
+      console.error("admin/exchange-rates crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+router.post(
+  "/exchange-rates",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("currency_settings.update"),
+  async (req, res) => {
+    try {
+      const fromCurrency = String(req.body.fromCurrency || "").trim().toUpperCase();
+      const toCurrency = String(req.body.toCurrency || "").trim().toUpperCase();
+
+      const rate = Number(req.body.rate || 0);
+      const feePercent = Number(req.body.feePercent || 0);
+      const flatFee = Number(req.body.flatFee || 0);
+      const minAmount = Number(req.body.minAmount || 0);
+      const maxAmount = Number(req.body.maxAmount || 0);
+      const isEnabled = Boolean(req.body.isEnabled);
+
+      if (!fromCurrency || !toCurrency || fromCurrency === toCurrency) {
+        return res.status(400).json({ message: "Invalid currency pair" });
+      }
+
+      if (!rate || rate <= 0) {
+        return res.status(400).json({ message: "Rate must be greater than 0" });
+      }
+
+      if (feePercent < 0 || flatFee < 0 || minAmount < 0 || maxAmount < 0) {
+        return res.status(400).json({ message: "Values cannot be negative" });
+      }
+
+      if (maxAmount > 0 && minAmount > maxAmount) {
+        return res.status(400).json({ message: "Min amount cannot exceed max amount" });
+      }
+
+      const { data: oldRate } = await supabase
+        .from("exchange_rates")
+        .select("*")
+        .eq("from_currency", fromCurrency)
+        .eq("to_currency", toCurrency)
+        .maybeSingle();
+
+      const payload = {
+        from_currency: fromCurrency,
+        to_currency: toCurrency,
+        rate,
+        fee_percent: feePercent,
+        flat_fee: flatFee,
+        min_amount: minAmount,
+        max_amount: maxAmount,
+        is_enabled: isEnabled,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .upsert(payload, { onConflict: "from_currency,to_currency" })
+        .select()
+        .maybeSingle();
+
+      if (error) {
+        console.error("admin/exchange-rates update error:", error);
+        return res.status(500).json({ message: "Failed to save exchange rate" });
+      }
+
+      await logAdminAction({
+        adminId: req.adminUser.id,
+        adminPhone: req.adminUser.phone,
+        action: "EXCHANGE_RATE_UPDATED",
+        targetType: "exchange_rate",
+        targetId: `${fromCurrency}_${toCurrency}`,
+        targetDisplay: `${fromCurrency} → ${toCurrency}`,
+        oldValue: oldRate || null,
+        newValue: data,
+        req,
+      });
+
+      return res.json({
+        message: "Exchange rate saved successfully",
+        rate: data,
+      });
+    } catch (err) {
+      console.error("admin/exchange-rates update crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
 
 // =====================================
 // GET /admin/export/users.csv
