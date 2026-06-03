@@ -819,6 +819,66 @@ async function rejectServiceRequest(requestId) {
       setCurrencySettingsLoading(false);
     }
   }
+  async function loadExchangeRates() {
+  setExchangeRatesLoading(true);
+  setMessage("");
+
+  try {
+    const res = await api.get("/admin/exchange-rates");
+    const rows = res.data?.rates || [];
+    setExchangeRates(rows);
+
+    if (rows.length > 0 && !selectedExchangeRate) {
+      handleSelectExchangeRate(rows[0]);
+    }
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to load exchange rates");
+  } finally {
+    setExchangeRatesLoading(false);
+  }
+}
+
+function handleSelectExchangeRate(rate) {
+  setSelectedExchangeRate(rate);
+
+  setExchangeRateForm({
+    fromCurrency: rate.from_currency || "USDT",
+    toCurrency: rate.to_currency || "SSP",
+    rate: String(rate.rate ?? ""),
+    feePercent: String(rate.fee_percent ?? ""),
+    flatFee: String(rate.flat_fee ?? ""),
+    minAmount: String(rate.min_amount ?? ""),
+    maxAmount: String(rate.max_amount ?? ""),
+    isEnabled: Boolean(rate.is_enabled),
+  });
+}
+
+async function saveExchangeRate(e) {
+  e.preventDefault();
+
+  setExchangeRatesLoading(true);
+  setMessage("");
+
+  try {
+    await api.post("/admin/exchange-rates", {
+      fromCurrency: exchangeRateForm.fromCurrency,
+      toCurrency: exchangeRateForm.toCurrency,
+      rate: Number(exchangeRateForm.rate || 0),
+      feePercent: Number(exchangeRateForm.feePercent || 0),
+      flatFee: Number(exchangeRateForm.flatFee || 0),
+      minAmount: Number(exchangeRateForm.minAmount || 0),
+      maxAmount: Number(exchangeRateForm.maxAmount || 0),
+      isEnabled: Boolean(exchangeRateForm.isEnabled),
+    });
+
+    setMessage("Exchange rate saved successfully");
+    await loadExchangeRates();
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to save exchange rate");
+  } finally {
+    setExchangeRatesLoading(false);
+  }
+}
 
   async function downloadCsv(url, filename) {
     try {
@@ -939,6 +999,7 @@ async function rejectServiceRequest(requestId) {
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
     if (page === "currencySettings") loadCurrencySettings();
+    if (page === "exchangeRates") loadExchangeRates();
     if (page === "referralRewards") {
   loadReferralRewardSettings();
   loadReferralRewardHistory();
