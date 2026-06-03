@@ -187,6 +187,7 @@ class SwapActivity : BaseFintechActivity() {
             return
         }
 
+
         val balance = balances[fromCurrency] ?: 0.0
         if (amount > balance) {
             showError("Insufficient balance")
