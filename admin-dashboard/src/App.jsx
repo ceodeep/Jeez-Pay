@@ -3563,6 +3563,223 @@ async function saveExchangeRate(e) {
             </div>
           )}
 
+          {page === "exchangeRates" && (
+  <div style={{ display: "grid", gap: 16 }}>
+    <div
+      style={{
+        background: "#fff",
+        padding: 20,
+        borderRadius: 16,
+        boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+      }}
+    >
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+        Exchange Rates
+      </div>
+
+      <div style={{ color: "#64748b", fontSize: 14, marginBottom: 18 }}>
+        Configure swap rates, fees, limits, and enabled pairs.
+      </div>
+
+      {exchangeRatesLoading ? (
+        <p>Loading exchange rates...</p>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "360px 1fr",
+            gap: 16,
+          }}
+        >
+          <div style={{ display: "grid", gap: 10 }}>
+            {exchangeRates.map((item) => (
+              <button
+                key={`${item.from_currency}_${item.to_currency}`}
+                onClick={() => handleSelectExchangeRate(item)}
+                style={{
+                  textAlign: "left",
+                  padding: 14,
+                  borderRadius: 12,
+                  border:
+                    selectedExchangeRate?.from_currency === item.from_currency &&
+                    selectedExchangeRate?.to_currency === item.to_currency
+                      ? "2px solid #0f172a"
+                      : "1px solid #e2e8f0",
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontWeight: 800 }}>
+                  {item.from_currency} → {item.to_currency}
+                </div>
+                <div style={{ color: "#64748b", fontSize: 13, marginTop: 6 }}>
+                  Rate: {item.rate}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <StatusBadge value={item.is_enabled ? "enabled" : "disabled"} />
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <form
+            onSubmit={saveExchangeRate}
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: 16,
+              padding: 20,
+              display: "grid",
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+              }}
+            >
+              <select
+                value={exchangeRateForm.fromCurrency}
+                onChange={(e) =>
+                  setExchangeRateForm({
+                    ...exchangeRateForm,
+                    fromCurrency: e.target.value,
+                  })
+                }
+                style={{ padding: 12, borderRadius: 12 }}
+              >
+                {["USDT", "SSP", "SDG", "EGP", "UGX"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+
+              <select
+                value={exchangeRateForm.toCurrency}
+                onChange={(e) =>
+                  setExchangeRateForm({
+                    ...exchangeRateForm,
+                    toCurrency: e.target.value,
+                  })
+                }
+                style={{ padding: 12, borderRadius: 12 }}
+              >
+                {["SSP", "SDG", "EGP", "UGX"].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            <input
+              type="number"
+              step="0.000001"
+              placeholder="Rate"
+              value={exchangeRateForm.rate}
+              onChange={(e) =>
+                setExchangeRateForm({ ...exchangeRateForm, rate: e.target.value })
+              }
+              style={{ padding: 12, borderRadius: 12 }}
+            />
+
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Fee Percent"
+              value={exchangeRateForm.feePercent}
+              onChange={(e) =>
+                setExchangeRateForm({
+                  ...exchangeRateForm,
+                  feePercent: e.target.value,
+                })
+              }
+              style={{ padding: 12, borderRadius: 12 }}
+            />
+
+            <input
+              type="number"
+              step="0.01"
+              placeholder="Flat Fee"
+              value={exchangeRateForm.flatFee}
+              onChange={(e) =>
+                setExchangeRateForm({
+                  ...exchangeRateForm,
+                  flatFee: e.target.value,
+                })
+              }
+              style={{ padding: 12, borderRadius: 12 }}
+            />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 14,
+              }}
+            >
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Min Amount"
+                value={exchangeRateForm.minAmount}
+                onChange={(e) =>
+                  setExchangeRateForm({
+                    ...exchangeRateForm,
+                    minAmount: e.target.value,
+                  })
+                }
+                style={{ padding: 12, borderRadius: 12 }}
+              />
+
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Max Amount"
+                value={exchangeRateForm.maxAmount}
+                onChange={(e) =>
+                  setExchangeRateForm({
+                    ...exchangeRateForm,
+                    maxAmount: e.target.value,
+                  })
+                }
+                style={{ padding: 12, borderRadius: 12 }}
+              />
+            </div>
+
+            <label style={{ display: "flex", gap: 10, fontWeight: 700 }}>
+              <input
+                type="checkbox"
+                checked={exchangeRateForm.isEnabled}
+                onChange={(e) =>
+                  setExchangeRateForm({
+                    ...exchangeRateForm,
+                    isEnabled: e.target.checked,
+                  })
+                }
+              />
+              Pair Enabled
+            </label>
+
+            <button
+              type="submit"
+              style={{
+                padding: "14px 18px",
+                borderRadius: 12,
+                border: "none",
+                background: "#0f172a",
+                color: "#fff",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Save Exchange Rate
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
           {page === "referralRewards" && (
   <div style={{ display: "grid", gap: 18 }}>
     <div
@@ -3961,6 +4178,8 @@ async function saveExchangeRate(e) {
     </div>
   </div>
 )}
+
+
 
                     {page === "roles" && (
             <div style={{ display: "grid", gap: 16 }}>
