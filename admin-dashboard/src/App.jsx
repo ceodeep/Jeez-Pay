@@ -1033,6 +1033,17 @@ async function saveExchangeRate(e) {
       maximumFractionDigits: 2,
     });
   }
+  const fieldStyle = {
+  width: "100%",
+  height: 46,
+  padding: "0 12px",
+  marginTop: 6,
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+  boxSizing: "border-box",
+};
 
   function openFile(path) {
   if (!path) return;
@@ -3623,207 +3634,100 @@ async function saveExchangeRate(e) {
           </div>
 
           <form
-            onSubmit={saveExchangeRate}
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: 16,
-              padding: 20,
-              display: "grid",
-              gap: 14,
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 14,
-              }}
-            >
-              <select
-                value={exchangeRateForm.fromCurrency}
-                onChange={(e) =>
-                  setExchangeRateForm({
-                    ...exchangeRateForm,
-                    fromCurrency: e.target.value,
-                  })
-                }
-                style={{
-  width: "100%",
-  height: 46,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  fontSize: 14,
-  fontWeight: 600,
-}}
-              >
-                {["USDT", "SSP", "SDG", "EGP", "UGX"].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
+  onSubmit={saveExchangeRate}
+  style={{
+    border: "1px solid #e2e8f0",
+    borderRadius: 16,
+    padding: 20,
+    display: "grid",
+    gap: 14,
+    alignContent: "start",
+  }}
+>
+  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+    <div>
+      <label style={{ fontSize: 13, fontWeight: 700 }}>From Currency</label>
+      <select
+        value={exchangeRateForm.fromCurrency}
+        onChange={(e) =>
+          setExchangeRateForm({ ...exchangeRateForm, fromCurrency: e.target.value })
+        }
+        style={fieldStyle}
+      >
+        {["USDT", "SSP", "SDG", "EGP", "UGX"].map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+    </div>
 
-              <select
-                value={exchangeRateForm.toCurrency}
-                onChange={(e) =>
-                  setExchangeRateForm({
-                    ...exchangeRateForm,
-                    toCurrency: e.target.value,
-                  })
-                }
-                style={{ padding: 12, borderRadius: 12 }}
-              >
-                {["SSP", "SDG", "EGP", "UGX"].map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </div>
+    <div>
+      <label style={{ fontSize: 13, fontWeight: 700 }}>To Currency</label>
+      <select
+        value={exchangeRateForm.toCurrency}
+        onChange={(e) =>
+          setExchangeRateForm({ ...exchangeRateForm, toCurrency: e.target.value })
+        }
+        style={fieldStyle}
+      >
+        {["SSP", "SDG", "EGP", "UGX"].map((c) => (
+          <option key={c} value={c}>{c}</option>
+        ))}
+      </select>
+    </div>
+  </div>
 
-            <input
-              type="number"
-              step="0.000001"
-              placeholder="Rate"
-              value={exchangeRateForm.rate}
-              onChange={(e) =>
-                setExchangeRateForm({ ...exchangeRateForm, rate: e.target.value })
-              }
-              style={{
-  width: "100%",
-  height: 46,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  fontSize: 14,
-  fontWeight: 600,
-}}
-            />
+  {[
+    ["rate", "Rate", "0.000001"],
+    ["feePercent", "Fee Percent", "0.01"],
+    ["flatFee", "Flat Fee", "0.01"],
+    ["minAmount", "Min Amount", "0.01"],
+    ["maxAmount", "Max Amount", "0.01"],
+  ].map(([key, label, step]) => (
+    <div key={key}>
+      <label style={{ fontSize: 13, fontWeight: 700 }}>{label}</label>
+      <input
+        type="number"
+        step={step}
+        value={exchangeRateForm[key]}
+        onChange={(e) =>
+          setExchangeRateForm({ ...exchangeRateForm, [key]: e.target.value })
+        }
+        style={fieldStyle}
+      />
+    </div>
+  ))}
 
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Fee Percent"
-              value={exchangeRateForm.feePercent}
-              onChange={(e) =>
-                setExchangeRateForm({
-                  ...exchangeRateForm,
-                  feePercent: e.target.value,
-                })
-              }
-              style={{
-  width: "100%",
-  height: 46,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  fontSize: 14,
-}}
-            />
+  <label style={{ display: "flex", gap: 10, fontWeight: 700 }}>
+    <input
+      type="checkbox"
+      checked={exchangeRateForm.isEnabled}
+      onChange={(e) =>
+        setExchangeRateForm({
+          ...exchangeRateForm,
+          isEnabled: e.target.checked,
+        })
+      }
+    />
+    Pair Enabled
+  </label>
 
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Flat Fee"
-              value={exchangeRateForm.flatFee}
-              onChange={(e) =>
-                setExchangeRateForm({
-                  ...exchangeRateForm,
-                  flatFee: e.target.value,
-                })
-              }
-              style={{
-  width: "100%",
-  height: 46,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  fontSize: 14,
-}}
-            />
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 14,
-              }}
-            >
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Min Amount"
-                value={exchangeRateForm.minAmount}
-                onChange={(e) =>
-                  setExchangeRateForm({
-                    ...exchangeRateForm,
-                    minAmount: e.target.value,
-                  })
-                }
-               style={{
-  width: "100%",
-  height: 46,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  fontSize: 14,
-}}
-              />
-
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Max Amount"
-                value={exchangeRateForm.maxAmount}
-                onChange={(e) =>
-                  setExchangeRateForm({
-                    ...exchangeRateForm,
-                    maxAmount: e.target.value,
-                  })
-                }
-                style={{
-  width: "100%",
-  height: 46,
-  padding: "0 12px",
-  borderRadius: 12,
-  border: "1px solid #cbd5e1",
-  background: "#fff",
-  fontSize: 14,
-}}
-              />
-            </div>
-
-            <label style={{ display: "flex", gap: 10, fontWeight: 700 }}>
-              <input
-                type="checkbox"
-                checked={exchangeRateForm.isEnabled}
-                onChange={(e) =>
-                  setExchangeRateForm({
-                    ...exchangeRateForm,
-                    isEnabled: e.target.checked,
-                  })
-                }
-              />
-              Pair Enabled
-            </label>
-
-            <button
-              type="submit"
-              style={{
-                padding: "14px 18px",
-                borderRadius: 12,
-                border: "none",
-                background: "#0f172a",
-                color: "#fff",
-                fontWeight: 800,
-                cursor: "pointer",
-              }}
-            >
-              Save Exchange Rate
-            </button>
-          </form>
+  <button
+    type="submit"
+    style={{
+      height: 46,
+      padding: "0 18px",
+      borderRadius: 12,
+      border: "none",
+      background: "#0f172a",
+      color: "#fff",
+      fontWeight: 800,
+      cursor: "pointer",
+      width: "fit-content",
+    }}
+  >
+    Save Exchange Rate
+  </button>
+</form>
         </div>
       )}
     </div>
