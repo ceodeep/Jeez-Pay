@@ -15,6 +15,8 @@ import com.jeezpay.app.network.dto.SwapPreviewRequest
 import com.jeezpay.app.network.dto.SwapPreviewResponse
 import com.jeezpay.app.network.dto.CryptoDepositAddressResponse
 import com.jeezpay.app.network.dto.CryptoDepositsResponse
+import com.jeezpay.app.network.dto.TransferQuoteRequest
+import com.jeezpay.app.network.dto.TransferQuoteResponse
 
 
 interface WalletApi {
@@ -59,5 +61,10 @@ interface WalletApi {
         @Query("token") token: String = "USDT",
         @Query("network") network: String = "TRON"
     ): CryptoDepositsResponse
+
+    @POST("wallet/transfer-quote")
+    suspend fun transferQuote(
+        @Body body: TransferQuoteRequest
+    ): TransferQuoteResponse
 
 }

@@ -80,6 +80,10 @@ class SendMoneyActivity : BaseFintechActivity() {
     private var loaderShownAt = 0L
     private val MIN_LOADER_TIME = 800L
 
+    private var quotedFee: Double = 0.0
+    private var quotedTotalDebit: Double = 0.0
+    private var quoteLoading: Boolean = false
+
 
     private var lastConfirmedReceiverIdentifier: String? = null
     private var resolvedReceiverName: String? = null
@@ -199,6 +203,7 @@ class SendMoneyActivity : BaseFintechActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 tvError.visibility = View.GONE
+                refreshFeeAndAvailable()
             }
             override fun afterTextChanged(s: Editable?) {}
         })
@@ -241,9 +246,19 @@ class SendMoneyActivity : BaseFintechActivity() {
                 return@setOnClickListener
             }
 
-            val fee = calcFixedFee(currency)
+            if (quoteLoading) {
+                showError("Calculating fee, please wait")
+                return@setOnClickListener
+            }
+
+            if (quotedTotalDebit <= 0.0) {
+                showError("Unable to calculate transfer fee")
+                return@setOnClickListener
+            }
+
+            val fee = quotedFee
             val available = vm.availableFor(currency)
-            val total = amount + fee
+            val total = quotedTotalDebit.takeIf { it > 0.0 } ?: (amount + fee)
 
             if (total > available) {
                 showError("Insufficient balance")
@@ -281,6 +296,7 @@ class SendMoneyActivity : BaseFintechActivity() {
                         )
                     }
                 }
+
             }.show(supportFragmentManager, "SendReviewBottomSheet")
         }
 
@@ -358,25 +374,45 @@ class SendMoneyActivity : BaseFintechActivity() {
         }
     }
 
-    private fun calcFixedFee(cur: String): Double {
-        return when (cur.uppercase()) {
-            "USDT", "USD" -> 0.0
-            "SSP" -> 270.0
-            "SDG" -> 172.0
-            "EGP" -> 30.0
-            "UGX" -> 168.0
-            else -> 0.0
-        }
-    }
+
 
     private fun refreshFeeAndAvailable() {
         val cur = ddCurrency.text.toString().uppercase()
-        val fee = calcFixedFee(cur)
-
-        tvFee.text = "Fee: ${df.format(fee)} $cur"
+        val amount = etAmount.text.toString().trim().toDoubleOrNull()
 
         val avail = vm.availableFor(cur)
         tvAvailable.text = "Available: ${df.format(avail)}"
+
+        if (amount == null || amount <= 0) {
+            quotedFee = 0.0
+            quotedTotalDebit = 0.0
+            tvFee.text = "Fee: -- $cur"
+            return
+        }
+
+        quoteLoading = true
+        tvFee.text = "Fee: loading..."
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                WalletRepository().transferQuoteSafe(cur, amount)
+            }) {
+                is ApiResult.Success -> {
+                    quoteLoading = false
+                    val quote = result.data
+                    quotedFee = quote.fee ?: 0.0
+                    quotedTotalDebit = quote.totalDebit ?: (amount + quotedFee)
+                    tvFee.text = "Fee: ${df.format(quotedFee)} $cur"
+                }
+
+                is ApiResult.Error -> {
+                    quoteLoading = false
+                    quotedFee = 0.0
+                    quotedTotalDebit = 0.0
+                    tvFee.text = "Fee: unavailable"
+                }
+            }
+        }
     }
 
     private fun showCurrencyPicker() {
