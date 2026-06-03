@@ -3647,7 +3647,16 @@ async function saveExchangeRate(e) {
                     fromCurrency: e.target.value,
                   })
                 }
-                style={{ padding: 12, borderRadius: 12 }}
+                style={{
+  width: "100%",
+  height: 46,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+  fontWeight: 600,
+}}
               >
                 {["USDT", "SSP", "SDG", "EGP", "UGX"].map((c) => (
                   <option key={c}>{c}</option>
@@ -3678,7 +3687,16 @@ async function saveExchangeRate(e) {
               onChange={(e) =>
                 setExchangeRateForm({ ...exchangeRateForm, rate: e.target.value })
               }
-              style={{ padding: 12, borderRadius: 12 }}
+              style={{
+  width: "100%",
+  height: 46,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+  fontWeight: 600,
+}}
             />
 
             <input
@@ -3692,7 +3710,15 @@ async function saveExchangeRate(e) {
                   feePercent: e.target.value,
                 })
               }
-              style={{ padding: 12, borderRadius: 12 }}
+              style={{
+  width: "100%",
+  height: 46,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+}}
             />
 
             <input
@@ -3706,7 +3732,15 @@ async function saveExchangeRate(e) {
                   flatFee: e.target.value,
                 })
               }
-              style={{ padding: 12, borderRadius: 12 }}
+              style={{
+  width: "100%",
+  height: 46,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+}}
             />
 
             <div
@@ -3727,7 +3761,15 @@ async function saveExchangeRate(e) {
                     minAmount: e.target.value,
                   })
                 }
-                style={{ padding: 12, borderRadius: 12 }}
+               style={{
+  width: "100%",
+  height: 46,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+}}
               />
 
               <input
@@ -3741,7 +3783,15 @@ async function saveExchangeRate(e) {
                     maxAmount: e.target.value,
                   })
                 }
-                style={{ padding: 12, borderRadius: 12 }}
+                style={{
+  width: "100%",
+  height: 46,
+  padding: "0 12px",
+  borderRadius: 12,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 14,
+}}
               />
             </div>
 
