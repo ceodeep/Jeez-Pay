@@ -1454,7 +1454,8 @@ async function saveExchangeRate(e) {
         <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
           {(stats.pendingKyc || 0) + (stats.pendingServiceRequests || 0)} pending items
         </div>
-        <div
+      </div>
+      <div
   style={{
     background: usdtScannerStatus?.enabled ? "#ecfdf5" : "#fef2f2",
     border: usdtScannerStatus?.enabled
@@ -1481,7 +1482,6 @@ async function saveExchangeRate(e) {
     {usdtScannerStatus?.lastErrors ?? 0}
   </div>
 </div>
-      </div>
     </div>
 
     <div
