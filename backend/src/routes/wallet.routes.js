@@ -685,7 +685,7 @@ router.get("/recipient/resolve", authMiddleware, async (req, res) => {
 
     const { data: kycProfile, error: kycNameErr } = await supabase
       .from("kyc_profiles")
-      .select("fullName, full_name")
+      .select("fullName, fullName")
       .eq("user_id", receiverUser.id)
       .maybeSingle();
 
@@ -696,7 +696,7 @@ router.get("/recipient/resolve", authMiddleware, async (req, res) => {
     const receiverName =
       receiverUser.fullName ||
       kycProfile?.fullName ||
-      kycProfile?.full_name ||
+      kycProfile?.fullName ||
       "JeezPay User";
 
     return res.json({
