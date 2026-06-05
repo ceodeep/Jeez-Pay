@@ -7,6 +7,7 @@
     <color name="primary_blue">#003087</color>
     <color name="accent_blue">#009CDE</color>
     <color name="bg_soft_blue">#EAF3FF</color>
+    <color name="white">#FFFFFF</color>
 
     <color name="error_red">#E53935</color>
 

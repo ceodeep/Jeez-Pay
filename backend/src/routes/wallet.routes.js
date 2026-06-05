@@ -871,7 +871,7 @@ if (!receiverActive || receiverActive.is_active === false) {
       p_sender_user_id: senderId,
       p_receiver_phone: phoneRaw,
       p_currency: currency,
-      p_amount: totalDebit,
+      p_amount: amount,
       p_description: description || `Sent to ${phoneNorm}`,
     });
 

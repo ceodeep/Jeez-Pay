@@ -32,6 +32,7 @@ import com.jeezpay.app.common.LoaderOverlayController
 
 
 
+
 class MainActivity : BaseFintechActivity() {
     private lateinit var imgProfile: View
 
@@ -39,6 +40,7 @@ class MainActivity : BaseFintechActivity() {
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
     private val walletRepo = WalletRepository()
+    private val billsServicesEnabled = false
 
     private val prefs by lazy { getSharedPreferences("jeezpay_prefs", MODE_PRIVATE) }
 
@@ -456,7 +458,16 @@ class MainActivity : BaseFintechActivity() {
         btnReceive.setOnClickListener {
             startActivity(Intent(this, ReceiveQrActivity::class.java))
         }
-        findViewById<View>(R.id.btnBill).setOnClickListener {
+        btnBill.setOnClickListener {
+            if (!billsServicesEnabled) {
+                AlertDialog.Builder(this)
+                    .setTitle("Coming Soon")
+                    .setMessage("Bills & Services will be available soon.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@setOnClickListener
+            }
+
             startActivity(Intent(this, ServicesActivity::class.java))
         }
     }
