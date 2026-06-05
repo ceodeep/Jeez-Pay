@@ -4477,9 +4477,55 @@ async function saveExchangeRate(e) {
           }}
           
         >
-          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>
-            Recent Fee Income
-          </div>
+          <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  }}
+>
+  <div style={{ fontSize: 18, fontWeight: 800 }}>
+    Recent Fee Income
+  </div>
+
+  <div style={{ display: "flex", gap: 10 }}>
+    <button
+      onClick={loadCompanyWallet}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: "1px solid #cbd5e1",
+        background: "#fff",
+        color: "#0f172a",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      Refresh
+    </button>
+
+    <button
+      onClick={exportCompanyWalletCsv}
+      disabled={!companyWalletData?.recentTransactions?.length}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: "1px solid #cbd5e1",
+        background: "#fff",
+        color: "#0f172a",
+        fontWeight: 700,
+        cursor: companyWalletData?.recentTransactions?.length
+          ? "pointer"
+          : "not-allowed",
+        opacity: companyWalletData?.recentTransactions?.length ? 1 : 0.55,
+      }}
+    >
+      Export CSV
+    </button>
+  </div>
+</div>
 
           {companyWalletData.recentTransactions?.length ? (
             <div style={{ display: "grid", gap: 10 }}>
