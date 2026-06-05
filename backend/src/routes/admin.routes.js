@@ -3454,4 +3454,86 @@ router.patch(
   }
 );
 
+router.get(
+  "/company-wallet",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.view"),
+  async (req, res) => {
+    try {
+      const { data: systemAccount, error: systemErr } = await supabase
+        .from("system_accounts")
+        .select("user_id")
+        .eq("key", "COMPANY_FEES")
+        .maybeSingle();
+
+      if (systemErr) {
+        console.error("company-wallet system account error:", systemErr);
+        return res.status(500).json({ message: "Failed to load company account" });
+      }
+
+      if (!systemAccount?.user_id) {
+        return res.status(404).json({ message: "Company fee account not configured" });
+      }
+
+      const companyUserId = systemAccount.user_id;
+
+      const { data: wallets, error: walletsErr } = await supabase
+        .from("wallets")
+        .select("id, currency, balance")
+        .eq("user_id", companyUserId)
+        .order("currency", { ascending: true });
+
+      if (walletsErr) {
+        console.error("company-wallet wallets error:", walletsErr);
+        return res.status(500).json({ message: "Failed to load company wallets" });
+      }
+
+      const walletIds = (wallets || []).map((w) => w.id);
+
+      let recentTransactions = [];
+
+      if (walletIds.length > 0) {
+        const { data: txs, error: txErr } = await supabase
+          .from("transactions")
+          .select("id, wallet_id, type, amount, description, reference, created_at, wallets(currency)")
+          .in("wallet_id", walletIds)
+          .eq("description", "Fee income")
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (txErr) {
+          console.error("company-wallet tx error:", txErr);
+          return res.status(500).json({ message: "Failed to load company transactions" });
+        }
+
+        recentTransactions = txs || [];
+      }
+
+      const balances = (wallets || []).map((w) => ({
+        walletId: w.id,
+        currency: w.currency,
+        balance: Number(w.balance || 0),
+      }));
+
+      const feeSummary = {};
+
+      for (const tx of recentTransactions) {
+        const currency = tx.wallets?.currency || "UNKNOWN";
+        feeSummary[currency] = (feeSummary[currency] || 0) + Number(tx.amount || 0);
+      }
+
+      return res.json({
+        companyUserId,
+        balances,
+        recentTransactions,
+        recentFeeSummary: feeSummary,
+      });
+    } catch (err) {
+      console.error("company-wallet crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
 module.exports = router;
