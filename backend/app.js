@@ -12,6 +12,7 @@ const adminRoutes = require("./src/routes/admin.routes");
 const servicesRoutes = require("./src/routes/services.routes");
 
 const app = express();
+app.set("trust proxy", 1);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -30,7 +31,7 @@ const otpLimiter = rateLimit({
 });
 
 app.use(morgan("dev"));
-app.set("trust proxy", 1);
+
 
 app.use(
   cors({
