@@ -10,6 +10,7 @@ const {
   MANAGEABLE_ROLES,
   getPermissionsForRole,
 } = require("../config/adminPermissions");
+const { getUsdtScannerStatus } = require("../jobs/usdtDepositScanner.job");
 
 const PROTECTED_ADMIN_ROLES = [
   "admin",
@@ -1705,6 +1706,16 @@ router.get(
       console.error("admin/me/permissions crash:", err);
       return res.status(500).json({ message: "Internal server error" });
     }
+  }
+);
+
+router.get(
+  "/usdt-scanner/status",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("dashboard.view"),
+  async (req, res) => {
+    return res.json(getUsdtScannerStatus());
   }
 );
 
