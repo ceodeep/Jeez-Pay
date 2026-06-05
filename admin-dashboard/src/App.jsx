@@ -4378,6 +4378,89 @@ async function saveExchangeRate(e) {
             </div>
           )}
 
+          {page === "companyWallet" && (
+  <div style={{ display: "grid", gap: 16 }}>
+    {companyWalletLoading ? (
+      <p>Loading company wallet...</p>
+    ) : !companyWalletData ? (
+      <div style={{ background: "#fff", padding: 24, borderRadius: 16 }}>
+        No company wallet data found.
+      </div>
+    ) : (
+      <>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+            gap: 16,
+          }}
+        >
+          {(companyWalletData.balances || []).map((w) => (
+            <Card
+              key={w.currency}
+              title={`${w.currency} Balance`}
+              value={renderMoney(w.balance)}
+            />
+          ))}
+        </div>
+
+        <div
+          style={{
+            background: "#fff",
+            padding: 20,
+            borderRadius: 16,
+            boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>
+            Recent Fee Income
+          </div>
+
+          {companyWalletData.recentTransactions?.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {companyWalletData.recentTransactions.map((tx) => (
+                <div
+                  key={tx.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 12,
+                    padding: 14,
+                    background: "#f8fafc",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 800 }}>
+                      {tx.description || "Fee income"}
+                    </div>
+                    <div style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
+                      Ref: {tx.reference || "-"} • {formatDate(tx.created_at)}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontWeight: 900,
+                      color: "#166534",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    +{renderMoney(tx.amount)} {tx.wallets?.currency || ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ color: "#64748b" }}>No fee income found yet.</div>
+          )}
+        </div>
+      </>
+    )}
+  </div>
+)}
+
           {page === "wallet" && (
             <div
               style={{
