@@ -1051,7 +1051,10 @@ async function saveExchangeRate(e) {
   }, [adminPermissions]);
 
     useEffect(() => {
-    if (page === "dashboard") loadDashboardStats();
+    if (page === "dashboard") {
+  loadDashboardStats();
+  loadUsdtScannerStatus();
+}
     if (page === "kyc") loadKycs();
     if (page === "users") loadUsers();
     if (page === "transactions") loadTransactions();
