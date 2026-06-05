@@ -89,6 +89,9 @@ function AppShell({ onLogout }) {
   const [roleUpdateLoadingUserId, setRoleUpdateLoadingUserId] = useState("");
   const [userRoleDrafts, setUserRoleDrafts] = useState({});
 
+  const [companyWalletLoading, setCompanyWalletLoading] = useState(false);
+const [companyWalletData, setCompanyWalletData] = useState(null);
+
   const [kycs, setKycs] = useState([]);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -208,6 +211,7 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       currencySettings: "currency_settings.view",
       roles: "users.role.update",
       exchangeRates: "currency_settings.view",
+      companyWallet: "wallets.view",
     };
 
     const required = pagePermissions[key];
@@ -225,6 +229,20 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       );
     }
   }
+
+  async function loadCompanyWallet() {
+  setCompanyWalletLoading(true);
+  setMessage("");
+
+  try {
+    const res = await api.get("/admin/company-wallet");
+    setCompanyWalletData(res.data || null);
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to load company wallet");
+  } finally {
+    setCompanyWalletLoading(false);
+  }
+}
 
   async function loadReferralRewardSettings() {
   setReferralRewardsLoading(true);
@@ -998,6 +1016,7 @@ async function saveExchangeRate(e) {
     if (page === "serviceRequests") loadServiceRequests();
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
+    if (page === "companyWallet") loadCompanyWallet();
     if (page === "currencySettings") loadCurrencySettings();
     if (page === "exchangeRates") loadExchangeRates();
     if (page === "referralRewards") {
@@ -1134,6 +1153,7 @@ async function saveExchangeRate(e) {
       ["transactions", "Transactions"],
       ["serviceRequests", "Service Requests"],
       ["walletView", "Wallet View"],
+      ["companyWallet", "Company Wallet"],
       ["wallet", "Wallet Adjust"],
     ],
   },
@@ -1248,6 +1268,7 @@ async function saveExchangeRate(e) {
       {page === "serviceRequests" && "Service Requests"}
       {page === "auditLogs" && "Audit Logs"}
       {page === "walletView" && "Wallet View"}
+      {page === "companyWallet" && "Company Wallet"}
       {page === "wallet" && "Wallet Adjustment"}
       {page === "settings" && "System Settings"}
       {page === "currencySettings" && "Currency Settings"}
