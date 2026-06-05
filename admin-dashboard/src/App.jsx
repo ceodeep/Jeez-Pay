@@ -229,6 +229,38 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       );
     }
   }
+  function exportCompanyWalletCsv() {
+  const rows = companyWalletData?.recentTransactions || [];
+
+  const csvRows = [
+    ["Date", "Reference", "Currency", "Amount", "Description"],
+    ...rows.map((tx) => [
+      formatDate(tx.created_at),
+      tx.reference || "",
+      tx.wallets?.currency || "",
+      tx.amount || 0,
+      tx.description || "",
+    ]),
+  ];
+
+  const csv = csvRows
+    .map((row) =>
+      row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")
+    )
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `company-wallet-fees-${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.URL.revokeObjectURL(url);
+}
 
   async function loadCompanyWallet() {
   setCompanyWalletLoading(true);
@@ -4082,6 +4114,22 @@ async function saveExchangeRate(e) {
           >
             Refresh
           </button>
+
+          <button
+  onClick={exportCompanyWalletCsv}
+  disabled={!companyWalletData?.recentTransactions?.length}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#0f172a",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+>
+  Export CSV
+</button>
         </div>
 
         {referralRewardHistory.length === 0 ? (
@@ -4403,6 +4451,21 @@ async function saveExchangeRate(e) {
             />
           ))}
         </div>
+        <button
+  onClick={loadCompanyWallet}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#0f172a",
+    fontWeight: 700,
+    cursor: "pointer",
+    width: "fit-content",
+  }}
+>
+  Refresh
+</button>
 
         <div
           style={{
@@ -4411,6 +4474,7 @@ async function saveExchangeRate(e) {
             borderRadius: 16,
             boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
           }}
+          
         >
           <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>
             Recent Fee Income
