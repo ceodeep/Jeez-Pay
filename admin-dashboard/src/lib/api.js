@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://217.144.154.171",
+  baseURL: "https://api.jeezpay.co/",
 });
 
 api.interceptors.request.use((config) => {
