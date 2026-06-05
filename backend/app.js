@@ -30,7 +30,18 @@ const otpLimiter = rateLimit({
 });
 
 app.use(morgan("dev"));
-app.use(cors());
+app.set("trust proxy", 1);
+
+app.use(
+  cors({
+    origin: [
+      "https://admin.jeezpay.co",
+      "http://localhost:5173",
+      "http://localhost:3000",
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.use("/auth/signup/request-otp", otpLimiter);
