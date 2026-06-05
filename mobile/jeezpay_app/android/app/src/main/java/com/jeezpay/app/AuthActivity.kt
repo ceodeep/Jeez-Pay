@@ -161,6 +161,7 @@ class AuthActivity : BaseFintechActivity() {
     private var pendingPinAction: PinAction = PinAction.VERIFY_LOGIN
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.JeezPayTheme)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_auth)
         initBlockingLoader()

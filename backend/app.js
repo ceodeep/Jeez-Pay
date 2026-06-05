@@ -37,8 +37,6 @@ app.use(
   cors({
     origin: [
       "https://admin.jeezpay.co",
-      "http://localhost:5173",
-      "http://localhost:3000",
       "https://api.jeezpay.co",
     ],
     credentials: true,
