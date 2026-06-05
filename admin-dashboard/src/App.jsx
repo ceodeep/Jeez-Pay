@@ -91,6 +91,7 @@ function AppShell({ onLogout }) {
 
   const [companyWalletLoading, setCompanyWalletLoading] = useState(false);
 const [companyWalletData, setCompanyWalletData] = useState(null);
+const [usdtScannerStatus, setUsdtScannerStatus] = useState(null);
 
   const [kycs, setKycs] = useState([]);
   const [users, setUsers] = useState([]);
@@ -229,6 +230,15 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       );
     }
   }
+
+  async function loadUsdtScannerStatus() {
+  try {
+    const res = await api.get("/admin/usdt-scanner/status");
+    setUsdtScannerStatus(res.data);
+  } catch (err) {
+    console.error("Failed to load USDT scanner status", err);
+  }
+}
   function exportCompanyWalletCsv() {
   const rows = companyWalletData?.recentTransactions || [];
 
@@ -1394,7 +1404,7 @@ async function saveExchangeRate(e) {
         <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
         gap: 16,
       }}
     >
@@ -1444,6 +1454,33 @@ async function saveExchangeRate(e) {
         <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
           {(stats.pendingKyc || 0) + (stats.pendingServiceRequests || 0)} pending items
         </div>
+        <div
+  style={{
+    background: usdtScannerStatus?.enabled ? "#ecfdf5" : "#fef2f2",
+    border: usdtScannerStatus?.enabled
+      ? "1px solid #bbf7d0"
+      : "1px solid #fecaca",
+    borderRadius: 18,
+    padding: 18,
+    color: usdtScannerStatus?.enabled ? "#166534" : "#b91c1c",
+    fontWeight: 700,
+  }}
+>
+  USDT Scanner
+  <div style={{ marginTop: 6, fontSize: 14, fontWeight: 500 }}>
+    {usdtScannerStatus?.enabled ? "Online" : "Offline"}
+  </div>
+  <div style={{ marginTop: 6, fontSize: 12, fontWeight: 500 }}>
+    Last scan:{" "}
+    {usdtScannerStatus?.lastScanAt
+      ? formatDate(usdtScannerStatus.lastScanAt)
+      : "No scans yet"}
+  </div>
+  <div style={{ marginTop: 4, fontSize: 12, fontWeight: 500 }}>
+    Credited: {usdtScannerStatus?.lastCreditedDeposits ?? 0} • Errors:{" "}
+    {usdtScannerStatus?.lastErrors ?? 0}
+  </div>
+</div>
       </div>
     </div>
 
