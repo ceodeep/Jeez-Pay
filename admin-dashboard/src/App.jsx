@@ -4102,20 +4102,6 @@ async function saveExchangeRate(e) {
           </div>
 
           <button
-            onClick={loadReferralRewardHistory}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "1px solid #cbd5e1",
-              background: "#fff",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            Refresh
-          </button>
-
-          <button
   onClick={exportCompanyWalletCsv}
   disabled={!companyWalletData?.recentTransactions?.length}
   style={{
@@ -4130,6 +4116,21 @@ async function saveExchangeRate(e) {
 >
   Export CSV
 </button>
+
+          <button
+            onClick={loadReferralRewardHistory}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid #cbd5e1",
+              background: "#fff",
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Refresh
+          </button>
+
         </div>
 
         {referralRewardHistory.length === 0 ? (
