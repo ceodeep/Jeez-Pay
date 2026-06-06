@@ -221,6 +221,7 @@ class TransactionsAdapter(
             val description = tx.description?.trim().orEmpty()
 
             val friendlyTitle = when {
+                description.equals("Transfer fee", ignoreCase = true) -> "Transfer Fee"
                 typeRaw == "swap_in" -> "Swap Received"
                 typeRaw == "swap_out" -> "Swap Sent"
                 typeRaw == "credit" && description.contains("admin", ignoreCase = true) -> "Wallet Top-up"

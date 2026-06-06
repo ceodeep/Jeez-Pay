@@ -186,14 +186,9 @@ class MainActivity : BaseFintechActivity() {
                 is ApiResult.Success -> {
                     val list = result.data.transactions ?: emptyList()
 
-                    val visibleList = list.filterNot { tx ->
-                        tx.description?.trim()?.equals("Transfer fee", ignoreCase = true) == true ||
-                                tx.type?.trim()?.equals("fee", ignoreCase = true) == true
-                    }
+                    txAdapter.submit(list)
 
-                    txAdapter.submit(visibleList)
-
-                    if (visibleList.isEmpty()) {
+                    if (list.isEmpty()) {
                         showInfoState("No transactions yet")
                     } else {
                         hideStatus()
@@ -623,15 +618,12 @@ class MainActivity : BaseFintechActivity() {
 
                         val list = histResult.data.transactions ?: emptyList()
 
-                        val visibleList = list.filterNot { tx ->
-                            tx.description?.trim()?.equals("Transfer fee", ignoreCase = true) == true ||
-                                    tx.type?.trim()?.equals("fee", ignoreCase = true) == true
-                        }
-
-                        txAdapter.submit(visibleList)
+                        txAdapter.submit(list)
                         isPagingTransactions = false
 
-                        if (visibleList.isEmpty()) {
+
+
+                        if (list.isEmpty()) {
                             showInfoState("No transactions yet")
                         } else {
                             hideStatus()

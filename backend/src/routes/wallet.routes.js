@@ -7,6 +7,8 @@ const { requireAdmin, requirePermission } = require("../middlewares/admin.middle
 const {
   createTronAccount,
   encryptPrivateKey,
+  tronWeb,
+  sendUsdtTrc20FromPrivateKey,
 } = require("../services/tron.service");
 const { scanUsdtDeposits } = require("../services/usdtDepositScanner.service");
 
@@ -1625,6 +1627,165 @@ router.get("/crypto/withdrawals", authMiddleware, async (req, res) => {
     return res.status(500).json({
       message: "Failed to fetch withdrawals",
     });
+  }
+});
+
+router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    if (String(process.env.USDT_WITHDRAWAL_ENABLED || "false") !== "true") {
+      return res.status(400).json({ message: "USDT withdrawals are disabled" });
+    }
+
+    const toAddress = String(req.body.toAddress || "").trim();
+    const amount = Number(req.body.amount || 0);
+    const pin = String(req.body.pin || "").trim();
+
+    const fee = Number(process.env.USDT_WITHDRAWAL_FEE || 1);
+    const min = Number(process.env.USDT_WITHDRAWAL_MIN || 5);
+    const totalDebit = amount + fee;
+
+    if (!tronWeb.isAddress(toAddress)) {
+      return res.status(400).json({ message: "Invalid TRON address" });
+    }
+
+    if (!amount || amount < min) {
+      return res.status(400).json({ message: `Minimum withdrawal is ${min} USDT` });
+    }
+
+    if (!pin) {
+      return res.status(400).json({ message: "PIN is required" });
+    }
+
+    const okKyc = await requireKycApproved(userId);
+    if (!okKyc) {
+      return res.status(403).json({ message: "KYC must be approved before withdrawals" });
+    }
+
+    const pinState = await getUserPinState(userId);
+    const okPin = pinState?.pin_hash && await bcrypt.compare(pin, pinState.pin_hash);
+
+    if (!okPin) {
+      return res.status(403).json({ message: "Invalid PIN" });
+    }
+
+    const treasuryPrivateKey = process.env.TRON_TREASURY_PRIVATE_KEY;
+
+    if (!treasuryPrivateKey) {
+      return res.status(500).json({ message: "Treasury wallet not configured" });
+    }
+
+    const { data: wallet, error: walletErr } = await supabase
+      .from("wallets")
+      .select("id, balance")
+      .eq("user_id", userId)
+      .eq("currency", "USDT")
+      .maybeSingle();
+
+    if (walletErr || !wallet) {
+      return res.status(400).json({ message: "USDT wallet not found" });
+    }
+
+    if (Number(wallet.balance || 0) < totalDebit) {
+      return res.status(400).json({ message: "Insufficient USDT balance" });
+    }
+
+    const reference = Date.now();
+
+    const { data: withdrawal, error: withdrawalErr } = await supabase
+      .from("crypto_withdrawals")
+      .insert({
+        user_id: userId,
+        wallet_id: wallet.id,
+        network: "TRON",
+        token: "USDT",
+        to_address: toAddress,
+        amount,
+        fee,
+        total_debit: totalDebit,
+        status: "processing",
+        reference,
+        submitted_at: new Date().toISOString(),
+      })
+      .select("*")
+      .single();
+
+    if (withdrawalErr) {
+      console.error("withdrawal insert error:", withdrawalErr);
+      return res.status(500).json({ message: "Failed to create withdrawal" });
+    }
+
+    await supabase
+      .from("wallets")
+      .update({ balance: Number(wallet.balance) - totalDebit })
+      .eq("id", wallet.id);
+
+    try {
+      const txHash = await sendUsdtTrc20FromPrivateKey({
+        fromPrivateKey: treasuryPrivateKey,
+        toAddress,
+        amount,
+      });
+
+      await supabase.from("transactions").insert([
+        {
+          wallet_id: wallet.id,
+          type: "debit",
+          amount,
+          description: "USDT withdrawal",
+          reference,
+        },
+        {
+          wallet_id: wallet.id,
+          type: "debit",
+          amount: fee,
+          description: "USDT withdrawal fee",
+          reference,
+        },
+      ]);
+
+      await supabase
+        .from("crypto_withdrawals")
+        .update({
+          status: "completed",
+          tx_hash: txHash,
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawal.id);
+
+      return res.json({
+        message: "USDT withdrawal submitted",
+        amount,
+        fee,
+        totalDebit,
+        txHash,
+        reference,
+      });
+    } catch (sendErr) {
+      console.error("USDT withdrawal send error:", sendErr);
+
+      await supabase
+        .from("wallets")
+        .update({ balance: Number(wallet.balance) })
+        .eq("id", wallet.id);
+
+      await supabase
+        .from("crypto_withdrawals")
+        .update({
+          status: "failed",
+          error_message: sendErr.message || "Blockchain transfer failed",
+          failed_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawal.id);
+
+      return res.status(500).json({
+        message: sendErr.message || "USDT withdrawal failed",
+      });
+    }
+  } catch (err) {
+    console.error("crypto withdraw crash:", err);
+    return res.status(500).json({ message: "Withdrawal failed" });
   }
 });
 
