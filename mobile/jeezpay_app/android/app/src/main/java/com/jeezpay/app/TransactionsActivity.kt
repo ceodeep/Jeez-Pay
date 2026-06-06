@@ -100,6 +100,9 @@ class TransactionsActivity : BaseFintechActivity() {
                     setLoading(false)
 
                     val list = result.data.transactions ?: emptyList()
+                    android.util.Log.d("TX_HISTORY", list.joinToString("\n") {
+                        "${it.type} | ${it.amount} | ${it.description} | ref=${it.reference}"
+                    })
 
                     adapter.submit(list)
 
