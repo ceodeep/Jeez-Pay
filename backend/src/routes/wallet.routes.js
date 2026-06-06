@@ -278,11 +278,11 @@ router.get("/history", authMiddleware, async (req, res) => {
     }
 
     const { data: txs, error: txErr } = await supabase
-      .from("transactions")
-      .select("type, amount, description, created_at")
-      .eq("wallet_id", wallet.id)
-      .order("created_at", { ascending: false })
-      .limit(50);
+  .from("transactions")
+  .select("id, wallet_id, type, amount, description, reference, created_at")
+  .eq("wallet_id", wallet.id)
+  .order("created_at", { ascending: false })
+  .limit(50);
 
     if (txErr) {
       console.error("history tx fetch error:", txErr);
