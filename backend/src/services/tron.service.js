@@ -72,9 +72,42 @@ async function createTronAccount() {
   };
 }
 
+async function sendUsdtTrc20FromPrivateKey({ fromPrivateKey, toAddress, amount }) {
+  if (!fromPrivateKey) {
+    throw new Error("Private key is required");
+  }
+
+  if (!tronWeb.isAddress(toAddress)) {
+    throw new Error("Invalid TRON address");
+  }
+
+  const contractAddress = process.env.USDT_TRC20_CONTRACT;
+
+  if (!contractAddress) {
+    throw new Error("USDT_TRC20_CONTRACT is missing");
+  }
+
+  const senderTronWeb = new TronWeb({
+    fullHost,
+    privateKey: fromPrivateKey,
+    headers: apiKey ? { "TRON-PRO-API-KEY": apiKey } : {},
+  });
+
+  const contract = await senderTronWeb.contract().at(contractAddress);
+
+  const amountInSun = Math.round(Number(amount) * 1_000_000);
+
+  const txHash = await contract.transfer(toAddress, amountInSun).send({
+    feeLimit: 100_000_000,
+  });
+
+  return txHash;
+}
+
 module.exports = {
   tronWeb,
   createTronAccount,
   encryptPrivateKey,
   decryptPrivateKey,
+  sendUsdtTrc20FromPrivateKey,
 };
