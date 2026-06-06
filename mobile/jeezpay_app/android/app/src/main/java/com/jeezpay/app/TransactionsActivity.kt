@@ -101,14 +101,9 @@ class TransactionsActivity : BaseFintechActivity() {
 
                     val list = result.data.transactions ?: emptyList()
 
-                    val visibleList = list.filterNot { tx ->
-                        tx.description?.trim()?.equals("Transfer fee", ignoreCase = true) == true ||
-                                tx.type?.trim()?.equals("fee", ignoreCase = true) == true
-                    }
+                    adapter.submit(list)
 
-                    adapter.submit(visibleList)
-
-                    if (visibleList.isEmpty()) {
+                    if (list.isEmpty()) {
                         tvError.text = "No transactions yet"
                         tvError.visibility = View.VISIBLE
                     }
