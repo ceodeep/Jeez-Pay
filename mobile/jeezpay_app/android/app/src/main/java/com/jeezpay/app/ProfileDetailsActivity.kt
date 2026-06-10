@@ -8,7 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 class ProfileDetailsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_simple_page)
+        setContentView(R.layout.activity_profile_details)
 
         val fullName = intent.getStringExtra("fullName").orEmpty()
         val dob = intent.getStringExtra("dob").orEmpty()
@@ -18,10 +18,12 @@ class ProfileDetailsActivity : AppCompatActivity() {
             finish()
         }
 
+        findViewById<TextView>(R.id.tvTopTitle).text = "Profile details"
+
         findViewById<TextView>(R.id.tvTitle).text =
             if (fullName.isBlank()) "Profile" else fullName
 
-        findViewById<TextView>(R.id.tvSubtitle).text = "Your verified profile information"
+        findViewById<TextView>(R.id.tvSubtitle).text = "Verified JeezPay identity"
 
         findViewById<TextView>(R.id.tvAvatarLetter).text =
             fullName.firstOrNull()?.uppercase() ?: "J"

@@ -452,9 +452,9 @@
                                     android:includeFontPadding="false"/>
                             </LinearLayout>
 
-                            <!-- Credit -->
+                            <!-- Withdraw -->
                             <LinearLayout
-                                android:id="@+id/btnCredit"
+                                android:id="@+id/btnWithdraw"
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_columnWeight="1"
@@ -473,16 +473,16 @@
                                         android:layout_width="24dp"
                                         android:layout_height="24dp"
                                         android:layout_gravity="center"
-                                        android:src="@drawable/ic_card"
+                                        android:src="@drawable/ic_arrow_up_right"
                                         app:tint="@color/paypal_blue"
-                                        android:contentDescription="Credit"/>
+                                        android:contentDescription="Withdraw"/>
                                 </FrameLayout>
 
                                 <TextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:layout_marginTop="6dp"
-                                    android:text="Credit"
+                                    android:text="Withdraw"
                                     android:textSize="12sp"
                                     android:textColor="@color/text_secondary"
                                     android:fontFamily="sans-serif-medium"

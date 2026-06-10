@@ -33,6 +33,10 @@ function escapeCsv(value) {
   return str;
 }
 
+function publicReference() {
+  return Number(String(Date.now()).slice(-11));
+}
+
 function toCsv(headers, rows) {
   const headerLine = headers.map(escapeCsv).join(",");
   const bodyLines = rows.map((row) =>
@@ -1428,213 +1432,11 @@ router.get("/crypto/deposits", authMiddleware, async (req, res) => {
 // POST /wallet/crypto/withdraw/request
 // Body: { toAddress, amount, pin }
 // =====================================
-router.post("/crypto/withdraw/request", authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-
-    const toAddress = String(req.body.toAddress || "").trim();
-    const amount = Number(req.body.amount);
-    const pin = String(req.body.pin || "").trim();
-
-    const network = "TRON";
-    const token = "USDT";
-
-    if (!toAddress || !toAddress.startsWith("T") || toAddress.length < 30) {
-      return res.status(400).json({
-        message: "Enter a valid TRON address",
-      });
-    }
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({
-        message: "Enter a valid withdrawal amount",
-      });
-    }
-
-    if (!pin) {
-      return res.status(400).json({
-        code: "PIN_REQUIRED",
-        message: "PIN is required",
-      });
-    }
-
-    const okKyc = await requireKycApproved(userId);
-    if (!okKyc) {
-      return res.status(403).json({
-        code: "KYC_REQUIRED",
-        message: "KYC must be approved before withdrawals",
-      });
-    }
-
-    const pinState = await getUserPinState(userId);
-
-    if (!pinState?.pin_hash) {
-      return res.status(400).json({
-        code: "PIN_NOT_SET",
-        message: "PIN not set for this account",
-      });
-    }
-
-    if (pinState.pin_locked_until) {
-      const lockedUntil = new Date(pinState.pin_locked_until);
-      if (lockedUntil > new Date()) {
-        return res.status(403).json({
-          code: "PIN_LOCKED",
-          message: "Too many attempts. Try again later.",
-        });
-      }
-    }
-
-    const okPin = await bcrypt.compare(pin, pinState.pin_hash);
-
-    if (!okPin) {
-      const attempts = (pinState.pin_failed_attempts || 0) + 1;
-
-      if (attempts >= 5) {
-        const lockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-        await updatePinFail(userId, attempts, lockedUntil);
-
-        return res.status(403).json({
-          code: "PIN_LOCKED",
-          message: "Too many wrong attempts. Locked for 5 minutes.",
-        });
-      }
-
-      await updatePinFail(userId, attempts, null);
-
-      return res.status(403).json({
-        code: "PIN_INVALID",
-        message: "Invalid PIN",
-      });
-    }
-
-    await resetPinFail(userId);
-
-    const { wallet, error: walletErr } = await ensureWallet(userId, token);
-
-    if (walletErr || !wallet) {
-      console.error("[crypto withdraw request] wallet error:", walletErr);
-      return res.status(500).json({ message: "Wallet check failed" });
-    }
-
-    const balance = Number(wallet.balance || 0);
-
-    // Temporary platform fee. You can change later from admin/settings.
-    const fee = 1;
-    const totalDebit = amount + fee;
-
-    if (amount < 5) {
-      return res.status(400).json({
-        message: "Minimum USDT withdrawal is 5 USDT",
-      });
-    }
-
-    if (balance < totalDebit) {
-      return res.status(400).json({
-        message: "Insufficient USDT balance",
-      });
-    }
-
-    // For safety, first version does NOT deduct immediately.
-    // Admin will review and approve/reject.
-    const { data: request, error: insertErr } = await supabase
-      .from("crypto_withdraw_requests")
-      .insert({
-        user_id: userId,
-        wallet_id: wallet.id,
-        network,
-        token,
-        to_address: toAddress,
-        amount,
-        fee,
-        total_debit: totalDebit,
-        status: "pending",
-      })
-      .select(`
-        id,
-        network,
-        token,
-        to_address,
-        amount,
-        fee,
-        total_debit,
-        status,
-        requested_at
-      `)
-      .single();
-
-    if (insertErr) {
-      console.error("[crypto withdraw request] insert error:", insertErr);
-      return res.status(500).json({
-        message: "Failed to submit withdrawal request",
-      });
-    }
-
-    return res.json({
-      message: "Withdrawal request submitted for review",
-      request,
-    });
-  } catch (err) {
-    console.error("[crypto withdraw request] crash:", err);
-    return res.status(500).json({
-      message: "Withdrawal request failed",
-    });
-  }
-});
-
-// =====================================
-// USDT TRC20 WITHDRAWAL HISTORY
-// GET /wallet/crypto/withdrawals
-// =====================================
-router.get("/crypto/withdrawals", authMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.userId;
-
-    const { data, error } = await supabase
-      .from("crypto_withdraw_requests")
-      .select(`
-        id,
-        network,
-        token,
-        to_address,
-        amount,
-        fee,
-        total_debit,
-        status,
-        tx_hash,
-        admin_note,
-        requested_at,
-        approved_at,
-        rejected_at,
-        completed_at
-      `)
-      .eq("user_id", userId)
-      .order("requested_at", { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error("[crypto withdrawals] fetch error:", error);
-      return res.status(500).json({
-        message: "Failed to fetch withdrawals",
-      });
-    }
-
-    return res.json({
-      withdrawals: data || [],
-    });
-  } catch (err) {
-    console.error("[crypto withdrawals] crash:", err);
-    return res.status(500).json({
-      message: "Failed to fetch withdrawals",
-    });
-  }
-});
-
 router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    if (String(process.env.USDT_WITHDRAWAL_ENABLED || "false") !== "true") {
+    if (String(process.env.USDT_WITHDRAWAL_ENABLED || "false").toLowerCase() !== "true") {
       return res.status(400).json({ message: "USDT withdrawals are disabled" });
     }
 
@@ -1650,25 +1452,30 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Invalid TRON address" });
     }
 
-    if (!amount || amount < min) {
+    if (!Number.isFinite(amount) || amount < min) {
       return res.status(400).json({ message: `Minimum withdrawal is ${min} USDT` });
     }
 
     if (!pin) {
-      return res.status(400).json({ message: "PIN is required" });
+      return res.status(400).json({ code: "PIN_REQUIRED", message: "PIN is required" });
     }
 
     const okKyc = await requireKycApproved(userId);
     if (!okKyc) {
-      return res.status(403).json({ message: "KYC must be approved before withdrawals" });
+      return res.status(403).json({
+        code: "KYC_REQUIRED",
+        message: "KYC must be approved before withdrawals",
+      });
     }
 
     const pinState = await getUserPinState(userId);
     const okPin = pinState?.pin_hash && await bcrypt.compare(pin, pinState.pin_hash);
 
     if (!okPin) {
-      return res.status(403).json({ message: "Invalid PIN" });
+      return res.status(403).json({ code: "PIN_INVALID", message: "Invalid PIN" });
     }
+
+    await resetPinFail(userId);
 
     const treasuryPrivateKey = process.env.TRON_TREASURY_PRIVATE_KEY;
 
@@ -1676,22 +1483,19 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Treasury wallet not configured" });
     }
 
-    const { data: wallet, error: walletErr } = await supabase
-      .from("wallets")
-      .select("id, balance")
-      .eq("user_id", userId)
-      .eq("currency", "USDT")
-      .maybeSingle();
+    const { wallet, error: walletErr } = await ensureWallet(userId, "USDT");
 
     if (walletErr || !wallet) {
       return res.status(400).json({ message: "USDT wallet not found" });
     }
 
-    if (Number(wallet.balance || 0) < totalDebit) {
+    const balance = Number(wallet.balance || 0);
+
+    if (balance < totalDebit) {
       return res.status(400).json({ message: "Insufficient USDT balance" });
     }
 
-    const reference = Date.now();
+    const reference = publicReference();
 
     const { data: withdrawal, error: withdrawalErr } = await supabase
       .from("crypto_withdrawals")
@@ -1716,10 +1520,15 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to create withdrawal" });
     }
 
-    await supabase
+    const { error: debitErr } = await supabase
       .from("wallets")
-      .update({ balance: Number(wallet.balance) - totalDebit })
+      .update({ balance: balance - totalDebit })
       .eq("id", wallet.id);
+
+    if (debitErr) {
+      console.error("withdrawal debit error:", debitErr);
+      return res.status(500).json({ message: "Failed to debit wallet" });
+    }
 
     try {
       const txHash = await sendUsdtTrc20FromPrivateKey({
@@ -1755,7 +1564,7 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
         .eq("id", withdrawal.id);
 
       return res.json({
-        message: "USDT withdrawal submitted",
+        message: "USDT withdrawal completed",
         amount,
         fee,
         totalDebit,
@@ -1767,7 +1576,7 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
 
       await supabase
         .from("wallets")
-        .update({ balance: Number(wallet.balance) })
+        .update({ balance })
         .eq("id", wallet.id);
 
       await supabase
@@ -1786,6 +1595,54 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("crypto withdraw crash:", err);
     return res.status(500).json({ message: "Withdrawal failed" });
+  }
+});
+
+// =====================================
+// USDT TRC20 WITHDRAWAL HISTORY
+// GET /wallet/crypto/withdrawals
+// =====================================
+router.get("/crypto/withdrawals", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const { data, error } = await supabase
+      .from("crypto_withdrawals")
+      .select(`
+        id,
+        network,
+        token,
+        to_address,
+        amount,
+        fee,
+        total_debit,
+        status,
+        tx_hash,
+        admin_note,
+        requested_at,
+        approved_at,
+        rejected_at,
+        completed_at
+      `)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("[crypto withdrawals] fetch error:", error);
+      return res.status(500).json({
+        message: "Failed to fetch withdrawals",
+      });
+    }
+
+    return res.json({
+      withdrawals: data || [],
+    });
+  } catch (err) {
+    console.error("[crypto withdrawals] crash:", err);
+    return res.status(500).json({
+      message: "Failed to fetch withdrawals",
+    });
   }
 });
 

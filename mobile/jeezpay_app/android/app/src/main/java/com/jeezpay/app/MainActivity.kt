@@ -28,6 +28,7 @@ import androidx.appcompat.app.AlertDialog
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
 import com.jeezpay.app.common.LoaderOverlayController
+import com.google.android.material.button.MaterialButton
 
 
 
@@ -435,6 +436,7 @@ class MainActivity : BaseFintechActivity() {
         val btnSwap = findViewById<View>(R.id.btnSwap)
         val btnDeposit = findViewById<View>(R.id.btnDeposit)
         val btnBill = findViewById<View>(R.id.btnBill)
+        val btnWithdraw = findViewById<View>(R.id.btnWithdraw)
 
         btnDeposit.setOnClickListener {
             startActivity(Intent(this, DepositActivity::class.java))
@@ -443,6 +445,7 @@ class MainActivity : BaseFintechActivity() {
         btnSend.setOnClickListener {
             startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))
         }
+
 
         btnReferral.setOnClickListener {
             startActivity(Intent(this, ReferralActivity::class.java))
@@ -455,15 +458,30 @@ class MainActivity : BaseFintechActivity() {
         }
         btnBill.setOnClickListener {
             if (!billsServicesEnabled) {
-                AlertDialog.Builder(this)
-                    .setTitle("Coming Soon")
-                    .setMessage("Bills & Services will be available soon.")
-                    .setPositiveButton("OK", null)
-                    .show()
+                showComingSoon(
+                    title = "Bills & Services",
+                    message = "Bill payments and service requests are currently in development. Soon you’ll be able to pay bills, request services, and manage payments directly from JeezPay.",
+                    icon = "🧾"
+                )
                 return@setOnClickListener
             }
 
             startActivity(Intent(this, ServicesActivity::class.java))
+        }
+
+        btnWithdraw.setOnClickListener {
+
+            if (selectedCurrency == "USDT") {
+                startActivity(
+                    Intent(this, WithdrawActivity::class.java)
+                        .putExtra("currency", "USDT")
+                )
+            } else {
+                showComingSoon(
+                    title = "Withdrawals Coming Soon",
+                    message = "Withdrawals for $selectedCurrency will be available in a future JeezPay update."
+                )
+            }
         }
     }
 
@@ -477,8 +495,9 @@ class MainActivity : BaseFintechActivity() {
 
         navCard.setOnClickListener {
             showComingSoon(
-                title = "Cards coming soon",
-                message = "You’ll soon be able to add and manage JeezPay virtual and physical cards here."
+                title = "JeezPay Cards",
+                message = "Virtual and physical cards are currently in development. Soon you’ll be able to pay online, withdraw from ATMs, and manage your cards directly from JeezPay.",
+                icon = "💳"
             )
         }
 
@@ -725,12 +744,24 @@ class MainActivity : BaseFintechActivity() {
         val imageView = findViewById<ImageView>(R.id.imgProfile)
         imageView.setImageResource(resId)
     }
-    private fun showComingSoon(title: String, message: String) {
-        MaterialAlertDialogBuilder(this)
-            .setTitle(title)
-            .setMessage(message)
-            .setPositiveButton("Got it", null)
-            .show()
+    private fun showComingSoon(
+        title: String,
+        message: String,
+        icon: String = "✨"
+    ) {
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.bottom_sheet_coming_soon, null)
+
+        view.findViewById<TextView>(R.id.tvComingSoonIcon).text = icon
+        view.findViewById<TextView>(R.id.tvComingSoonTitle).text = title
+        view.findViewById<TextView>(R.id.tvComingSoonMessage).text = message
+
+        view.findViewById<MaterialButton>(R.id.btnComingSoonClose).setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.setContentView(view)
+        dialog.show()
     }
 }
 
