@@ -1495,9 +1495,9 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Insufficient USDT balance" });
     }
 
-    const reference = publicReference();
+   const reference = publicReference();
 
-    const { data: prepared, error: prepareErr } = await supabase.rpc(
+const { data: prepared, error: prepareErr } = await supabase.rpc(
   "prepare_usdt_withdrawal",
   {
     p_user_id: userId,
@@ -1516,77 +1516,22 @@ if (prepareErr) {
 }
 
 const withdrawalId = prepared?.withdrawalId;
-const walletId = prepared?.walletId;
 const totalDebitPrepared = Number(prepared?.totalDebit || totalDebit);
 
-    try {
-      const txHash = await sendUsdtTrc20FromPrivateKey({
-        fromPrivateKey: treasuryPrivateKey,
-        toAddress,
-        amount,
-      });
-
-      await supabase.from("transactions").insert([
-        {
-          wallet_id: walletId,
-          type: "debit",
-          amount,
-          description: "USDT withdrawal",
-          reference,
-        },
-        {
-         wallet_id: walletId,
-          type: "debit",
-          amount: fee,
-          description: "USDT withdrawal fee",
-          reference,
-        },
-      ]);
-
-      await supabase
-        .from("crypto_withdrawals")
-        .update({
-          status: "completed",
-          tx_hash: txHash,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", withdrawalId);
-
-      return res.json({
-        message: "USDT withdrawal completed",
-        amount,
-        fee,
-        totalDebit,
-        txHash,
-        reference,
-      });
-    } catch (sendErr) {
-      console.error("USDT withdrawal send error:", sendErr);
-
-      await supabase
-        .from("wallets")
-        .update({ balance })
-        .eq("id", walletId);
-
-      await supabase
-        .from("crypto_withdrawals")
-        .update({
-          status: "failed",
-          error_message: sendErr.message || "Blockchain transfer failed",
-          failed_at: new Date().toISOString(),
-        })
-        .eq("id", withdrawalId);
-
-      return res.status(500).json({
-        message: sendErr.message || "USDT withdrawal failed",
-      });
-    }
+return res.json({
+  message: "Withdrawal request submitted for review",
+  status: "pending",
+  amount,
+  fee,
+  totalDebit: totalDebitPrepared,
+  reference,
+  withdrawalId,
+});
   } catch (err) {
     console.error("crypto withdraw crash:", err);
     return res.status(500).json({ message: "Withdrawal failed" });
   }
 });
-
 // =====================================
 // USDT TRC20 WITHDRAWAL HISTORY
 // GET /wallet/crypto/withdrawals
