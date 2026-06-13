@@ -20,6 +20,9 @@ const PROTECTED_ADMIN_ROLES = [
   "support_agent",
   "auditor",
 ];
+const {
+  sendUsdtTrc20FromPrivateKey,
+} = require("../services/tron.service");
 
 function isProtectedAdminRole(role) {
   return PROTECTED_ADMIN_ROLES.includes(String(role || "").trim());
@@ -3548,7 +3551,7 @@ router.get(
 );
 
 router.post(
-  "/admin/crypto/withdrawals/:id/approve",
+  "/crypto/withdrawals/:id/approve",
   authMiddleware,
   requireAdmin,
   requirePermission("crypto.withdrawals.approve"),
@@ -3657,7 +3660,7 @@ router.post(
 );
 
 router.post(
-  "/admin/crypto/withdrawals/:id/reject",
+  "/crypto/withdrawals/:id/reject",
   authMiddleware,
   requireAdmin,
   requirePermission("crypto.withdrawals.reject"),
@@ -3736,7 +3739,7 @@ router.post(
 );
 
 router.get(
-  "/admin/crypto/withdrawals",
+  "/crypto/withdrawals",
   authMiddleware,
   requireAdmin,
   requirePermission("crypto.withdrawals.view"),
