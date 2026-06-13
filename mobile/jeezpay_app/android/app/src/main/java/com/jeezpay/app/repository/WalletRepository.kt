@@ -162,14 +162,16 @@ class WalletRepository {
     suspend fun cryptoWithdrawSafe(
         toAddress: String,
         amount: Double,
-        pin: String
+        pin: String,
+        network: String
     ): ApiResult<CryptoWithdrawResponse> {
         return safeApiCall {
             api.cryptoWithdraw(
                 CryptoWithdrawRequest(
                     toAddress = toAddress,
                     amount = amount,
-                    pin = pin
+                    pin = pin,
+                    network = network
                 )
             )
         }

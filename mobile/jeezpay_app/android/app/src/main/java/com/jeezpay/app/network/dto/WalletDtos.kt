@@ -161,7 +161,8 @@ data class TransferQuoteResponse(
 data class CryptoWithdrawRequest(
     val toAddress: String,
     val amount: Double,
-    val pin: String
+    val pin: String,
+    val network: String
 )
 
 data class CryptoWithdrawResponse(

@@ -91,10 +91,6 @@ class WithdrawActivity : AppCompatActivity() {
             return
         }
 
-        if (selectedNetwork != "TRC20") {
-            showComingSoon("USDT $selectedNetwork withdrawals are coming soon.")
-            return
-        }
 
         val address = etAddress.text?.toString()?.trim().orEmpty()
         val amount = etAmount.text?.toString()?.toDoubleOrNull() ?: 0.0
@@ -161,7 +157,8 @@ class WithdrawActivity : AppCompatActivity() {
                 repo.cryptoWithdrawSafe(
                     toAddress = pendingAddress,
                     amount = pendingAmount,
-                    pin = pin
+                    pin = pin,
+                    network = selectedNetwork
                 )
             }) {
                 is ApiResult.Success -> {
@@ -217,8 +214,9 @@ class WithdrawActivity : AppCompatActivity() {
         }
 
         view.findViewById<View>(R.id.rowBep20).setOnClickListener {
+            selectedNetwork = "BEP20"
+            findViewById<TextView>(R.id.tvNetwork).text = selectedNetwork
             dialog.dismiss()
-            showComingSoon("USDT BEP20 withdrawals are coming soon.")
         }
 
         dialog.setContentView(view)
