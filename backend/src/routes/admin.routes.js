@@ -3622,7 +3622,7 @@ await supabase.from("transactions").insert([
   },
 ]);
 
-await supabase
+const { error: completeErr } = await supabase
   .from("crypto_withdrawals")
   .update({
     status: "completed",
@@ -3631,6 +3631,14 @@ await supabase
     completed_at: new Date().toISOString(),
   })
   .eq("id", withdrawalId);
+
+if (completeErr) {
+  console.error("complete withdrawal update error:", completeErr);
+  return res.status(500).json({
+    message: "Withdrawal sent but failed to mark completed. Manual review required.",
+    txHash,
+  });
+}
 
 await logAdminAction({
   adminId,
