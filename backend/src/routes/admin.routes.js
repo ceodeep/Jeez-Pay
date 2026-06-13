@@ -22,6 +22,7 @@ const PROTECTED_ADMIN_ROLES = [
 ];
 const {
   sendUsdtTrc20FromPrivateKey,
+  waitForTransactionSuccess,
 } = require("../services/tron.service");
 
 function isProtectedAdminRole(role) {
@@ -3604,6 +3605,14 @@ if (lockErr || !lockedWithdrawal) {
   toAddress: lockedWithdrawal.to_address,
   amount: Number(lockedWithdrawal.amount),
 });
+await supabase
+  .from("crypto_withdrawals")
+  .update({
+    tx_hash: txHash,
+  })
+  .eq("id", withdrawalId);
+
+await waitForTransactionSuccess(txHash);
 
 await supabase.from("transactions").insert([
   {
@@ -3659,13 +3668,13 @@ return res.json({
 });
       } catch (sendErr) {
         await supabase
-          .from("crypto_withdrawals")
-          .update({
-            status: "failed",
-            error_message: sendErr.message || "Blockchain send failed",
-            failed_at: new Date().toISOString(),
-          })
-          .eq("id", withdrawalId);
+  .from("crypto_withdrawals")
+  .update({
+    status: "failed",
+    error_message: sendErr.message || "Blockchain send failed",
+    failed_at: new Date().toISOString(),
+  })
+  .eq("id", withdrawalId);
 
         return res.status(500).json({
           message: sendErr.message || "Blockchain send failed",
