@@ -1395,18 +1395,18 @@ router.get("/crypto/deposits", authMiddleware, async (req, res) => {
     const { data, error } = await supabase
       .from("crypto_deposits")
       .select(`
-        id,
-        network,
-        token,
-        tx_hash,
-        from_address,
-        to_address,
-        amount,
-        confirmations,
-        status,
-        credited_at,
-        created_at
-      `)
+  id,
+  network,
+  token,
+  tx_hash,
+  from_address,
+  to_address,
+  amount,
+  confirmations,
+  status,
+  credited_at,
+  created_at
+`)
       .eq("user_id", userId)
       .eq("network", network)
       .eq("token", token)
@@ -1497,38 +1497,27 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
 
     const reference = publicReference();
 
-    const { data: withdrawal, error: withdrawalErr } = await supabase
-      .from("crypto_withdrawals")
-      .insert({
-        user_id: userId,
-        wallet_id: wallet.id,
-        network: "TRON",
-        token: "USDT",
-        to_address: toAddress,
-        amount,
-        fee,
-        total_debit: totalDebit,
-        status: "processing",
-        reference,
-        submitted_at: new Date().toISOString(),
-      })
-      .select("*")
-      .single();
+    const { data: prepared, error: prepareErr } = await supabase.rpc(
+  "prepare_usdt_withdrawal",
+  {
+    p_user_id: userId,
+    p_to_address: toAddress,
+    p_amount: amount,
+    p_fee: fee,
+    p_reference: reference,
+  }
+);
 
-    if (withdrawalErr) {
-      console.error("withdrawal insert error:", withdrawalErr);
-      return res.status(500).json({ message: "Failed to create withdrawal" });
-    }
+if (prepareErr) {
+  console.error("prepare withdrawal error:", prepareErr);
+  return res.status(400).json({
+    message: prepareErr.message || "Failed to prepare withdrawal",
+  });
+}
 
-    const { error: debitErr } = await supabase
-      .from("wallets")
-      .update({ balance: balance - totalDebit })
-      .eq("id", wallet.id);
-
-    if (debitErr) {
-      console.error("withdrawal debit error:", debitErr);
-      return res.status(500).json({ message: "Failed to debit wallet" });
-    }
+const withdrawalId = prepared?.withdrawalId;
+const walletId = prepared?.walletId;
+const totalDebitPrepared = Number(prepared?.totalDebit || totalDebit);
 
     try {
       const txHash = await sendUsdtTrc20FromPrivateKey({
@@ -1539,14 +1528,14 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
 
       await supabase.from("transactions").insert([
         {
-          wallet_id: wallet.id,
+          wallet_id: walletId,
           type: "debit",
           amount,
           description: "USDT withdrawal",
           reference,
         },
         {
-          wallet_id: wallet.id,
+         wallet_id: walletId,
           type: "debit",
           amount: fee,
           description: "USDT withdrawal fee",
@@ -1561,7 +1550,7 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
           tx_hash: txHash,
           completed_at: new Date().toISOString(),
         })
-        .eq("id", withdrawal.id);
+        .eq("id", withdrawalId);
 
       return res.json({
         message: "USDT withdrawal completed",
@@ -1577,7 +1566,7 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
       await supabase
         .from("wallets")
         .update({ balance })
-        .eq("id", wallet.id);
+        .eq("id", walletId);
 
       await supabase
         .from("crypto_withdrawals")
@@ -1586,7 +1575,7 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
           error_message: sendErr.message || "Blockchain transfer failed",
           failed_at: new Date().toISOString(),
         })
-        .eq("id", withdrawal.id);
+        .eq("id", withdrawalId);
 
       return res.status(500).json({
         message: sendErr.message || "USDT withdrawal failed",
@@ -1609,21 +1598,22 @@ router.get("/crypto/withdrawals", authMiddleware, async (req, res) => {
     const { data, error } = await supabase
       .from("crypto_withdrawals")
       .select(`
-        id,
-        network,
-        token,
-        to_address,
-        amount,
-        fee,
-        total_debit,
-        status,
-        tx_hash,
-        admin_note,
-        requested_at,
-        approved_at,
-        rejected_at,
-        completed_at
-      `)
+  id,
+  network,
+  token,
+  to_address,
+  amount,
+  fee,
+  total_debit,
+  status,
+  tx_hash,
+  reference,
+  error_message,
+  created_at,
+  submitted_at,
+  completed_at,
+  failed_at
+`)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(50);

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@android:color/transparent">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="12dp"
+        app:cardBackgroundColor="@color/card_white"
+        app:cardCornerRadius="30dp"
+        app:cardElevation="0dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="22dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Choose currency"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Select what you want to withdraw."
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:id="@+id/rowUsdt"
+                style="@style/WithdrawCurrencyRow"
+                android:layout_marginTop="18dp">
+
+                <ImageView
+                    style="@style/WithdrawCurrencyIcon"
+                    android:src="@drawable/logo_usdt" />
+
+                <LinearLayout style="@style/WithdrawCurrencyTextWrap">
+
+                    <TextView
+                        style="@style/WithdrawCurrencyTitle"
+                        android:text="USDT" />
+
+                    <TextView
+                        style="@style/WithdrawCurrencySubtitle"
+                        android:text="Available on TRC20" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowSdg"
+                style="@style/WithdrawCurrencyRow">
+
+                <ImageView
+                    style="@style/WithdrawCurrencyIcon"
+                    android:src="@drawable/flag_sdg" />
+
+                <LinearLayout style="@style/WithdrawCurrencyTextWrap">
+
+                    <TextView
+                        style="@style/WithdrawCurrencyTitle"
+                        android:text="SDG" />
+
+                    <TextView
+                        style="@style/WithdrawCurrencySubtitle"
+                        android:text="Coming soon" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowSsp"
+                style="@style/WithdrawCurrencyRow">
+
+                <ImageView
+                    style="@style/WithdrawCurrencyIcon"
+                    android:src="@drawable/flag_ssp" />
+
+                <LinearLayout style="@style/WithdrawCurrencyTextWrap">
+
+                    <TextView
+                        style="@style/WithdrawCurrencyTitle"
+                        android:text="SSP" />
+
+                    <TextView
+                        style="@style/WithdrawCurrencySubtitle"
+                        android:text="Coming soon" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowEgp"
+                style="@style/WithdrawCurrencyRow">
+
+                <ImageView
+                    style="@style/WithdrawCurrencyIcon"
+                    android:src="@drawable/flag_egp" />
+
+                <LinearLayout style="@style/WithdrawCurrencyTextWrap">
+
+                    <TextView
+                        style="@style/WithdrawCurrencyTitle"
+                        android:text="EGP" />
+
+                    <TextView
+                        style="@style/WithdrawCurrencySubtitle"
+                        android:text="Coming soon" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowUgx"
+                style="@style/WithdrawCurrencyRow">
+
+                <ImageView
+                    style="@style/WithdrawCurrencyIcon"
+                    android:src="@drawable/flag_ugx" />
+
+                <LinearLayout style="@style/WithdrawCurrencyTextWrap">
+
+                    <TextView
+                        style="@style/WithdrawCurrencyTitle"
+                        android:text="UGX" />
+
+                    <TextView
+                        style="@style/WithdrawCurrencySubtitle"
+                        android:text="Coming soon" />
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+</FrameLayout>

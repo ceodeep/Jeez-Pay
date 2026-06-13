@@ -17,6 +17,9 @@ import com.jeezpay.app.network.dto.CryptoDepositAddressResponse
 import com.jeezpay.app.network.dto.CryptoDepositsResponse
 import com.jeezpay.app.network.dto.TransferQuoteRequest
 import com.jeezpay.app.network.dto.TransferQuoteResponse
+import com.jeezpay.app.network.dto.CryptoWithdrawRequest
+import com.jeezpay.app.network.dto.CryptoWithdrawResponse
+import com.jeezpay.app.network.dto.WithdrawalsResponse
 
 
 interface WalletApi {
@@ -66,5 +69,13 @@ interface WalletApi {
     suspend fun transferQuote(
         @Body body: TransferQuoteRequest
     ): TransferQuoteResponse
+
+    @POST("wallet/crypto/withdraw")
+    suspend fun cryptoWithdraw(
+        @Body body: CryptoWithdrawRequest
+    ): CryptoWithdrawResponse
+
+    @GET("wallet/crypto/withdrawals")
+    suspend fun cryptoWithdrawals(): WithdrawalsResponse
 
 }

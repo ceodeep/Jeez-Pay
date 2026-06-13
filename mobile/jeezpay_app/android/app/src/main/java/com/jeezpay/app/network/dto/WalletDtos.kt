@@ -157,3 +157,18 @@ data class TransferQuoteResponse(
     val maxTransfer: Double? = null,
     val isEnabled: Boolean? = null
 )
+
+data class CryptoWithdrawRequest(
+    val toAddress: String,
+    val amount: Double,
+    val pin: String
+)
+
+data class CryptoWithdrawResponse(
+    val message: String? = null,
+    val amount: Double? = null,
+    val fee: Double? = null,
+    val totalDebit: Double? = null,
+    val txHash: String? = null,
+    val reference: Long? = null
+)
