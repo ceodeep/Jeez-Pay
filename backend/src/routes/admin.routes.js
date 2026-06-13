@@ -3674,7 +3674,24 @@ return res.json({
     error_message: sendErr.message || "Blockchain send failed",
     failed_at: new Date().toISOString(),
   })
+  
   .eq("id", withdrawalId);
+  const refundAmount = Number(lockedWithdrawal.total_debit || 0);
+
+const { data: wallet } = await supabase
+  .from("wallets")
+  .select("id, balance")
+  .eq("id", lockedWithdrawal.wallet_id)
+  .maybeSingle();
+
+if (wallet && refundAmount > 0) {
+  await supabase
+    .from("wallets")
+    .update({
+      balance: Number(wallet.balance || 0) + refundAmount,
+    })
+    .eq("id", wallet.id);
+}
 
         return res.status(500).json({
           message: sendErr.message || "Blockchain send failed",
