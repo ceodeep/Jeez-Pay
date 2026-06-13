@@ -1443,14 +1443,35 @@ router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
     const toAddress = String(req.body.toAddress || "").trim();
     const amount = Number(req.body.amount || 0);
     const pin = String(req.body.pin || "").trim();
+    const network = String(req.body.network || "TRC20").trim().toUpperCase();
+
+    if (!["TRC20", "BEP20"].includes(network)) {
+  return res.status(400).json({
+    message: "Unsupported network",
+  });
+}
 
     const fee = Number(process.env.USDT_WITHDRAWAL_FEE || 1);
     const min = Number(process.env.USDT_WITHDRAWAL_MIN || 5);
     const totalDebit = amount + fee;
 
-    if (!tronWeb.isAddress(toAddress)) {
-      return res.status(400).json({ message: "Invalid TRON address" });
-    }
+    if (network === "TRC20") {
+  if (!tronWeb.isAddress(toAddress)) {
+    return res.status(400).json({
+      message: "Invalid TRC20 address",
+    });
+  }
+}
+
+if (network === "BEP20") {
+  const { isBscAddress } = require("../services/bsc.service");
+
+  if (!isBscAddress(toAddress)) {
+    return res.status(400).json({
+      message: "Invalid BEP20 address",
+    });
+  }
+}
 
     if (!Number.isFinite(amount) || amount < min) {
       return res.status(400).json({ message: `Minimum withdrawal is ${min} USDT` });
@@ -1505,6 +1526,7 @@ const { data: prepared, error: prepareErr } = await supabase.rpc(
     p_amount: amount,
     p_fee: fee,
     p_reference: reference,
+p_network: network,
   }
 );
 
