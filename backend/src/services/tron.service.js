@@ -130,6 +130,30 @@ async function waitForTransactionSuccess(txHash, maxAttempts = 20, delayMs = 300
   throw new Error("Transaction confirmation timed out");
 }
 
+async function sendTrxFromPrivateKey({ fromPrivateKey, toAddress, amount }) {
+  if (!fromPrivateKey) throw new Error("Private key is required");
+  if (!tronWeb.isAddress(toAddress)) throw new Error("Invalid TRON address");
+
+  const senderTronWeb = new TronWeb({
+    fullHost,
+    privateKey: fromPrivateKey,
+    headers: apiKey ? { "TRON-PRO-API-KEY": apiKey } : {},
+  });
+
+  const amountInSun = Math.floor(Number(amount) * 1_000_000);
+
+  const result = await senderTronWeb.trx.sendTransaction(
+    toAddress,
+    amountInSun
+  );
+
+  if (!result?.result) {
+    throw new Error(result?.message || "TRX transfer failed");
+  }
+
+  return result.txid;
+}
+
 module.exports = {
   tronWeb,
   createTronAccount,
@@ -137,4 +161,5 @@ module.exports = {
   decryptPrivateKey,
   sendUsdtTrc20FromPrivateKey,
   waitForTransactionSuccess,
+  sendTrxFromPrivateKey,
 };

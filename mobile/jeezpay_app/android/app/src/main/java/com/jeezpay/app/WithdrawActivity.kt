@@ -69,6 +69,7 @@ class WithdrawActivity : AppCompatActivity() {
 
         tvCurrency.text = selectedCurrency
         tvNetwork.text = selectedNetwork
+        updateNetworkUi()
 
         btnBack.setOnClickListener { finish() }
 
@@ -209,12 +210,14 @@ class WithdrawActivity : AppCompatActivity() {
 
         view.findViewById<View>(R.id.rowTrc20).setOnClickListener {
             selectedNetwork = "TRC20"
+            updateNetworkUi()
             findViewById<TextView>(R.id.tvNetwork).text = selectedNetwork
             dialog.dismiss()
         }
 
         view.findViewById<View>(R.id.rowBep20).setOnClickListener {
             selectedNetwork = "BEP20"
+            updateNetworkUi()
             findViewById<TextView>(R.id.tvNetwork).text = selectedNetwork
             dialog.dismiss()
         }
@@ -274,5 +277,23 @@ class WithdrawActivity : AppCompatActivity() {
 
         dialog.setContentView(view)
         dialog.show()
+    }
+
+    private fun updateNetworkUi() {
+        findViewById<TextView>(R.id.tvWithdrawBadge).text = "USDT $selectedNetwork"
+
+        findViewById<TextView>(R.id.tvWithdrawInfo).text =
+            if (selectedNetwork == "BEP20") {
+                "Withdraw USDT from your JeezPay balance to an external BNB Smart Chain wallet address."
+            } else {
+                "Withdraw USDT from your JeezPay balance to an external TRON wallet address."
+            }
+
+        findViewById<TextView>(R.id.tvWithdrawNetworkInfo).text =
+            if (selectedNetwork == "BEP20") {
+                "Network: BNB Smart Chain (BEP20)\nMinimum withdrawal: 5 USDT\nWithdrawal fee: 1 USDT"
+            } else {
+                "Network: TRON (TRC20)\nMinimum withdrawal: 5 USDT\nWithdrawal fee: 1 USDT"
+            }
     }
 }
