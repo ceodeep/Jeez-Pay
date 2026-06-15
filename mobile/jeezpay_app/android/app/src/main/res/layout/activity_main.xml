@@ -473,7 +473,7 @@
                                         android:layout_width="24dp"
                                         android:layout_height="24dp"
                                         android:layout_gravity="center"
-                                        android:src="@drawable/ic_arrow_up_right"
+                                        android:src="@drawable/ic_withdraw"
                                         app:tint="@color/paypal_blue"
                                         android:contentDescription="Withdraw"/>
                                 </FrameLayout>

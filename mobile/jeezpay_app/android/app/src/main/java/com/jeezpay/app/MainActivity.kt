@@ -471,7 +471,7 @@ class MainActivity : BaseFintechActivity() {
 
         btnWithdraw.setOnClickListener {
 
-            if (selectedCurrency == "USDT") {
+            if (selectedCode == "USDT") {
                 startActivity(
                     Intent(this, WithdrawActivity::class.java)
                         .putExtra("currency", "USDT")
@@ -479,7 +479,7 @@ class MainActivity : BaseFintechActivity() {
             } else {
                 showComingSoon(
                     title = "Withdrawals Coming Soon",
-                    message = "Withdrawals for $selectedCurrency will be available in a future JeezPay update."
+                    message = "Withdrawals for $selectedCode will be available in a future JeezPay update."
                 )
             }
         }

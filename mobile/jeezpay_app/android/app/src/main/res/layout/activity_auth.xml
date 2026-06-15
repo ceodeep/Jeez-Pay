@@ -28,11 +28,11 @@
                 android:layout_width="80dp"
                 android:layout_height="80dp"
                 android:layout_marginTop="58dp"
-                android:src="@drawable/ic_user_circle"
+                android:src="@drawable/ic_jeezpay_logo"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:tint="#2A82EE" />
+                 />
 
             <TextView
                 android:id="@+id/tvLoginTitle"
