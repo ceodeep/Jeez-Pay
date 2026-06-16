@@ -3580,13 +3580,23 @@ router.post(
         return res.status(500).json({ message: "Treasury wallet not configured" });
       }
 
-      await supabase
-        .from("crypto_withdrawals")
-        .update({
-          status: "processing",
-          submitted_at: new Date().toISOString(),
-        })
-        .eq("id", withdrawalId);
+      const { data: lockedWithdrawal, error: lockErr } = await supabase
+  .from("crypto_withdrawals")
+  .update({
+    status: "processing",
+    submitted_at: new Date().toISOString(),
+    admin_id: adminId,
+  })
+  .eq("id", withdrawalId)
+  .eq("status", "pending")
+  .select("*")
+  .maybeSingle();
+
+if (lockErr || !lockedWithdrawal) {
+  return res.status(400).json({
+    message: "Withdrawal is no longer pending",
+  });
+}
 
       try {
         const txHash = await sendUsdtTrc20FromPrivateKey({
@@ -3613,13 +3623,13 @@ router.post(
         ]);
 
         await supabase
-          .from("crypto_withdrawals")
-          .update({
-            status: "completed",
-            tx_hash: txHash,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", withdrawalId);
+  .from("crypto_withdrawals")
+  .update({
+    status: "completed",
+    tx_hash: txHash,
+    admin_id: adminId,
+    completed_at: new Date().toISOString(),
+  })
 
         await logAdminAction({
           adminId,
@@ -3707,13 +3717,14 @@ router.post(
       }
 
       await supabase
-        .from("crypto_withdrawals")
-        .update({
-          status: "rejected",
-          error_message: reason,
-          failed_at: new Date().toISOString(),
-        })
-        .eq("id", withdrawalId);
+  .from("crypto_withdrawals")
+  .update({
+    status: "rejected",
+    error_message: reason,
+    admin_note: reason,
+    admin_id: adminId,
+    failed_at: new Date().toISOString(),
+  })
 
       await logAdminAction({
         adminId,
