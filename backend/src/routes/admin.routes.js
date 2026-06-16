@@ -3547,4 +3547,235 @@ router.get(
   }
 );
 
+router.post(
+  "/admin/crypto/withdrawals/:id/approve",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("crypto.withdrawals.approve"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const withdrawalId = req.params.id;
+
+      const { data: withdrawal, error: fetchErr } = await supabase
+        .from("crypto_withdrawals")
+        .select("*")
+        .eq("id", withdrawalId)
+        .maybeSingle();
+
+      if (fetchErr || !withdrawal) {
+        return res.status(404).json({ message: "Withdrawal not found" });
+      }
+
+      if (withdrawal.status !== "pending") {
+        return res.status(400).json({ message: "Withdrawal is not pending" });
+      }
+
+      const treasuryPrivateKey = process.env.TRON_TREASURY_PRIVATE_KEY;
+
+      if (!treasuryPrivateKey) {
+        return res.status(500).json({ message: "Treasury wallet not configured" });
+      }
+
+      await supabase
+        .from("crypto_withdrawals")
+        .update({
+          status: "processing",
+          submitted_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawalId);
+
+      try {
+        const txHash = await sendUsdtTrc20FromPrivateKey({
+          fromPrivateKey: treasuryPrivateKey,
+          toAddress: withdrawal.to_address,
+          amount: Number(withdrawal.amount),
+        });
+
+        await supabase.from("transactions").insert([
+          {
+            wallet_id: withdrawal.wallet_id,
+            type: "debit",
+            amount: withdrawal.amount,
+            description: "USDT withdrawal",
+            reference: withdrawal.reference,
+          },
+          {
+            wallet_id: withdrawal.wallet_id,
+            type: "debit",
+            amount: withdrawal.fee,
+            description: "USDT withdrawal fee",
+            reference: withdrawal.reference,
+          },
+        ]);
+
+        await supabase
+          .from("crypto_withdrawals")
+          .update({
+            status: "completed",
+            tx_hash: txHash,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", withdrawalId);
+
+        await logAdminAction({
+          adminId,
+          adminPhone: req.adminUser?.phone || null,
+          action: "CRYPTO_WITHDRAWAL_APPROVED",
+          targetType: "crypto_withdrawal",
+          targetId: withdrawalId,
+          targetDisplay: withdrawal.to_address,
+          oldValue: { status: "pending" },
+          newValue: { status: "completed", txHash },
+          req,
+        });
+
+        return res.json({
+          message: "Withdrawal approved and sent",
+          txHash,
+          reference: withdrawal.reference,
+        });
+      } catch (sendErr) {
+        await supabase
+          .from("crypto_withdrawals")
+          .update({
+            status: "failed",
+            error_message: sendErr.message || "Blockchain send failed",
+            failed_at: new Date().toISOString(),
+          })
+          .eq("id", withdrawalId);
+
+        return res.status(500).json({
+          message: sendErr.message || "Blockchain send failed",
+        });
+      }
+    } catch (err) {
+      console.error("approve withdrawal crash:", err);
+      return res.status(500).json({ message: "Failed to approve withdrawal" });
+    }
+  }
+);
+
+router.post(
+  "/admin/crypto/withdrawals/:id/reject",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("crypto.withdrawals.reject"),
+  async (req, res) => {
+    try {
+      const adminId = req.user.userId;
+      const withdrawalId = req.params.id;
+      const reason = String(req.body.reason || "").trim() || "Rejected by admin";
+
+      const { data: withdrawal, error: fetchErr } = await supabase
+        .from("crypto_withdrawals")
+        .select("*")
+        .eq("id", withdrawalId)
+        .maybeSingle();
+
+      if (fetchErr || !withdrawal) {
+        return res.status(404).json({ message: "Withdrawal not found" });
+      }
+
+      if (withdrawal.status !== "pending") {
+        return res.status(400).json({ message: "Only pending withdrawals can be rejected" });
+      }
+
+      const { data: wallet, error: walletErr } = await supabase
+        .from("wallets")
+        .select("id, balance")
+        .eq("id", withdrawal.wallet_id)
+        .maybeSingle();
+
+      if (walletErr || !wallet) {
+        return res.status(400).json({ message: "Wallet not found" });
+      }
+
+      const refundAmount = Number(withdrawal.total_debit || 0);
+      const newBalance = Number(wallet.balance || 0) + refundAmount;
+
+      const { error: refundErr } = await supabase
+        .from("wallets")
+        .update({ balance: newBalance })
+        .eq("id", wallet.id);
+
+      if (refundErr) {
+        return res.status(500).json({ message: "Failed to refund wallet" });
+      }
+
+      await supabase
+        .from("crypto_withdrawals")
+        .update({
+          status: "rejected",
+          error_message: reason,
+          failed_at: new Date().toISOString(),
+        })
+        .eq("id", withdrawalId);
+
+      await logAdminAction({
+        adminId,
+        adminPhone: req.adminUser?.phone || null,
+        action: "CRYPTO_WITHDRAWAL_REJECTED",
+        targetType: "crypto_withdrawal",
+        targetId: withdrawalId,
+        targetDisplay: withdrawal.to_address,
+        oldValue: { status: "pending" },
+        newValue: { status: "rejected", reason, refunded: refundAmount },
+        req,
+      });
+
+      return res.json({
+        message: "Withdrawal rejected and refunded",
+        refunded: refundAmount,
+      });
+    } catch (err) {
+      console.error("reject withdrawal crash:", err);
+      return res.status(500).json({ message: "Failed to reject withdrawal" });
+    }
+  }
+);
+
+router.get(
+  "/admin/crypto/withdrawals",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("crypto.withdrawals.view"),
+  async (req, res) => {
+    const status = String(req.query.status || "pending").trim();
+
+    const { data, error } = await supabase
+      .from("crypto_withdrawals")
+      .select(`
+        id,
+        user_id,
+        wallet_id,
+        network,
+        token,
+        to_address,
+        amount,
+        fee,
+        total_debit,
+        status,
+        tx_hash,
+        reference,
+        error_message,
+        created_at,
+        submitted_at,
+        completed_at,
+        failed_at
+      `)
+      .eq("status", status)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      return res.status(500).json({ message: "Failed to fetch withdrawals" });
+    }
+
+    return res.json({ withdrawals: data || [] });
+  }
+);
+
+
+
 module.exports = router;
