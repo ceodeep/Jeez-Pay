@@ -13,6 +13,9 @@ const ROLE_PERMISSIONS = {
     "settings.view",
     "currency_settings.view",
     "currency_settings.update",
+    "crypto.withdrawals.view",
+"crypto.withdrawals.approve",
+"crypto.withdrawals.reject",
   ],
 
   kyc_officer: [
@@ -64,6 +67,9 @@ const ALL_PERMISSIONS = [
   "settings.update",
   "currency_settings.view",
   "currency_settings.update",
+  "crypto.withdrawals.view",
+"crypto.withdrawals.approve",
+"crypto.withdrawals.reject",
 ];
 
 const MANAGEABLE_ROLES = [
