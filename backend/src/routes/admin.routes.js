@@ -3755,38 +3755,77 @@ router.get(
   requireAdmin,
   requirePermission("crypto.withdrawals.view"),
   async (req, res) => {
-    const status = String(req.query.status || "pending").trim();
+    try {
+      const status = String(req.query.status || "pending").trim().toLowerCase();
+      const reference = String(req.query.reference || "").trim();
+      const address = String(req.query.address || "").trim();
+      const userId = String(req.query.userId || "").trim();
 
-    const { data, error } = await supabase
-      .from("crypto_withdrawals")
-      .select(`
-        id,
-        user_id,
-        wallet_id,
-        network,
-        token,
-        to_address,
-        amount,
-        fee,
-        total_debit,
-        status,
-        tx_hash,
-        reference,
-        error_message,
-        created_at,
-        submitted_at,
-        completed_at,
-        failed_at
-      `)
-      .eq("status", status)
-      .order("created_at", { ascending: false })
-      .limit(100);
+      let query = supabase
+        .from("crypto_withdrawals")
+        .select(`
+          id,
+          user_id,
+          wallet_id,
+          network,
+          token,
+          to_address,
+          amount,
+          fee,
+          total_debit,
+          status,
+          tx_hash,
+          reference,
+          error_message,
+          admin_id,
+          admin_note,
+          created_at,
+          submitted_at,
+          completed_at,
+          failed_at,
+          users (
+            id,
+            phone,
+            wallet_account_number
+          )
+        `)
+        .order("created_at", { ascending: false })
+        .limit(100);
 
-    if (error) {
-      return res.status(500).json({ message: "Failed to fetch withdrawals" });
+      if (status && status !== "all") {
+        query = query.eq("status", status);
+      }
+
+      if (reference) {
+        query = query.eq("reference", reference);
+      }
+
+      if (address) {
+        query = query.ilike("to_address", `%${address}%`);
+      }
+
+      if (userId) {
+        query = query.eq("user_id", userId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("[admin crypto withdrawals] fetch error:", error);
+        return res.status(500).json({
+          message: "Failed to fetch crypto withdrawals",
+        });
+      }
+
+      return res.json({
+        withdrawals: data || [],
+      });
+    } catch (err) {
+      console.error("[admin crypto withdrawals] crash:", err);
+      return res.status(500).json({
+        message: "Failed to fetch crypto withdrawals",
+      });
     }
-
-    return res.json({ withdrawals: data || [] });
   }
 );
 

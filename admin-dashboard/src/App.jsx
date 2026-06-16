@@ -104,6 +104,10 @@ const [serviceTypeFilter, setServiceTypeFilter] = useState("all");
 const [serviceSearch, setServiceSearch] = useState("");
 const [serviceActionLoadingId, setServiceActionLoadingId] = useState("");
 const [serviceRequests, setServiceRequests] = useState([]);
+const [cryptoWithdrawalsLoading, setCryptoWithdrawalsLoading] = useState(false);
+const [cryptoWithdrawalStatusFilter, setCryptoWithdrawalStatusFilter] = useState("pending");
+const [cryptoWithdrawalActionLoadingId, setCryptoWithdrawalActionLoadingId] = useState("");
+const [cryptoWithdrawals, setCryptoWithdrawals] = useState([]);
 
 
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
@@ -202,7 +206,7 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       kyc: "kyc.view",
       users: "users.view",
       transactions: "transactions.view",
-      withdrawals: "transactions.view",
+      withdrawals: "crypto.withdrawals.view",
       serviceRequests: "transactions.view",
       auditLogs: "audit_logs.view",
       walletView: "wallets.view",
@@ -213,6 +217,7 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       roles: "users.role.update",
       exchangeRates: "currency_settings.view",
       companyWallet: "wallets.view",
+      
     };
 
     const required = pagePermissions[key];
@@ -548,6 +553,70 @@ async function loadReferralRewardHistory() {
     );
   } finally {
     setServiceRequestsLoading(false);
+  }
+}
+
+async function loadCryptoWithdrawals() {
+  setCryptoWithdrawalsLoading(true);
+  setMessage("");
+
+  try {
+    const res = await api.get(
+      `/admin/crypto/withdrawals?status=${encodeURIComponent(cryptoWithdrawalStatusFilter)}`
+    );
+
+    setCryptoWithdrawals(res.data?.withdrawals || []);
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to load crypto withdrawals");
+  } finally {
+    setCryptoWithdrawalsLoading(false);
+  }
+}
+
+async function approveCryptoWithdrawal(id) {
+  if (!id) return;
+
+  if (!window.confirm("Approve this USDT withdrawal and send it on-chain?")) return;
+
+  try {
+    setCryptoWithdrawalActionLoadingId(id);
+
+    await api.post(`/admin/crypto/withdrawals/${id}/approve`);
+
+    setMessage("Withdrawal approved successfully");
+    await loadCryptoWithdrawals();
+    await loadAuditLogs();
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to approve withdrawal");
+  } finally {
+    setCryptoWithdrawalActionLoadingId("");
+  }
+}
+
+async function rejectCryptoWithdrawal(id) {
+  if (!id) return;
+
+  const reason = window.prompt("Rejection reason:", "Rejected by JeezPay finance review") || "";
+
+  if (!reason.trim()) {
+    setMessage("Rejection reason is required");
+    return;
+  }
+
+  try {
+    setCryptoWithdrawalActionLoadingId(id);
+
+    await api.post(`/admin/crypto/withdrawals/${id}/reject`, {
+      reason: reason.trim(),
+    });
+
+    setMessage("Withdrawal rejected and refunded");
+    await loadCryptoWithdrawals();
+    await loadAuditLogs();
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to reject withdrawal");
+  } finally {
+    setCryptoWithdrawalActionLoadingId("");
   }
 }
 
@@ -1062,13 +1131,14 @@ async function saveExchangeRate(e) {
     if (page === "auditLogs") loadAuditLogs();
     if (page === "settings") loadSystemSettings();
     if (page === "companyWallet") loadCompanyWallet();
+    if (page === "withdrawals") loadCryptoWithdrawals();
     if (page === "currencySettings") loadCurrencySettings();
     if (page === "exchangeRates") loadExchangeRates();
     if (page === "referralRewards") {
   loadReferralRewardSettings();
   loadReferralRewardHistory();
 }
-  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter,  serviceStatusFilter, serviceTypeFilter, serviceSearch, auditActionFilter]);
+  }, [page, kycStatusFilter, userRoleFilter, txTypeFilter,  serviceStatusFilter, serviceTypeFilter, serviceSearch, auditActionFilter,cryptoWithdrawalStatusFilter]);
   const kycCounts = {
     all: kycs.length,
     pending: kycs.filter((k) => k.status === "pending").length,
@@ -1197,6 +1267,7 @@ async function saveExchangeRate(e) {
       ["users", "Users"],
       ["transactions", "Transactions"],
       ["serviceRequests", "Service Requests"],
+      ["withdrawals", "Crypto Withdrawals"],
       ["walletView", "Wallet View"],
       ["companyWallet", "Company Wallet"],
       ["wallet", "Wallet Adjust"],
@@ -1320,6 +1391,7 @@ async function saveExchangeRate(e) {
       {page === "roles" && "Roles & Permissions"}
       {page === "referralRewards" && "Referral Rewards"}
       {page === "exchangeRates" && "Exchange Rates"}
+      {page === "withdrawals" && "Crypto Withdrawals"}
     </h1>
 
     <p
@@ -1839,6 +1911,206 @@ async function saveExchangeRate(e) {
               )}
             </div>
           )}
+          {page === "withdrawals" && (
+  <div>
+    <div
+      style={{
+        display: "flex",
+        gap: 10,
+        marginBottom: 16,
+        flexWrap: "wrap",
+        alignItems: "center",
+      }}
+    >
+      {["pending", "processing", "completed", "rejected", "failed", "all"].map(
+        (status) => (
+          <button
+            key={status}
+            onClick={() => setCryptoWithdrawalStatusFilter(status)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "none",
+              cursor: "pointer",
+              background:
+                cryptoWithdrawalStatusFilter === status ? "#0f172a" : "#e2e8f0",
+              color:
+                cryptoWithdrawalStatusFilter === status ? "#fff" : "#0f172a",
+              fontWeight: 600,
+              textTransform: "capitalize",
+            }}
+          >
+            {status}
+          </button>
+        )
+      )}
+
+      <button
+        onClick={loadCryptoWithdrawals}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: "1px solid #cbd5e1",
+          background: "#fff",
+          color: "#0f172a",
+          fontWeight: 700,
+          cursor: "pointer",
+        }}
+      >
+        Refresh
+      </button>
+    </div>
+
+    {cryptoWithdrawalsLoading ? (
+      <p>Loading withdrawals...</p>
+    ) : cryptoWithdrawals.length === 0 ? (
+      <div
+        style={{
+          background: "#fff",
+          padding: 24,
+          borderRadius: 16,
+          boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+          color: "#64748b",
+        }}
+      >
+        No crypto withdrawals found.
+      </div>
+    ) : (
+      <div style={{ display: "grid", gap: 12 }}>
+        {cryptoWithdrawals.map((item) => {
+          const isPending = String(item.status || "").toLowerCase() === "pending";
+
+          return (
+            <div
+              key={item.id}
+              style={{
+                background: "#fff",
+                padding: 18,
+                borderRadius: 16,
+                boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: 17 }}>
+                  {renderMoney(item.amount)} {item.token || "USDT"} Withdrawal
+                </div>
+
+                <div
+                  style={{
+                    color: "#64748b",
+                    marginTop: 8,
+                    lineHeight: 1.7,
+                    fontSize: 14,
+                  }}
+                >
+                  <div>
+                    <strong>Total Debit:</strong>{" "}
+                    {renderMoney(item.total_debit)} {item.token || "USDT"}
+                  </div>
+                  <div>
+                    <strong>Fee:</strong> {renderMoney(item.fee)}{" "}
+                    {item.token || "USDT"}
+                  </div>
+                  <div>
+                    <strong>Network:</strong> {item.network || "-"}
+                  </div>
+                  <div>
+                    <strong>Address:</strong> {item.to_address || "-"}
+                  </div>
+                  <div>
+                    <strong>Reference:</strong> {item.reference || "-"}
+                  </div>
+                  <div>
+                    <strong>User:</strong>{" "}
+                    {item.users?.phone ||
+                      item.users?.wallet_account_number ||
+                      item.user_id ||
+                      "-"}
+                  </div>
+                  <div>
+                    <strong>Created:</strong> {formatDate(item.created_at)}
+                  </div>
+                  <div>
+                    <strong>TX Hash:</strong> {item.tx_hash || "-"}
+                  </div>
+                  <div>
+                    <strong>Admin Note:</strong> {item.admin_note || "-"}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <StatusBadge value={item.status} />
+
+                {isPending && (
+                  <>
+                    {hasPermission("crypto.withdrawals.approve") && (
+                      <button
+                        onClick={() => approveCryptoWithdrawal(item.id)}
+                        disabled={cryptoWithdrawalActionLoadingId === item.id}
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: "none",
+                          background: "#dcfce7",
+                          color: "#166534",
+                          cursor:
+                            cryptoWithdrawalActionLoadingId === item.id
+                              ? "not-allowed"
+                              : "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {cryptoWithdrawalActionLoadingId === item.id
+                          ? "Processing..."
+                          : "Approve"}
+                      </button>
+                    )}
+
+                    {hasPermission("crypto.withdrawals.reject") && (
+                      <button
+                        onClick={() => rejectCryptoWithdrawal(item.id)}
+                        disabled={cryptoWithdrawalActionLoadingId === item.id}
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 10,
+                          border: "none",
+                          background: "#fee2e2",
+                          color: "#b91c1c",
+                          cursor:
+                            cryptoWithdrawalActionLoadingId === item.id
+                              ? "not-allowed"
+                              : "pointer",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {cryptoWithdrawalActionLoadingId === item.id
+                          ? "Processing..."
+                          : "Reject + Refund"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+)}
 
           {page === "users" && (
   <div>
