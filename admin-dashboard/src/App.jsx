@@ -206,7 +206,7 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       kyc: "kyc.view",
       users: "users.view",
       transactions: "transactions.view",
-      withdrawals: "crypto.withdrawals.view",
+      crypto.withdrawals.view,
       serviceRequests: "transactions.view",
       auditLogs: "audit_logs.view",
       walletView: "wallets.view",
