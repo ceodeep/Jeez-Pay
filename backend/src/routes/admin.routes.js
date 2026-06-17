@@ -3690,21 +3690,35 @@ router.post(
         return res.status(404).json({ message: "Withdrawal not found" });
       }
 
-      if (withdrawal.status !== "pending") {
-        return res.status(400).json({ message: "Only pending withdrawals can be rejected" });
-      }
+      const { data: lockedWithdrawal, error: lockErr } = await supabase
+  .from("crypto_withdrawals")
+  .update({
+    status: "rejecting",
+    admin_id: adminId,
+    admin_note: reason,
+  })
+  .eq("id", withdrawalId)
+  .eq("status", "pending")
+  .select("*")
+  .maybeSingle();
+
+if (lockErr || !lockedWithdrawal) {
+  return res.status(400).json({
+    message: "Withdrawal is no longer pending",
+  });
+}
 
       const { data: wallet, error: walletErr } = await supabase
         .from("wallets")
         .select("id, balance")
-        .eq("id", withdrawal.wallet_id)
+        .eq("id", lockedWithdrawal.wallet_id)
         .maybeSingle();
 
       if (walletErr || !wallet) {
         return res.status(400).json({ message: "Wallet not found" });
       }
 
-      const refundAmount = Number(withdrawal.total_debit || 0);
+      const refundAmount = Number(lockedWithdrawal.total_debit || 0);
       const newBalance = Number(wallet.balance || 0) + refundAmount;
 
       const { error: refundErr } = await supabase
@@ -3725,6 +3739,7 @@ router.post(
     admin_id: adminId,
     failed_at: new Date().toISOString(),
   })
+    .eq("id", withdrawalId);
 
       await logAdminAction({
         adminId,
