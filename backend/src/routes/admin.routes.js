@@ -3600,29 +3600,29 @@ if (lockErr || !lockedWithdrawal) {
 
       try {
         const txHash = await sendUsdtTrc20FromPrivateKey({
-          fromPrivateKey: treasuryPrivateKey,
-          toAddress: withdrawal.to_address,
-          amount: Number(withdrawal.amount),
-        });
+  fromPrivateKey: treasuryPrivateKey,
+  toAddress: lockedWithdrawal.to_address,
+  amount: Number(lockedWithdrawal.amount),
+});
 
-        await supabase.from("transactions").insert([
-          {
-            wallet_id: withdrawal.wallet_id,
-            type: "debit",
-            amount: withdrawal.amount,
-            description: "USDT withdrawal",
-            reference: withdrawal.reference,
-          },
-          {
-            wallet_id: withdrawal.wallet_id,
-            type: "debit",
-            amount: withdrawal.fee,
-            description: "USDT withdrawal fee",
-            reference: withdrawal.reference,
-          },
-        ]);
+await supabase.from("transactions").insert([
+  {
+    wallet_id: lockedWithdrawal.wallet_id,
+    type: "debit",
+    amount: lockedWithdrawal.amount,
+    description: "USDT withdrawal",
+    reference: lockedWithdrawal.reference,
+  },
+  {
+    wallet_id: lockedWithdrawal.wallet_id,
+    type: "debit",
+    amount: lockedWithdrawal.fee,
+    description: "USDT withdrawal fee",
+    reference: lockedWithdrawal.reference,
+  },
+]);
 
-        await supabase
+const { error: completeErr } = await supabase
   .from("crypto_withdrawals")
   .update({
     status: "completed",
@@ -3630,24 +3630,33 @@ if (lockErr || !lockedWithdrawal) {
     admin_id: adminId,
     completed_at: new Date().toISOString(),
   })
+  .eq("id", withdrawalId);
 
-        await logAdminAction({
-          adminId,
-          adminPhone: req.adminUser?.phone || null,
-          action: "CRYPTO_WITHDRAWAL_APPROVED",
-          targetType: "crypto_withdrawal",
-          targetId: withdrawalId,
-          targetDisplay: withdrawal.to_address,
-          oldValue: { status: "pending" },
-          newValue: { status: "completed", txHash },
-          req,
-        });
+if (completeErr) {
+  console.error("complete withdrawal update error:", completeErr);
+  return res.status(500).json({
+    message: "Withdrawal sent but failed to mark completed. Manual review required.",
+    txHash,
+  });
+}
 
-        return res.json({
-          message: "Withdrawal approved and sent",
-          txHash,
-          reference: withdrawal.reference,
-        });
+await logAdminAction({
+  adminId,
+  adminPhone: req.adminUser?.phone || null,
+  action: "CRYPTO_WITHDRAWAL_APPROVED",
+  targetType: "crypto_withdrawal",
+  targetId: withdrawalId,
+  targetDisplay: lockedWithdrawal.to_address,
+  oldValue: { status: "pending" },
+  newValue: { status: "completed", txHash },
+  req,
+});
+
+return res.json({
+  message: "Withdrawal approved and sent",
+  txHash,
+  reference: lockedWithdrawal.reference,
+});
       } catch (sendErr) {
         await supabase
           .from("crypto_withdrawals")
