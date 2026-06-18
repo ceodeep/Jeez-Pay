@@ -24,6 +24,9 @@ const {
   sendUsdtTrc20FromPrivateKey,
   waitForTransactionSuccess,
 } = require("../services/tron.service");
+const {
+  sendUsdtBep20FromPrivateKey,
+} = require("../services/bsc.service");
 
 function isProtectedAdminRole(role) {
   return PROTECTED_ADMIN_ROLES.includes(String(role || "").trim());
@@ -3575,11 +3578,19 @@ router.post(
         return res.status(400).json({ message: "Withdrawal is not pending" });
       }
 
-      const treasuryPrivateKey = process.env.TRON_TREASURY_PRIVATE_KEY;
+      const withdrawalNetwork = String(withdrawal.network || "TRC20").toUpperCase();
 
-      if (!treasuryPrivateKey) {
-        return res.status(500).json({ message: "Treasury wallet not configured" });
-      }
+if (withdrawalNetwork === "TRC20" && !process.env.TRON_TREASURY_PRIVATE_KEY) {
+  return res.status(500).json({ message: "TRC20 treasury wallet not configured" });
+}
+
+if (withdrawalNetwork === "BEP20" && !process.env.BSC_TREASURY_PRIVATE_KEY) {
+  return res.status(500).json({ message: "BEP20 treasury wallet not configured" });
+}
+
+if (!["TRC20", "BEP20"].includes(withdrawalNetwork)) {
+  return res.status(400).json({ message: "Unsupported withdrawal network" });
+}
 
       const { data: lockedWithdrawal, error: lockErr } = await supabase
   .from("crypto_withdrawals")
@@ -3599,74 +3610,93 @@ if (lockErr || !lockedWithdrawal) {
   });
 }
 
-      try {
-        const txHash = await sendUsdtTrc20FromPrivateKey({
-  fromPrivateKey: treasuryPrivateKey,
-  toAddress: lockedWithdrawal.to_address,
-  amount: Number(lockedWithdrawal.amount),
-});
-await supabase
-  .from("crypto_withdrawals")
-  .update({
-    tx_hash: txHash,
-  })
-  .eq("id", withdrawalId);
+     try {
+  const lockedNetwork = String(lockedWithdrawal.network || "TRC20").toUpperCase();
 
-await waitForTransactionSuccess(txHash);
+  let txHash;
 
-await supabase.from("transactions").insert([
-  {
-    wallet_id: lockedWithdrawal.wallet_id,
-    type: "debit",
-    amount: lockedWithdrawal.amount,
-    description: "USDT withdrawal",
-    reference: lockedWithdrawal.reference,
-  },
-  {
-    wallet_id: lockedWithdrawal.wallet_id,
-    type: "debit",
-    amount: lockedWithdrawal.fee,
-    description: "USDT withdrawal fee",
-    reference: lockedWithdrawal.reference,
-  },
-]);
+  if (lockedNetwork === "TRC20") {
+    txHash = await sendUsdtTrc20FromPrivateKey({
+      fromPrivateKey: process.env.TRON_TREASURY_PRIVATE_KEY,
+      toAddress: lockedWithdrawal.to_address,
+      amount: Number(lockedWithdrawal.amount),
+    });
 
-const { error: completeErr } = await supabase
-  .from("crypto_withdrawals")
-  .update({
-    status: "completed",
-    tx_hash: txHash,
-    admin_id: adminId,
-    completed_at: new Date().toISOString(),
-  })
-  .eq("id", withdrawalId);
+    await supabase
+      .from("crypto_withdrawals")
+      .update({ tx_hash: txHash })
+      .eq("id", withdrawalId);
 
-if (completeErr) {
-  console.error("complete withdrawal update error:", completeErr);
-  return res.status(500).json({
-    message: "Withdrawal sent but failed to mark completed. Manual review required.",
-    txHash,
+    await waitForTransactionSuccess(txHash);
+  } else if (lockedNetwork === "BEP20") {
+    txHash = await sendUsdtBep20FromPrivateKey({
+      fromPrivateKey: process.env.BSC_TREASURY_PRIVATE_KEY,
+      toAddress: lockedWithdrawal.to_address,
+      amount: Number(lockedWithdrawal.amount),
+    });
+
+    await supabase
+      .from("crypto_withdrawals")
+      .update({ tx_hash: txHash })
+      .eq("id", withdrawalId);
+  } else {
+    throw new Error("Unsupported withdrawal network");
+  }
+
+  await supabase.from("transactions").insert([
+    {
+      wallet_id: lockedWithdrawal.wallet_id,
+      type: "debit",
+      amount: lockedWithdrawal.amount,
+      description: `${lockedNetwork} USDT withdrawal`,
+      reference: lockedWithdrawal.reference,
+    },
+    {
+      wallet_id: lockedWithdrawal.wallet_id,
+      type: "debit",
+      amount: lockedWithdrawal.fee,
+      description: `${lockedNetwork} USDT withdrawal fee`,
+      reference: lockedWithdrawal.reference,
+    },
+  ]);
+
+  const { error: completeErr } = await supabase
+    .from("crypto_withdrawals")
+    .update({
+      status: "completed",
+      tx_hash: txHash,
+      admin_id: adminId,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", withdrawalId);
+
+  if (completeErr) {
+    console.error("complete withdrawal update error:", completeErr);
+    return res.status(500).json({
+      message: "Withdrawal sent but failed to mark completed. Manual review required.",
+      txHash,
+    });
+  }
+
+  await logAdminAction({
+    adminId,
+    adminPhone: req.adminUser?.phone || null,
+    action: "CRYPTO_WITHDRAWAL_APPROVED",
+    targetType: "crypto_withdrawal",
+    targetId: withdrawalId,
+    targetDisplay: lockedWithdrawal.to_address,
+    oldValue: { status: "pending" },
+    newValue: { status: "completed", network: lockedNetwork, txHash },
+    req,
   });
-}
 
-await logAdminAction({
-  adminId,
-  adminPhone: req.adminUser?.phone || null,
-  action: "CRYPTO_WITHDRAWAL_APPROVED",
-  targetType: "crypto_withdrawal",
-  targetId: withdrawalId,
-  targetDisplay: lockedWithdrawal.to_address,
-  oldValue: { status: "pending" },
-  newValue: { status: "completed", txHash },
-  req,
-});
-
-return res.json({
-  message: "Withdrawal approved and sent",
-  txHash,
-  reference: lockedWithdrawal.reference,
-});
-      } catch (sendErr) {
+  return res.json({
+    message: "Withdrawal approved and sent",
+    network: lockedNetwork,
+    txHash,
+    reference: lockedWithdrawal.reference,
+  });
+} catch (sendErr) {
         await supabase
   .from("crypto_withdrawals")
   .update({
