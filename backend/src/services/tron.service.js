@@ -104,10 +104,37 @@ async function sendUsdtTrc20FromPrivateKey({ fromPrivateKey, toAddress, amount }
   return txHash;
 }
 
+async function waitForTransactionSuccess(txHash, maxAttempts = 20, delayMs = 3000) {
+  if (!txHash) {
+    throw new Error("Transaction hash is required");
+  }
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const info = await tronWeb.trx.getTransactionInfo(txHash);
+
+    if (info && Object.keys(info).length > 0) {
+      if (info.receipt?.result === "SUCCESS") {
+        return info;
+      }
+
+      throw new Error(
+        info.resMessage
+          ? Buffer.from(info.resMessage, "hex").toString("utf8")
+          : `Transaction failed: ${info.receipt?.result || "UNKNOWN"}`
+      );
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  throw new Error("Transaction confirmation timed out");
+}
+
 module.exports = {
   tronWeb,
   createTronAccount,
   encryptPrivateKey,
   decryptPrivateKey,
   sendUsdtTrc20FromPrivateKey,
+  waitForTransactionSuccess,
 };
