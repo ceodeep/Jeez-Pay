@@ -1984,20 +1984,36 @@ async function saveExchangeRate(e) {
       >
         Refresh
       </button>
-      <div className="actions">
-  <button onClick={loadCryptoWithdrawals}>
-    Refresh
-  </button>
+      <button
+  onClick={runBep20DepositScan}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #bfdbfe",
+    background: "#eff6ff",
+    color: "#1d4ed8",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+>
+  Run BEP20 Scan
+</button>
 
-  <button onClick={runBep20DepositScan}>
-    Run BEP20 Scan
-  </button>
-
-  <button onClick={runBep20DepositSweep}>
-    Run BEP20 Sweep
-  </button>
-  
-</div>
+<button
+  onClick={runBep20DepositSweep}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #bbf7d0",
+    background: "#ecfdf5",
+    color: "#166534",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+>
+  Run BEP20 Sweep
+</button>
+      
       
     </div>
     
