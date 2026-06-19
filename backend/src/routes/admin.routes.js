@@ -4022,6 +4022,39 @@ router.post(
   }
 );
 
+async function saveScannerLog(operation, result) {
+  await supabase.from("scanner_logs").insert({
+    operation,
+    result,
+  });
+}
+
+router.get(
+  "/scanner-logs",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.adjust"),
+  async (req, res) => {
+    try {
+      const { data, error } = await supabase
+        .from("scanner_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error("scanner logs fetch error:", error);
+        return res.status(500).json({ message: "Failed to load scanner logs" });
+      }
+
+      return res.json({ logs: data || [] });
+    } catch (err) {
+      console.error("scanner logs crash:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
 
 
 module.exports = router;
