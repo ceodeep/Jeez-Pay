@@ -33,15 +33,19 @@ const otpLimiter = rateLimit({
 app.use(morgan("dev"));
 
 
-app.use(
-  cors({
-    origin: [
-      "https://admin.jeezpay.co",
-      "https://api.jeezpay.co",
-    ],
-    credentials: true,
-  })
-);
+const cors = require("cors");
+
+app.use(cors({
+  origin: [
+    "https://admin.jeezpay.co",
+    "https://www.admin.jeezpay.co",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
+
+app.options("*", cors());
 app.use(express.json());
 
 app.use("/auth/signup/request-otp", otpLimiter);
