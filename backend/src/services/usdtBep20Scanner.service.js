@@ -84,7 +84,7 @@ if (!fromBlock || fromBlock <= 0) {
 }
 
 const maxRange = Number(process.env.BEP20_SCAN_MAX_BLOCK_RANGE || 10);
-const toBlock = Math.min(fromBlock + maxRange, latestBlock);
+const toBlock = Math.min(fromBlock + maxRange - 1, latestBlock);
 
 if (toBlock <= fromBlock) {
   return {
