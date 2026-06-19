@@ -619,6 +619,29 @@ async function rejectCryptoWithdrawal(id) {
     setCryptoWithdrawalActionLoadingId("");
   }
 }
+async function runBep20DepositScan() {
+  try {
+    setMessage("Running BEP20 deposit scan...");
+    const res = await api.post("/admin/crypto/deposits/scan-bep20");
+    setMessage(
+      `BEP20 scan completed. Scanned: ${res.data?.scannedAddresses || 0}, credited: ${res.data?.creditedDeposits || 0}`
+    );
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "BEP20 scan failed");
+  }
+}
+
+async function runBep20DepositSweep() {
+  try {
+    setMessage("Running BEP20 sweep...");
+    const res = await api.post("/admin/crypto/deposits/sweep-bep20", {
+      limit: 5,
+    });
+    setMessage(`BEP20 sweep completed. Results: ${res.data?.results?.length || 0}`);
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "BEP20 sweep failed");
+  }
+}
 
 async function completeServiceRequest(requestId) {
   if (!requestId) return;
@@ -1942,7 +1965,9 @@ async function saveExchangeRate(e) {
           >
             {status}
           </button>
+          
         )
+        
       )}
 
       <button
@@ -1959,7 +1984,23 @@ async function saveExchangeRate(e) {
       >
         Refresh
       </button>
+      <div className="actions">
+  <button onClick={loadCryptoWithdrawals}>
+    Refresh
+  </button>
+
+  <button onClick={runBep20DepositScan}>
+    Run BEP20 Scan
+  </button>
+
+  <button onClick={runBep20DepositSweep}>
+    Run BEP20 Sweep
+  </button>
+  
+</div>
+      
     </div>
+    
 
     {cryptoWithdrawalsLoading ? (
       <p>Loading withdrawals...</p>
