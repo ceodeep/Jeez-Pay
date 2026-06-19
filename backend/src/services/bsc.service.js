@@ -122,6 +122,6 @@ module.exports = {
   getBnbBalance,
   getUsdtBep20Balance,
   createBscWallet,
-  sendusdtBep20FromPrivateKey,
+  sendUsdtBep20FromPrivateKey,
   sendBnbFromPrivateKey,
 };
