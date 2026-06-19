@@ -43,8 +43,8 @@
         android:background="@drawable/bg_auth_input_box"
         android:gravity="center_vertical"
         android:paddingStart="16dp"
-        android:text="USDT BEP20  •  Coming soon"
-        android:textColor="@color/text_secondary"
+        android:text="USDT BEP20 • Available"
+        android:textColor="@color/text_primary"
         android:textSize="16sp"
         android:textStyle="bold" />
 </LinearLayout>

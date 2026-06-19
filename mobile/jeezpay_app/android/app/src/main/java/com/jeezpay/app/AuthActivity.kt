@@ -84,7 +84,7 @@ class AuthActivity : BaseFintechActivity() {
     private lateinit var tvResendOtp: TextView
 
     // PIN set
-    private lateinit var btnBackPin: TextView
+    private lateinit var btnBackPin: ImageView
     private lateinit var etPin: EditText
     private lateinit var btnSetPin: MaterialButton
     private lateinit var setPinDot1: ImageView
@@ -258,6 +258,7 @@ class AuthActivity : BaseFintechActivity() {
         countryCodeBox = findViewById(R.id.countryCodeBox)
         btnLoginEmailMode = findViewById(R.id.btnLoginEmailMode)
         btnLoginPhoneMode = findViewById(R.id.btnLoginPhoneMode)
+        btnBackPin = findViewById(R.id.btnBackPin)
 
 
         otpBox1 = findViewById(R.id.otpBox1)
@@ -275,7 +276,7 @@ class AuthActivity : BaseFintechActivity() {
         btnBiometricUnlock = findViewById(R.id.btnBiometricUnlock)
         etSignupEmail = findViewById(R.id.etSignupEmail)
 
-        btnBackPin = findViewById(R.id.btnBackPin)
+        findViewById<ImageView>(R.id.btnBackPin)
         etPin = findViewById(R.id.etPin)
         btnSetPin = findViewById(R.id.btnSetPin)
         setPinDot1 = findViewById(R.id.setPinDot1)

@@ -27,6 +27,9 @@ const {
 const {
   sendUsdtBep20FromPrivateKey,
 } = require("../services/bsc.service");
+const {
+  sweepCreditedUsdtDeposits,
+} = require("../services/usdtSweep.service");
 
 function isProtectedAdminRole(role) {
   return PROTECTED_ADMIN_ROLES.includes(String(role || "").trim());
@@ -3904,6 +3907,42 @@ router.get(
       console.error("[admin crypto withdrawals] crash:", err);
       return res.status(500).json({
         message: "Failed to fetch crypto withdrawals",
+      });
+    }
+  }
+);
+
+router.post(
+  "/crypto/deposits/sweep",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.adjust"),
+  async (req, res) => {
+    try {
+      const limit = Number(req.body.limit || 5);
+
+      const results = await sweepCreditedUsdtDeposits(limit);
+
+      await logAdminAction({
+        adminId: req.user.userId,
+        adminPhone: req.adminUser?.phone || null,
+        action: "USDT_DEPOSITS_SWEEP_RUN",
+        targetType: "crypto_deposits",
+        targetId: null,
+        targetDisplay: "TRC20 deposit sweep",
+        oldValue: null,
+        newValue: { results },
+        req,
+      });
+
+      return res.json({
+        message: "USDT sweep completed",
+        results,
+      });
+    } catch (err) {
+      console.error("USDT sweep route error:", err);
+      return res.status(500).json({
+        message: err.message || "USDT sweep failed",
       });
     }
   }
