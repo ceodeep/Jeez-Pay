@@ -454,6 +454,19 @@ async function loadReferralRewardHistory() {
     setScannerLogsLoading(false);
   }
 }
+async function runTronMaxRentEnergy() {
+  try {
+    setMessage("Requesting TRON energy rental...");
+    const res = await api.post("/admin/tronmax/rent-energy", {});
+    setMessage(
+      res.data?.result?.skipped
+        ? `TronMax skipped: ${res.data.result.reason}`
+        : `TronMax rental requested. Order: ${res.data?.result?.orderId || "-"}`
+    );
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "TronMax rental failed");
+  }
+}
 
   async function loadUserDetails(identifier) {
     setUserDetailsLoading(true);
@@ -2084,6 +2097,20 @@ async function saveExchangeRate(e) {
     >
       Run TRC20 Sweep
     </button>
+    <button
+  onClick={runTronMaxRentEnergy}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #fde68a",
+    background: "#fffbeb",
+    color: "#92400e",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+>
+  Rent TRON Energy
+</button>
   </div>
 </div>
 
