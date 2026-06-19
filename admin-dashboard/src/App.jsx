@@ -1345,6 +1345,7 @@ async function saveExchangeRate(e) {
       ["companyWallet", "Company Wallet"],
       ["wallet", "Wallet Adjust"],
       ["treasuryOps", "Treasury Ops"],
+      ["scannerLogs", "Scanner Logs"],
     ],
   },
   {
