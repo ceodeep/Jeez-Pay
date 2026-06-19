@@ -31,6 +31,10 @@ const {
   sweepCreditedUsdtDeposits,
 } = require("../services/usdtSweep.service");
 
+const {
+  scanUsdtBep20Deposits,
+} = require("../services/usdtBep20Scanner.service");
+
 function isProtectedAdminRole(role) {
   return PROTECTED_ADMIN_ROLES.includes(String(role || "").trim());
 }
@@ -3943,6 +3947,37 @@ router.post(
       console.error("USDT sweep route error:", err);
       return res.status(500).json({
         message: err.message || "USDT sweep failed",
+      });
+    }
+  }
+);
+
+router.post(
+  "/crypto/deposits/scan-bep20",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.adjust"),
+  async (req, res) => {
+    try {
+      const result = await scanUsdtBep20Deposits();
+
+      await logAdminAction({
+        adminId: req.user.userId,
+        adminPhone: req.adminUser?.phone || null,
+        action: "USDT_BEP20_DEPOSIT_SCAN_RUN",
+        targetType: "crypto_deposits",
+        targetId: null,
+        targetDisplay: "BEP20 deposit scanner",
+        oldValue: null,
+        newValue: result,
+        req,
+      });
+
+      return res.json(result);
+    } catch (err) {
+      console.error("BEP20 deposit scan route error:", err);
+      return res.status(500).json({
+        message: err.message || "BEP20 deposit scan failed",
       });
     }
   }

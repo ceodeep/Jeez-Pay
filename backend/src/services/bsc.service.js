@@ -47,6 +47,27 @@ async function getBnbBalance(address) {
   return Number(ethers.formatEther(balance));
 }
 
+async function sendBnbFromPrivateKey({ fromPrivateKey, toAddress, amount }) {
+  if (!fromPrivateKey) throw new Error("Private key is required");
+  if (!isBscAddress(toAddress)) throw new Error("Invalid BEP20 address");
+
+  const provider = getProvider();
+  const wallet = new ethers.Wallet(fromPrivateKey, provider);
+
+  const tx = await wallet.sendTransaction({
+    to: toAddress,
+    value: ethers.parseEther(String(amount)),
+  });
+
+  const receipt = await tx.wait(1);
+
+  if (!receipt || receipt.status !== 1) {
+    throw new Error("BNB transfer failed");
+  }
+
+  return tx.hash;
+}
+
 async function getUsdtBep20Balance(address) {
   if (!usdtContract) throw new Error("USDT_BEP20_CONTRACT is missing");
 
@@ -101,4 +122,6 @@ module.exports = {
   getBnbBalance,
   getUsdtBep20Balance,
   createBscWallet,
+  sendusdtBep20FromPrivateKey,
+  sendBnbFromPrivateKey,
 };
