@@ -13,8 +13,8 @@ android {
         applicationId = "com.jeezpay.app"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = 1
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // CRITICAL: Only build ARM64 for debug (3x faster)

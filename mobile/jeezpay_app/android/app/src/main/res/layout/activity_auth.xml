@@ -1163,21 +1163,20 @@
                             android:textColorHint="#80000000"
                             android:textSize="16sp" />
 
-                        <com.google.android.material.textfield.TextInputLayout
+                        <EditText
+                            android:id="@+id/etSignupEmail"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
+                            android:layout_height="62dp"
                             android:layout_marginTop="12dp"
-                            >
-
-                            <EditText
-                                android:id="@+id/etSignupEmail"
-                                android:layout_width="match_parent"
-                                android:layout_height="56dp"
-                                android:hint="Email address"
-                                android:inputType="textEmailAddress"
-                                android:textColor="@color/text_primary"
-                                android:textColorHint="@color/text_secondary"/>
-                        </com.google.android.material.textfield.TextInputLayout>
+                            android:background="@drawable/bg_auth_input_box"
+                            android:hint="Email address"
+                            android:inputType="textEmailAddress"
+                            android:maxLines="1"
+                            android:paddingStart="18dp"
+                            android:paddingEnd="18dp"
+                            android:textColor="#000000"
+                            android:textColorHint="#80000000"
+                            android:textSize="16sp" />
 
                         <LinearLayout
                             android:layout_width="match_parent"

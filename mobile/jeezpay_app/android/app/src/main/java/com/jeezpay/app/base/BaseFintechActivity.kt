@@ -138,10 +138,15 @@ abstract class BaseFintechActivity : AppCompatActivity() {
             is AppError.Unauthorized -> {
                 hideBlockingLoader()
 
+                Toast.makeText(
+                    this,
+                    error.message.ifBlank { "Invalid credentials" },
+                    Toast.LENGTH_LONG
+                ).show()
+
                 if (onUnauthorized != null) {
                     onUnauthorized()
                 } else {
-                    Toast.makeText(this, error.message, Toast.LENGTH_LONG).show()
                     SessionManager(this).clearAll()
 
                     val i = Intent(this, AuthActivity::class.java).apply {
