@@ -68,7 +68,33 @@ async function scanUsdtBep20Deposits() {
   const contract = new ethers.Contract(USDT_BEP20_CONTRACT, ERC20_ABI, provider);
 
   const latestBlock = await provider.getBlockNumber();
-  const fromBlock = Math.max(latestBlock - Number(process.env.BEP20_SCAN_BLOCK_LOOKBACK || 5000), 0);
+
+const { data: state, error: stateErr } = await supabase
+  .from("scanner_state")
+  .select("last_block")
+  .eq("scanner_name", "bep20_usdt")
+  .maybeSingle();
+
+if (stateErr) throw stateErr;
+
+let fromBlock = Number(state?.last_block || 0);
+
+if (!fromBlock || fromBlock <= 0) {
+  fromBlock = Math.max(latestBlock - 10, 0);
+}
+
+const maxRange = Number(process.env.BEP20_SCAN_MAX_BLOCK_RANGE || 10);
+const toBlock = Math.min(fromBlock + maxRange, latestBlock);
+
+if (toBlock <= fromBlock) {
+  return {
+    message: "BEP20 scanner already up to date",
+    scannedAddresses: 0,
+    detectedDeposits: 0,
+    creditedDeposits: 0,
+    errors: [],
+  };
+}
 
   const { data: addresses, error: addressErr } = await supabase
     .from("crypto_deposit_addresses")
@@ -92,7 +118,7 @@ async function scanUsdtBep20Deposits() {
 
     try {
       const filter = contract.filters.Transfer(null, addressRow.address);
-      const transfers = await contract.queryFilter(filter, fromBlock, latestBlock);
+      const transfers = await contract.queryFilter(filter, fromBlock, toBlock);
 
       for (const transfer of transfers) {
         detectedDeposits += 1;
@@ -121,11 +147,20 @@ async function scanUsdtBep20Deposits() {
       });
     }
   }
+  await supabase
+  .from("scanner_state")
+  .upsert({
+    scanner_name: "bep20_usdt",
+    last_block: toBlock,
+    updated_at: new Date().toISOString(),
+  });
 
   return {
     message: "BEP20 deposit scan completed",
     startedAt,
     finishedAt: new Date().toISOString(),
+    fromBlock,
+    toBlock,
     scannedAddresses,
     detectedDeposits,
     creditedDeposits,
