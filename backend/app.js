@@ -33,7 +33,6 @@ const otpLimiter = rateLimit({
 app.use(morgan("dev"));
 
 
-const cors = require("cors");
 
 app.use(cors({
   origin: [
