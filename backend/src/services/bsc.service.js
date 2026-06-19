@@ -1,4 +1,5 @@
 const { ethers } = require("ethers");
+const crypto = require("crypto");
 
 const rpcUrl = process.env.BSC_RPC_URL;
 const usdtContract = process.env.USDT_BEP20_CONTRACT;
@@ -58,9 +59,46 @@ async function getUsdtBep20Balance(address) {
   return Number(ethers.formatUnits(balance, decimals));
 }
 
+const ENCRYPTION_KEY = process.env.WALLET_ENCRYPTION_KEY;
+
+function encryptPrivateKey(privateKey) {
+  if (!ENCRYPTION_KEY) {
+    throw new Error("WALLET_ENCRYPTION_KEY is required");
+  }
+
+  const iv = crypto.randomBytes(12);
+  const key = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
+
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+
+  const encrypted = Buffer.concat([
+    cipher.update(privateKey, "utf8"),
+    cipher.final(),
+  ]);
+
+  const authTag = cipher.getAuthTag();
+
+  return [
+    iv.toString("hex"),
+    authTag.toString("hex"),
+    encrypted.toString("hex"),
+  ].join(":");
+}
+
+function createBscWallet() {
+  const wallet = ethers.Wallet.createRandom();
+
+  return {
+    address: wallet.address,
+    privateKey: wallet.privateKey,
+    encryptedPrivateKey: encryptPrivateKey(wallet.privateKey),
+  };
+}
+
 module.exports = {
   isBscAddress,
   sendUsdtBep20FromPrivateKey,
   getBnbBalance,
   getUsdtBep20Balance,
+  createBscWallet,
 };
