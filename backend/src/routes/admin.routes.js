@@ -37,6 +37,7 @@ const {
 const {
   scanUsdtBep20Deposits,
 } = require("../services/usdtBep20Scanner.service");
+const { rentTronEnergy } = require("../services/tronmax.service");
 
 function isProtectedAdminRole(role) {
   return PROTECTED_ADMIN_ROLES.includes(String(role || "").trim());
@@ -4063,6 +4064,41 @@ router.get(
     } catch (err) {
       console.error("scanner logs crash:", err);
       return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+router.post(
+  "/tronmax/rent-energy",
+  authMiddleware,
+  requireAdmin,
+  requirePermission("wallets.adjust"),
+  async (req, res) => {
+    try {
+      const receiver = String(req.body.receiver || process.env.TRON_TREASURY_ADDRESS || "").trim();
+      const amount = Number(req.body.amount || process.env.TRONMAX_DEFAULT_ENERGY || 65000);
+      const duration = String(req.body.duration || process.env.TRONMAX_DEFAULT_DURATION || "15m");
+
+      if (!receiver) {
+        return res.status(400).json({ message: "Receiver address is required" });
+      }
+
+      const result = await rentTronEnergy({
+        receiver,
+        amount,
+        duration,
+        purpose: "manual_admin_test",
+      });
+
+      return res.json({
+        message: "TronMax energy rental requested",
+        result,
+      });
+    } catch (err) {
+      console.error("tronmax rent energy error:", err);
+      return res.status(500).json({
+        message: err.message || "Failed to rent TRON energy",
+      });
     }
   }
 );
