@@ -646,7 +646,7 @@ async function runBep20DepositSweep() {
 async function runTrc20DepositScan() {
   try {
     setMessage("Running TRC20 deposit scan...");
-    const res = await api.post("/admin/crypto/deposits/scan", {
+    const res = await api.post("/admin/crypto/deposits/scan-trc20", {
       limit: 5,
     });
 
@@ -661,7 +661,7 @@ async function runTrc20DepositScan() {
 async function runTrc20DepositSweep() {
   try {
     setMessage("Running TRC20 sweep...");
-    const res = await api.post("/admin/crypto/deposits/sweep", {
+    const res = await api.post("/admin/crypto/deposits/sweep-trc20", {
       limit: 5,
     });
 
