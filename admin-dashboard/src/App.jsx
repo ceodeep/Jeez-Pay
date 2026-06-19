@@ -247,19 +247,7 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
   } catch (err) {
     console.error("Failed to load USDT scanner status", err);
   }
-  async function loadScannerLogs() {
-  setScannerLogsLoading(true);
-  setMessage("");
-
-  try {
-    const res = await api.get("/admin/scanner-logs");
-    setScannerLogs(res.data?.logs || []);
-  } catch (err) {
-    setMessage(err?.response?.data?.message || "Failed to load scanner logs");
-  } finally {
-    setScannerLogsLoading(false);
-  }
-}
+ 
 }
   function exportCompanyWalletCsv() {
   const rows = companyWalletData?.recentTransactions || [];
@@ -449,6 +437,23 @@ async function loadReferralRewardHistory() {
       setLoading(false);
     }
   }
+
+  async function loadScannerLogs() {
+  setScannerLogsLoading(true);
+  setMessage("");
+
+  try {
+    const res = await api.get("/admin/scanner-logs");
+    setScannerLogs(res.data?.logs || []);
+  } catch (err) {
+    setMessage(
+      err?.response?.data?.message ||
+      "Failed to load scanner logs"
+    );
+  } finally {
+    setScannerLogsLoading(false);
+  }
+}
 
   async function loadUserDetails(identifier) {
     setUserDetailsLoading(true);
