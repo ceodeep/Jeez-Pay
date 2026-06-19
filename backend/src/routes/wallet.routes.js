@@ -11,6 +11,10 @@ const {
   sendUsdtTrc20FromPrivateKey,
 } = require("../services/tron.service");
 const { scanUsdtDeposits } = require("../services/usdtDepositScanner.service");
+const {
+  createBscWallet,
+} = require("../services/bsc.service");
+
 
 // ---- helper: check admin ----
 async function isAdmin(userId) {
@@ -1340,7 +1344,7 @@ router.get("/crypto/deposit-address", authMiddleware, async (req, res) => {
     }
 
     if (network === "BEP20") {
-      const { createBscWallet } = require("../services/bsc.service");
+
       const wallet = createBscWallet();
       address = wallet.address;
       encryptedPrivateKey = wallet.encryptedPrivateKey;
@@ -1406,11 +1410,17 @@ router.get("/crypto/deposits", authMiddleware, async (req, res) => {
     const token = String(req.query.token || "USDT").trim().toUpperCase();
     const network = String(req.query.network || "TRON").trim().toUpperCase();
 
-    if (token !== "USDT" || network !== "TRON") {
-      return res.status(400).json({
-        message: "Only USDT on TRON is supported right now",
-      });
-    }
+    if (token !== "USDT") {
+  return res.status(400).json({
+    message: "Only USDT deposits are supported",
+  });
+}
+
+if (!["TRON", "BEP20"].includes(network)) {
+  return res.status(400).json({
+    message: "Unsupported network",
+  });
+}
 
     const { data, error } = await supabase
       .from("crypto_deposits")
