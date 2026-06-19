@@ -1293,11 +1293,18 @@ router.get("/crypto/deposit-address", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     const token = String(req.query.token || "USDT").trim().toUpperCase();
-    const network = String(req.query.network || "TRON").trim().toUpperCase();
+    const rawNetwork = String(req.query.network || "TRON").trim().toUpperCase();
 
-    if (token !== "USDT" || network !== "TRON") {
+    const network =
+      rawNetwork === "TRON" || rawNetwork === "TRC20"
+        ? "TRC20"
+        : rawNetwork === "BSC" || rawNetwork === "BEP20"
+        ? "BEP20"
+        : rawNetwork;
+
+    if (token !== "USDT" || !["TRC20", "BEP20"].includes(network)) {
       return res.status(400).json({
-        message: "Only USDT on TRON is supported right now",
+        message: "Only USDT on TRC20 and BEP20 is supported",
       });
     }
 
@@ -1323,8 +1330,21 @@ router.get("/crypto/deposit-address", authMiddleware, async (req, res) => {
       });
     }
 
-    const account = await createTronAccount();
-    const encryptedPrivateKey = encryptPrivateKey(account.privateKey);
+    let address;
+    let encryptedPrivateKey;
+
+    if (network === "TRC20") {
+      const account = await createTronAccount();
+      address = account.address;
+      encryptedPrivateKey = encryptPrivateKey(account.privateKey);
+    }
+
+    if (network === "BEP20") {
+      const { createBscWallet } = require("../services/bsc.service");
+      const wallet = createBscWallet();
+      address = wallet.address;
+      encryptedPrivateKey = wallet.encryptedPrivateKey;
+    }
 
     const { data: created, error: createErr } = await supabase
       .from("crypto_deposit_addresses")
@@ -1332,7 +1352,7 @@ router.get("/crypto/deposit-address", authMiddleware, async (req, res) => {
         user_id: userId,
         network,
         token,
-        address: account.address,
+        address,
         encrypted_private_key: encryptedPrivateKey,
       })
       .select("address, network, token, created_at")

@@ -20,9 +20,9 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
   const { data: deposits, error } = await supabase
     .from("crypto_deposits")
     .select("*")
-    .eq("network", "TRC20")
+    .in("network", ["TRON", "TRC20"])
     .eq("token", "USDT")
-    .eq("status", "credited")
+    .in("status", ["credited", "completed"])
     .eq("sweep_status", "not_swept")
     .gte("amount", MIN_SWEEP_AMOUNT)
     .order("created_at", { ascending: true })
@@ -46,7 +46,7 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
         .from("crypto_deposit_addresses")
         .select("address, encrypted_private_key")
         .eq("address", deposit.to_address)
-        .eq("network", "TRC20")
+        .in("network", ["TRON", "TRC20"])
         .eq("token", "USDT")
         .maybeSingle();
 
