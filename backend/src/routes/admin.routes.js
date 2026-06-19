@@ -3929,6 +3929,10 @@ router.post(
       const limit = Number(req.body.limit || 5);
 
       const results = await sweepCreditedUsdtDeposits(limit);
+      await supabase.from("scanner_logs").insert({
+  operation: "trc20_sweep",
+  result,
+});
 
       await logAdminAction({
         adminId: req.user.userId,
@@ -4000,6 +4004,10 @@ router.post(
       const limit = Number(req.body.limit || 5);
 
       const results = await sweepCreditedBep20Deposits(limit);
+      await supabase.from("scanner_logs").insert({
+  operation: "bep20_sweep",
+  result: { results },
+});
 
       await logAdminAction({
         adminId: req.user.userId,
