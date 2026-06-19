@@ -658,10 +658,23 @@ async function runTrc20DepositScan() {
   }
 }
 
+async function runTrc20DepositScan() {
+  try {
+    setMessage("Running TRC20 deposit scan...");
+    const res = await api.post("/wallet/crypto/scan-deposits");
+
+    setMessage(
+      `TRC20 scan completed. Scanned: ${res.data?.scannedAddresses || 0}, credited: ${res.data?.creditedDeposits || 0}`
+    );
+  } catch (err) {
+    setMessage(err?.response?.data?.message || err.message || "TRC20 scan failed");
+  }
+}
+
 async function runTrc20DepositSweep() {
   try {
     setMessage("Running TRC20 sweep...");
-    const res = await api.post("/admin/crypto/deposits/sweep-trc20", {
+    const res = await api.post("/admin/crypto/deposits/sweep", {
       limit: 5,
     });
 
