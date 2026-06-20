@@ -2038,6 +2038,103 @@ async function saveExchangeRate(e) {
       >
         Refresh
       </button>
+      <div
+  style={{
+    border: "1px solid #e2e8f0",
+    borderRadius: 16,
+    padding: 18,
+    background: "#f8fafc",
+  }}
+>
+  <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>
+    USDT TRC20
+  </div>
+
+  <div style={{ color: "#64748b", fontSize: 13, marginBottom: 14 }}>
+    Scan TRON deposits and sweep credited USDT to treasury.
+  </div>
+
+  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+    <button
+      onClick={runTrc20DepositScan}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: "1px solid #bfdbfe",
+        background: "#eff6ff",
+        color: "#1d4ed8",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      Run TRC20 Scan
+    </button>
+
+    <button
+      onClick={runTrc20DepositSweep}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: "1px solid #bbf7d0",
+        background: "#ecfdf5",
+        color: "#166534",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      Run TRC20 Sweep
+    </button>
+  </div>
+</div>
+
+<div
+  style={{
+    border: "1px solid #e2e8f0",
+    borderRadius: 16,
+    padding: 18,
+    background: "#f8fafc",
+  }}
+>
+  <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>
+    USDT BEP20
+  </div>
+
+  <div style={{ color: "#64748b", fontSize: 13, marginBottom: 14 }}>
+    Scan BNB Smart Chain deposits and sweep credited USDT to treasury.
+  </div>
+
+  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+    <button
+      onClick={runBep20DepositScan}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: "1px solid #bfdbfe",
+        background: "#eff6ff",
+        color: "#1d4ed8",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      Run BEP20 Scan
+    </button>
+
+    <button
+      onClick={runBep20DepositSweep}
+      style={{
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: "1px solid #bbf7d0",
+        background: "#ecfdf5",
+        color: "#166534",
+        fontWeight: 700,
+        cursor: "pointer",
+      }}
+    >
+      Run BEP20 Sweep
+    </button>
+  </div>
+</div>
       
       
       
