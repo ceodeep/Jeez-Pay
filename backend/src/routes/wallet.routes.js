@@ -1393,7 +1393,12 @@ router.post("/crypto/scan-deposits", authMiddleware, async (req, res) => {
     }
 
     const result = await scanUsdtDeposits();
-    const result = await scanUsdtDeposits();
+    await supabase.from("scanner_logs").insert({
+  operation: "trc20_scan",
+  result,
+});
+
+return res.json(result);
 
 await supabase.from("scanner_logs").insert({
   operation: "trc20_scan",
