@@ -3963,6 +3963,10 @@ router.post(
   async (req, res) => {
     try {
       const result = await scanUsdtBep20Deposits();
+      await supabase.from("scanner_logs").insert({
+  operation: "bep20_scan",
+  result,
+});
 
       await logAdminAction({
         adminId: req.user.userId,
