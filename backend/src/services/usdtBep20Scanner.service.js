@@ -77,7 +77,7 @@ const { data: state, error: stateErr } = await supabase
 
 if (stateErr) throw stateErr;
 
-let fromBlock = Number(state?.last_block || 0);
+let fromBlock = Number(state?.last_block || 0) + 1;
 
 if (!fromBlock || fromBlock <= 0) {
   fromBlock = Math.max(latestBlock - 10, 0);
