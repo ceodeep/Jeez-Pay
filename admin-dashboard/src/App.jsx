@@ -217,6 +217,7 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       roles: "users.role.update",
       exchangeRates: "currency_settings.view",
       companyWallet: "wallets.view",
+      treasuryOps: "wallets.adjust",
       
     };
 
@@ -1294,6 +1295,7 @@ async function saveExchangeRate(e) {
       ["walletView", "Wallet View"],
       ["companyWallet", "Company Wallet"],
       ["wallet", "Wallet Adjust"],
+      ["treasuryOps", "Treasury Ops"],
     ],
   },
   {
@@ -1415,6 +1417,7 @@ async function saveExchangeRate(e) {
       {page === "referralRewards" && "Referral Rewards"}
       {page === "exchangeRates" && "Exchange Rates"}
       {page === "withdrawals" && "Crypto Withdrawals"}
+      {page === "treasuryOps" && "Treasury Operations"}
     </h1>
 
     <p
@@ -1984,35 +1987,7 @@ async function saveExchangeRate(e) {
       >
         Refresh
       </button>
-      <button
-  onClick={runBep20DepositScan}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: "1px solid #bfdbfe",
-    background: "#eff6ff",
-    color: "#1d4ed8",
-    fontWeight: 700,
-    cursor: "pointer",
-  }}
->
-  Run BEP20 Scan
-</button>
-
-<button
-  onClick={runBep20DepositSweep}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: "1px solid #bbf7d0",
-    background: "#ecfdf5",
-    color: "#166534",
-    fontWeight: 700,
-    cursor: "pointer",
-  }}
->
-  Run BEP20 Sweep
-</button>
+      
       
       
     </div>
@@ -4938,6 +4913,127 @@ async function saveExchangeRate(e) {
         </div>
       </>
     )}
+  </div>
+)}
+
+{page === "treasuryOps" && (
+  <div style={{ display: "grid", gap: 16, maxWidth: 900 }}>
+    <div
+      style={{
+        background: "#fff",
+        padding: 22,
+        borderRadius: 18,
+        boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+      }}
+    >
+      <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>
+        Treasury Operations
+      </div>
+
+      <div style={{ color: "#64748b", fontSize: 14, marginBottom: 18 }}>
+        Manually run deposit scans and treasury sweeps for supported USDT networks.
+      </div>
+
+      <div style={{ display: "grid", gap: 16 }}>
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 16,
+            padding: 18,
+            background: "#f8fafc",
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>
+            USDT TRC20
+          </div>
+
+          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 14 }}>
+            Scan TRON deposits and sweep credited USDT to treasury.
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={runTrc20DepositScan}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #bfdbfe",
+                background: "#eff6ff",
+                color: "#1d4ed8",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Run TRC20 Scan
+            </button>
+
+            <button
+              onClick={runTrc20DepositSweep}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #bbf7d0",
+                background: "#ecfdf5",
+                color: "#166534",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Run TRC20 Sweep
+            </button>
+          </div>
+        </div>
+
+        <div
+          style={{
+            border: "1px solid #e2e8f0",
+            borderRadius: 16,
+            padding: 18,
+            background: "#f8fafc",
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 17, marginBottom: 6 }}>
+            USDT BEP20
+          </div>
+
+          <div style={{ color: "#64748b", fontSize: 13, marginBottom: 14 }}>
+            Scan BNB Smart Chain deposits and sweep credited USDT to treasury.
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={runBep20DepositScan}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #bfdbfe",
+                background: "#eff6ff",
+                color: "#1d4ed8",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Run BEP20 Scan
+            </button>
+
+            <button
+              onClick={runBep20DepositSweep}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #bbf7d0",
+                background: "#ecfdf5",
+                color: "#166534",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Run BEP20 Sweep
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 )}
 
