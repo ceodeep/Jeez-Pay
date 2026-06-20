@@ -2066,20 +2066,7 @@ async function saveExchangeRate(e) {
   <div style={{ color: "#64748b", fontSize: 13, marginBottom: 14 }}>
     Scan TRON deposits and sweep credited USDT to treasury.
   </div>
-  <button
-  onClick={runTronMaxRentEnergy}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: "1px solid #fde68a",
-    background: "#fffbeb",
-    color: "#92400e",
-    fontWeight: 700,
-    cursor: "pointer",
-  }}
->
-  Rent TRON Energy
-</button>
+ 
 
   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
     <button
@@ -5157,6 +5144,20 @@ async function saveExchangeRate(e) {
             >
               Run TRC20 Sweep
             </button>
+            <button
+  onClick={runTronMaxRentEnergy}
+  style={{
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #fde68a",
+    background: "#fffbeb",
+    color: "#92400e",
+    fontWeight: 700,
+    cursor: "pointer",
+  }}
+>
+  Rent TRON Energy
+</button>
           </div>
         </div>
 
