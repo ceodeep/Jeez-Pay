@@ -108,6 +108,8 @@ const [cryptoWithdrawalsLoading, setCryptoWithdrawalsLoading] = useState(false);
 const [cryptoWithdrawalStatusFilter, setCryptoWithdrawalStatusFilter] = useState("pending");
 const [cryptoWithdrawalActionLoadingId, setCryptoWithdrawalActionLoadingId] = useState("");
 const [cryptoWithdrawals, setCryptoWithdrawals] = useState([]);
+const [scannerLogsLoading, setScannerLogsLoading] = useState(false);
+const [scannerLogs, setScannerLogs] = useState([]);
 
 
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
@@ -218,6 +220,7 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
       exchangeRates: "currency_settings.view",
       companyWallet: "wallets.view",
       treasuryOps: "wallets.adjust",
+      scannerLogs: "wallets.adjust",
       
     };
 
@@ -244,6 +247,19 @@ const [exchangeRateForm, setExchangeRateForm] = useState({
   } catch (err) {
     console.error("Failed to load USDT scanner status", err);
   }
+  async function loadScannerLogs() {
+  setScannerLogsLoading(true);
+  setMessage("");
+
+  try {
+    const res = await api.get("/admin/scanner-logs");
+    setScannerLogs(res.data?.logs || []);
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "Failed to load scanner logs");
+  } finally {
+    setScannerLogsLoading(false);
+  }
+}
 }
   function exportCompanyWalletCsv() {
   const rows = companyWalletData?.recentTransactions || [];
@@ -1183,6 +1199,7 @@ async function saveExchangeRate(e) {
     if (page === "settings") loadSystemSettings();
     if (page === "companyWallet") loadCompanyWallet();
     if (page === "withdrawals") loadCryptoWithdrawals();
+    if (page === "scannerLogs") loadScannerLogs();
     if (page === "currencySettings") loadCurrencySettings();
     if (page === "exchangeRates") loadExchangeRates();
     if (page === "referralRewards") {
@@ -1445,6 +1462,7 @@ async function saveExchangeRate(e) {
       {page === "exchangeRates" && "Exchange Rates"}
       {page === "withdrawals" && "Crypto Withdrawals"}
       {page === "treasuryOps" && "Treasury Operations"}
+      {page === "scannerLogs" && "Scanner Logs"}
     </h1>
 
     <p
@@ -5061,6 +5079,82 @@ async function saveExchangeRate(e) {
         </div>
       </div>
     </div>
+  </div>
+)}
+
+{page === "scannerLogs" && (
+  <div style={{ display: "grid", gap: 16 }}>
+    <div
+      style={{
+        background: "#fff",
+        padding: 20,
+        borderRadius: 16,
+        boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>Scanner Logs</div>
+          <div style={{ color: "#64748b", fontSize: 14, marginTop: 4 }}>
+            Latest deposit scanner and sweep operation logs.
+          </div>
+        </div>
+
+        <button
+          onClick={loadScannerLogs}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid #cbd5e1",
+            background: "#fff",
+            color: "#0f172a",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    {scannerLogsLoading ? (
+      <p>Loading scanner logs...</p>
+    ) : scannerLogs.length === 0 ? (
+      <div style={{ background: "#fff", padding: 24, borderRadius: 16 }}>
+        No scanner logs found yet.
+      </div>
+    ) : (
+      <div style={{ display: "grid", gap: 12 }}>
+        {scannerLogs.map((log) => (
+          <div
+            key={log.id}
+            style={{
+              background: "#fff",
+              padding: 18,
+              borderRadius: 16,
+              boxShadow: "0 6px 24px rgba(15, 23, 42, 0.06)",
+            }}
+          >
+            <div style={{ fontWeight: 800 }}>{log.operation}</div>
+            <div style={{ color: "#64748b", fontSize: 13, marginTop: 6 }}>
+              {formatDate(log.created_at)}
+            </div>
+            <pre
+              style={{
+                marginTop: 12,
+                padding: 12,
+                background: "#f8fafc",
+                borderRadius: 12,
+                overflowX: "auto",
+                fontSize: 12,
+              }}
+            >
+              {JSON.stringify(log.result || {}, null, 2)}
+            </pre>
+          </div>
+        ))}
+      </div>
+    )}
   </div>
 )}
 
