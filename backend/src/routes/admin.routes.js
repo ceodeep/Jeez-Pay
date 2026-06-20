@@ -3931,7 +3931,7 @@ router.post(
       const results = await sweepCreditedUsdtDeposits(limit);
       await supabase.from("scanner_logs").insert({
   operation: "trc20_sweep",
-  result,
+  results,
 });
 
       await logAdminAction({
