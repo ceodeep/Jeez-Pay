@@ -39,6 +39,7 @@ const {
 } = require("../services/usdtBep20Scanner.service");
 const { rentTronEnergy } = require("../services/tronmax.service");
 
+
 function isProtectedAdminRole(role) {
   return PROTECTED_ADMIN_ROLES.includes(String(role || "").trim());
 }
@@ -3627,6 +3628,12 @@ if (lockErr || !lockedWithdrawal) {
   let txHash;
 
   if (lockedNetwork === "TRC20") {
+    await rentTronEnergy({
+  receiver: process.env.TRON_TREASURY_ADDRESS,
+  amount: Number(process.env.TRONMAX_DEFAULT_ENERGY || 65000),
+  duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
+  purpose: "trc20_withdrawal",
+});
     txHash = await sendUsdtTrc20FromPrivateKey({
       fromPrivateKey: process.env.TRON_TREASURY_PRIVATE_KEY,
       toAddress: lockedWithdrawal.to_address,
