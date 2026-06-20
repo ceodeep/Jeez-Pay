@@ -32,6 +32,7 @@
                 app:tint="@color/text_primary" />
 
             <TextView
+                android:id="@+id/tvDepositTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
@@ -63,6 +64,7 @@
                 android:paddingBottom="28dp">
 
                 <TextView
+                    android:id="@+id/tvDepositSubtitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
@@ -71,15 +73,37 @@
                     android:textSize="20sp"
                     android:textStyle="bold" />
 
-                <TextView
+
+                <LinearLayout
+                    android:id="@+id/networkSelector"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:lineSpacingExtra="2dp"
-                    android:text="Send only USDT on the TRON/TRC20 network to this address."
-                    android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:layout_height="48dp"
+                    android:layout_marginTop="18dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvTrc20"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_auth_input_box"
+                        android:gravity="center"
+                        android:text="TRC20"
+                        android:textColor="@color/text_primary"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvBep20"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_auth_input_box"
+                        android:gravity="center"
+                        android:text="BEP20"
+                        android:textColor="@color/text_secondary"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <ImageView
                     android:id="@+id/ivQrCode"
@@ -150,15 +174,6 @@
             app:cardCornerRadius="20dp"
             app:cardElevation="0dp">
 
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:lineSpacingExtra="2dp"
-                android:padding="16dp"
-                android:text="Important: Deposits are not automatically credited until the blockchain monitoring service is enabled. Do not send real funds yet during testing."
-                android:textColor="#8A5A00"
-                android:textSize="13sp"
-                android:textStyle="bold" />
         </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>

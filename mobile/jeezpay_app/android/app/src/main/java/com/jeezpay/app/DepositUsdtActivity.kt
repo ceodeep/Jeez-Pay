@@ -30,6 +30,11 @@ class DepositUsdtActivity : BaseFintechActivity() {
     private lateinit var btnCopyAddress: MaterialButton
     private lateinit var tvStatus: TextView
     private lateinit var btnDepositHistory: MaterialButton
+    private lateinit var tvDepositTitle: TextView
+    private lateinit var tvDepositSubtitle: TextView
+    private lateinit var tvTrc20: TextView
+    private lateinit var tvBep20: TextView
+    private var selectedNetwork = "TRC20"
 
     private var currentAddress: String = ""
 
@@ -44,6 +49,25 @@ class DepositUsdtActivity : BaseFintechActivity() {
         btnDepositHistory = findViewById(R.id.btnDepositHistory)
         tvStatus = findViewById(R.id.tvStatus)
 
+        tvDepositTitle = findViewById(R.id.tvDepositTitle)
+        tvDepositSubtitle = findViewById(R.id.tvDepositSubtitle)
+        tvTrc20 = findViewById(R.id.tvTrc20)
+        tvBep20 = findViewById(R.id.tvBep20)
+
+        tvTrc20.setOnClickListener {
+            selectedNetwork = "TRC20"
+            updateNetworkUi()
+            loadDepositAddress()
+        }
+
+        tvBep20.setOnClickListener {
+            selectedNetwork = "BEP20"
+            updateNetworkUi()
+            loadDepositAddress()
+        }
+
+        updateNetworkUi()
+
         btnBack.setOnClickListener { finish() }
 
         btnCopyAddress.setOnClickListener {
@@ -52,7 +76,7 @@ class DepositUsdtActivity : BaseFintechActivity() {
                 return@setOnClickListener
             }
 
-            copyToClipboard("JeezPay USDT TRC20 address", currentAddress)
+            copyToClipboard("JeezPay USDT $selectedNetwork address", currentAddress)
             toast("Address copied")
         }
         btnDepositHistory.setOnClickListener {
@@ -68,7 +92,7 @@ class DepositUsdtActivity : BaseFintechActivity() {
         btnCopyAddress.alpha = 0.65f
 
         lifecycleScope.launch {
-            when (val result = repo.cryptoDepositAddressSafe("USDT", "TRON")) {
+            when (val result = repo.cryptoDepositAddressSafe("USDT", selectedNetwork)) {
                 is ApiResult.Success -> {
                     val address = result.data.address?.trim().orEmpty()
 
@@ -147,5 +171,23 @@ class DepositUsdtActivity : BaseFintechActivity() {
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+    private fun updateNetworkUi() {
+        tvDepositTitle.text = "USDT $selectedNetwork Deposit Address"
+
+        tvDepositSubtitle.text =
+            if (selectedNetwork == "BEP20") {
+                "Send only USDT on the BNB Smart Chain/BEP20 network to this address."
+            } else {
+                "Send only USDT on the TRON/TRC20 network to this address."
+            }
+
+        tvTrc20.setTextColor(
+            getColor(if (selectedNetwork == "TRC20") R.color.text_primary else R.color.text_secondary)
+        )
+
+        tvBep20.setTextColor(
+            getColor(if (selectedNetwork == "BEP20") R.color.text_primary else R.color.text_secondary)
+        )
     }
 }
