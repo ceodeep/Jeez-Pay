@@ -643,6 +643,29 @@ async function runBep20DepositSweep() {
     setMessage(err?.response?.data?.message || "BEP20 sweep failed");
   }
 }
+async function runTrc20DepositScan() {
+  try {
+    setMessage("Running TRC20 deposit scan...");
+    const res = await api.post("/admin/crypto/deposits/scan");
+    setMessage(
+      `TRC20 scan completed. Scanned: ${res.data?.scannedAddresses || 0}, credited: ${res.data?.creditedDeposits || 0}`
+    );
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "TRC20 scan failed");
+  }
+}
+
+async function runTrc20DepositSweep() {
+  try {
+    setMessage("Running TRC20 sweep...");
+    const res = await api.post("/admin/crypto/deposits/sweep");
+    setMessage(
+      `TRC20 sweep completed. Results: ${res.data?.results?.length || 0}`
+    );
+  } catch (err) {
+    setMessage(err?.response?.data?.message || "TRC20 sweep failed");
+  }
+}
 
 async function completeServiceRequest(requestId) {
   if (!requestId) return;
