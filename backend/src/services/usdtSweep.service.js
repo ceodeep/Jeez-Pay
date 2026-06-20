@@ -5,6 +5,7 @@ const {
   sendUsdtTrc20FromPrivateKey,
   sendTrxFromPrivateKey,
 } = require("./tron.service");
+const { rentTronEnergy } = require("./tronmax.service");
 
 const TREASURY_ADDRESS = process.env.TRON_TREASURY_ADDRESS;
 const TREASURY_PRIVATE_KEY = process.env.TRON_TREASURY_PRIVATE_KEY;
@@ -68,6 +69,13 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
         .from("crypto_deposits")
         .update({ sweep_status: "sweeping" })
         .eq("id", deposit.id);
+
+        await rentTronEnergy({
+  receiver: deposit.to_address,
+  amount: Number(process.env.TRONMAX_DEFAULT_ENERGY || 65000),
+  duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
+  purpose: "trc20_sweep",
+});
 
       const sweepTxHash = await sendUsdtTrc20FromPrivateKey({
         fromPrivateKey: userPrivateKey,
