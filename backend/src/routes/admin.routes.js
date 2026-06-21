@@ -48,7 +48,7 @@ function isProtectedAdminRole(role) {
 
 
 function makeAdminAdjustmentReference() {
-  return `ADM-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+  return Date.now();
 }
 // ---------- helper: normalize phone ----------
 function normalizePhone(raw) {
