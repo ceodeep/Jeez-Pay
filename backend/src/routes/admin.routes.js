@@ -133,6 +133,11 @@ async function getUserByAdminIdentifier(identifierRaw) {
   }
 
   // 4) Try UUID as id
+ // 4) Try UUID as id
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+if (uuidRegex.test(raw)) {
   const r4 = await supabase
     .from("users")
     .select("id, phone, role, wallet_account_number, is_active")
@@ -141,8 +146,9 @@ async function getUserByAdminIdentifier(identifierRaw) {
 
   if (r4.error) throw r4.error;
   if (r4.data) return r4.data;
+}
 
-  return null;
+return null;
 }
 
 // =====================================
