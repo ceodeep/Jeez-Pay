@@ -47,8 +47,8 @@ async function fetchTrc20TransfersForAddress(address) {
   }
 
   const url =
-    `${fullHost}/v1/accounts/${address}/transactions/trc20` +
-    `?limit=50&only_confirmed=true&only_to=true&contract_address=${contract}`;
+  `${fullHost}/v1/accounts/${address}/transactions/trc20` +
+  `?limit=50&only_confirmed=true&only_to=true&contract_address=${contract}&order_by=block_timestamp,desc`;
 
   const headers = {};
   if (process.env.TRONGRID_API_KEY) {
@@ -63,7 +63,10 @@ async function fetchTrc20TransfersForAddress(address) {
   }
 
   const json = await response.json();
-  return json.data || [];
+  return (json.data || [])
+  .filter((tx) => String(tx.to || "").toLowerCase() === String(address).toLowerCase())
+  .filter((tx) => String(tx.token_info?.address || "").toLowerCase() === String(contract).toLowerCase())
+  .sort((a, b) => Number(b.block_timestamp || 0) - Number(a.block_timestamp || 0));
 }
 
 async function creditDepositOnce({ addressRow, transfer }) {
