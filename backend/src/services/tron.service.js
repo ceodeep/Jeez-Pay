@@ -101,7 +101,49 @@ async function sendUsdtTrc20FromPrivateKey({ fromPrivateKey, toAddress, amount }
     feeLimit: 100_000_000,
   });
 
+  await waitForTronTransactionSuccess(txHash);
+
   return txHash;
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForTronTransactionSuccess(txHash, attempts = 20, delayMs = 3000) {
+  const checkerTronWeb = new TronWeb({
+    fullHost,
+    headers: apiKey ? { "TRON-PRO-API-KEY": apiKey } : {},
+  });
+
+  for (let i = 0; i < attempts; i += 1) {
+    const info = await checkerTronWeb.trx.getTransactionInfo(txHash);
+
+    if (info && Object.keys(info).length > 0) {
+      if (info.receipt?.result === "SUCCESS") {
+        return info;
+      }
+
+      const reasonHex = info.resMessage;
+      let reason = "";
+
+      try {
+        reason = reasonHex
+          ? Buffer.from(reasonHex, "hex").toString("utf8")
+          : "";
+      } catch (_) {
+        reason = "";
+      }
+
+      throw new Error(
+        `TRON transaction failed: ${info.receipt?.result || "UNKNOWN"} ${reason}`.trim()
+      );
+    }
+
+    await sleep(delayMs);
+  }
+
+  throw new Error("TRON transaction confirmation timed out");
 }
 
 async function waitForTransactionSuccess(txHash, maxAttempts = 20, delayMs = 3000) {
