@@ -115,7 +115,7 @@ async function scanUsdtDeposits() {
   const { data: addresses, error: addressErr } = await supabase
     .from("crypto_deposit_addresses")
     .select("user_id, address, network, token")
-    .eq("network", "TRON")
+    .in("network", ["TRON", "TRC20"])
     .eq("token", "USDT")
     .eq("is_active", true);
 
