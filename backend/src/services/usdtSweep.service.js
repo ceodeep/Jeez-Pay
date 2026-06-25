@@ -108,7 +108,7 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
         throw new Error(`TronMax energy rental failed: ${rentErr.message}`);
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      await new Promise((resolve) => setTimeout(resolve, 60000));
 
       const sweepTxHash = await sendUsdtTrc20FromPrivateKey({
         fromPrivateKey: userPrivateKey,
