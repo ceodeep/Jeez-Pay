@@ -81,6 +81,12 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
     amount: 1,
   });
 
+  if (!activationTxHash) {
+    throw new Error("TRON activation failed: no transaction hash returned");
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 10000));
+
   await supabase
     .from("crypto_deposit_addresses")
     .update({
@@ -89,8 +95,6 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
       tron_activated_at: new Date().toISOString(),
     })
     .eq("address", deposit.to_address);
-    
-    await new Promise((resolve) => setTimeout(resolve, 8000));
 }
 
       try {
