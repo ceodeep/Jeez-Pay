@@ -10,7 +10,7 @@ const { rentTronEnergy } = require("./tronmax.service");
 const TREASURY_ADDRESS = process.env.TRON_TREASURY_ADDRESS;
 const TREASURY_PRIVATE_KEY = process.env.TRON_TREASURY_PRIVATE_KEY;
 
-const SWEEP_TRX_TOPUP_AMOUNT = Number(process.env.SWEEP_TRX_TOPUP_AMOUNT || 30);
+
 const MIN_SWEEP_AMOUNT = Number(process.env.MIN_USDT_SWEEP_AMOUNT || 1);
 
 async function sweepCreditedUsdtDeposits(limit = 10) {
@@ -56,7 +56,7 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
 
       const { data: depositAddress, error: addrErr } = await supabase
         .from("crypto_deposit_addresses")
-        .select("address, encrypted_private_key")
+        .select("address, encrypted_private_key, tron_activated")
         .eq("address", deposit.to_address)
         .in("network", ["TRON", "TRC20"])
         .eq("token", "USDT")
@@ -73,6 +73,25 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
       );
 
       let tronmaxOrder = null;
+
+      if (!depositAddress.tron_activated) {
+  const activationTxHash = await sendTrxFromPrivateKey({
+    fromPrivateKey: TREASURY_PRIVATE_KEY,
+    toAddress: deposit.to_address,
+    amount: 1,
+  });
+
+  await supabase
+    .from("crypto_deposit_addresses")
+    .update({
+      tron_activated: true,
+      tron_activation_tx_hash: activationTxHash,
+      tron_activated_at: new Date().toISOString(),
+    })
+    .eq("address", deposit.to_address);
+    
+    await new Promise((resolve) => setTimeout(resolve, 8000));
+}
 
       try {
         tronmaxOrder = await rentTronEnergy({
