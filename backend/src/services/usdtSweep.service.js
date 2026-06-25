@@ -29,19 +29,30 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
     .order("created_at", { ascending: true })
     .limit(limit);
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
   const results = [];
 
   for (const deposit of deposits || []) {
     try {
-      await supabase
+      const { data: lockedDeposit, error: lockErr } = await supabase
         .from("crypto_deposits")
-        .update({ sweep_status: "funding", sweep_error: null })
+        .update({ sweep_status: "sweeping", sweep_error: null })
         .eq("id", deposit.id)
-        .eq("sweep_status", "not_swept");
+        .eq("sweep_status", "not_swept")
+        .select("id")
+        .maybeSingle();
+
+      if (lockErr) throw lockErr;
+
+      if (!lockedDeposit) {
+        results.push({
+          depositId: deposit.id,
+          status: "skipped",
+          error: "Deposit already being processed",
+        });
+        continue;
+      }
 
       const { data: depositAddress, error: addrErr } = await supabase
         .from("crypto_deposit_addresses")
@@ -51,7 +62,9 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
         .eq("token", "USDT")
         .maybeSingle();
 
-      if (addrErr || !depositAddress?.encrypted_private_key) {
+      if (addrErr) throw addrErr;
+
+      if (!depositAddress?.encrypted_private_key) {
         throw new Error("Deposit private key not found");
       }
 
@@ -59,23 +72,20 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
         depositAddress.encrypted_private_key
       );
 
-      const fundingTxHash = await sendTrxFromPrivateKey({
-        fromPrivateKey: TREASURY_PRIVATE_KEY,
-        toAddress: deposit.to_address,
-        amount: SWEEP_TRX_TOPUP_AMOUNT,
-      });
+      let tronmaxOrder = null;
 
-      await supabase
-        .from("crypto_deposits")
-        .update({ sweep_status: "sweeping" })
-        .eq("id", deposit.id);
+      try {
+        tronmaxOrder = await rentTronEnergy({
+          receiver: deposit.to_address,
+          amount: Number(process.env.TRONMAX_DEFAULT_ENERGY || 65000),
+          duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
+          purpose: "trc20_sweep",
+        });
+      } catch (rentErr) {
+        throw new Error(`TronMax energy rental failed: ${rentErr.message}`);
+      }
 
-        await rentTronEnergy({
-  receiver: deposit.to_address,
-  amount: Number(process.env.TRONMAX_DEFAULT_ENERGY || 65000),
-  duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
-  purpose: "trc20_sweep",
-});
+      await new Promise((resolve) => setTimeout(resolve, 10000));
 
       const sweepTxHash = await sendUsdtTrc20FromPrivateKey({
         fromPrivateKey: userPrivateKey,
@@ -92,7 +102,7 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
           sweep_error: null,
           raw_payload: {
             ...(deposit.raw_payload || {}),
-            sweep_funding_tx_hash: fundingTxHash,
+            tronmax_order: tronmaxOrder || null,
           },
         })
         .eq("id", deposit.id);
@@ -100,7 +110,7 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
       results.push({
         depositId: deposit.id,
         status: "swept",
-        fundingTxHash,
+        tronmaxOrder,
         sweepTxHash,
       });
     } catch (err) {
@@ -115,7 +125,7 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
       results.push({
         depositId: deposit.id,
         status: "failed",
-        error: err.message,
+        error: err.message || "Sweep failed",
       });
     }
   }
