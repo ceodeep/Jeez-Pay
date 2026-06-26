@@ -3982,37 +3982,49 @@ router.post(
   requireAdmin,
   requirePermission("wallets.adjust"),
   async (req, res) => {
-    try {
-      const limit = Number(req.body.limit || 5);
+    const limit = Number(req.body.limit || 5);
+    const adminId = req.user.userId;
+    const adminPhone = req.adminUser?.phone || null;
 
-      const results = await sweepCreditedUsdtDeposits(limit);
-      await supabase.from("scanner_logs").insert({
-  operation: "trc20_sweep",
-  results,
-});
+    res.json({
+      message: "TRC20 USDT sweep started",
+      status: "processing",
+    });
 
-      await logAdminAction({
-        adminId: req.user.userId,
-        adminPhone: req.adminUser?.phone || null,
-        action: "USDT_DEPOSITS_SWEEP_RUN",
-        targetType: "crypto_deposits",
-        targetId: null,
-        targetDisplay: "TRC20 deposit sweep",
-        oldValue: null,
-        newValue: { results },
-        req,
-      });
+    setImmediate(async () => {
+      try {
+        const results = await sweepCreditedUsdtDeposits(limit);
 
-      return res.json({
-        message: "USDT sweep completed",
-        results,
-      });
-    } catch (err) {
-      console.error("USDT sweep route error:", err);
-      return res.status(500).json({
-        message: err.message || "USDT sweep failed",
-      });
-    }
+        await supabase.from("scanner_logs").insert({
+          operation: "trc20_sweep",
+          result: results,
+        });
+
+        await logAdminAction({
+          adminId,
+          adminPhone,
+          action: "USDT_DEPOSITS_SWEEP_RUN",
+          targetType: "crypto_deposits",
+          targetId: null,
+          targetDisplay: "TRC20 deposit sweep",
+          oldValue: null,
+          newValue: { results },
+          req: null,
+        });
+
+        console.log("[trc20_sweep] completed:", results);
+      } catch (err) {
+        console.error("[trc20_sweep] background error:", err);
+
+        await supabase.from("scanner_logs").insert({
+          operation: "trc20_sweep_error",
+          result: {
+            message: err.message || "TRC20 sweep failed",
+            stack: err.stack || null,
+          },
+        });
+      }
+    });
   }
 );
 
