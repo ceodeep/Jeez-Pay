@@ -196,6 +196,32 @@ async function sendTrxFromPrivateKey({ fromPrivateKey, toAddress, amount }) {
   return result.txid;
 }
 
+async function getUsdtTrc20Balance(address) {
+  if (!tronWeb.isAddress(address)) {
+    throw new Error("Invalid TRON address");
+  }
+
+  const contractAddress = process.env.USDT_TRC20_CONTRACT;
+
+  if (!contractAddress) {
+    throw new Error("USDT_TRC20_CONTRACT is missing");
+  }
+
+  const contract = await tronWeb.contract().at(contractAddress);
+  const result = await contract.balanceOf(address).call();
+
+  const raw =
+    typeof result === "bigint"
+      ? result.toString()
+      : result?._hex
+        ? BigInt(result._hex).toString()
+        : result?.toString
+          ? result.toString()
+          : String(result || "0");
+
+  return Number(raw) / 1_000_000;
+}
+
 module.exports = {
   tronWeb,
   createTronAccount,
@@ -204,4 +230,5 @@ module.exports = {
   sendUsdtTrc20FromPrivateKey,
   waitForTransactionSuccess,
   sendTrxFromPrivateKey,
+  getUsdtTrc20Balance,
 };
