@@ -3651,7 +3651,7 @@ const withdrawalEnergy =
         131000
       );
 
-await rentTronEnergy({
+const tronmaxOrder = await rentTronEnergy({
   receiver: process.env.TRON_TREASURY_ADDRESS,
   amount: withdrawalEnergy,
   duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
@@ -3663,6 +3663,31 @@ txHash = await sendUsdtTrc20FromPrivateKey({
   toAddress: lockedWithdrawal.to_address,
   amount: Number(lockedWithdrawal.amount),
 });
+
+await supabase
+  .from("crypto_withdrawals")
+  .update({
+    raw_payload: {
+      ...(lockedWithdrawal.raw_payload || {}),
+      tronmax: {
+        purpose: "trc20_withdrawal",
+        receiver: process.env.TRON_TREASURY_ADDRESS,
+        recipient: lockedWithdrawal.to_address,
+        recipient_usdt_balance_before: recipientUsdtBalance,
+        recipient_threshold_usdt: Number(
+          process.env.TRC20_RECIPIENT_USDT_THRESHOLD || 0.5
+        ),
+        energy_rented: withdrawalEnergy,
+        order_id: tronmaxOrder?.orderId || null,
+        status: tronmaxOrder?.status || null,
+        filled: tronmaxOrder?.filled || null,
+        paid_amount: tronmaxOrder?.paidAmount || null,
+        price: tronmaxOrder?.price || null,
+      },
+      withdrawal_tx_hash: txHash,
+    },
+  })
+  .eq("id", lockedWithdrawal.id);
 
     await supabase
       .from("crypto_withdrawals")
