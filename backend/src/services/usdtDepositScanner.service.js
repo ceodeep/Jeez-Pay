@@ -2,6 +2,8 @@ const supabase = require("../config/supabase");
 
 const USDT_DECIMALS = 6;
 
+
+
 function normalizeTronAmount(value, decimals = USDT_DECIMALS) {
   const raw = Number(value || 0);
   const d = Number(decimals || USDT_DECIMALS);
@@ -9,6 +11,44 @@ function normalizeTronAmount(value, decimals = USDT_DECIMALS) {
   if (!Number.isFinite(raw) || raw <= 0) return 0;
 
   return raw / Math.pow(10, d);
+}
+
+function roundUsdt(value) {
+  return Math.round(Number(value || 0) * 1_000_000) / 1_000_000;
+}
+
+function calculateTrc20DepositFee({ amount, tronActivated }) {
+  const trxUsdtRate = Number(process.env.TRX_USDT_ESTIMATE || 0.32);
+
+  const activationBurnTrx = tronActivated
+    ? 0
+    : Number(process.env.TRC20_ACTIVATION_BURN_TRX || 1.1);
+
+  const sweepRentalTrx = Number(process.env.TRC20_SWEEP_RENTAL_TRX || 4.225);
+  const platformFeeUsdt = Number(process.env.TRC20_PLATFORM_FEE_USDT || 0.25);
+
+  const networkFeeUsdt = roundUsdt(
+    (activationBurnTrx + sweepRentalTrx) * trxUsdtRate
+  );
+
+  const totalFeeUsdt = roundUsdt(networkFeeUsdt + platformFeeUsdt);
+  const netAmount = roundUsdt(Number(amount) - totalFeeUsdt);
+
+  return {
+    fee_model: "trc20_dynamic_estimate_v1",
+    gross_amount: roundUsdt(amount),
+    network_fee_usdt: networkFeeUsdt,
+    platform_fee_usdt: roundUsdt(platformFeeUsdt),
+    total_fee_usdt: totalFeeUsdt,
+    net_amount: netAmount,
+    fee_currency: "USDT",
+    estimates: {
+      trx_usdt_rate: trxUsdtRate,
+      activation_burn_trx: activationBurnTrx,
+      sweep_rental_trx: sweepRentalTrx,
+      tron_activated: !!tronActivated,
+    },
+  };
 }
 
 async function ensureWallet(userId, currency) {
@@ -89,14 +129,32 @@ async function creditDepositOnce({ addressRow, transfer }) {
     return { credited: false, reason: "invalid_amount", txHash };
   }
 
-  const { data, error } = await supabase.rpc("credit_usdt_trc20_deposit", {
-    p_user_id: addressRow.user_id,
-    p_tx_hash: txHash,
-    p_from_address: fromAddress || null,
-    p_to_address: toAddress,
-    p_amount: amount,
-    p_raw_payload: transfer,
-  });
+  const fee = calculateTrc20DepositFee({
+  amount,
+  tronActivated: addressRow.tron_activated,
+});
+
+if (fee.net_amount <= 0) {
+  return {
+    credited: false,
+    reason: "deposit_amount_too_small_after_fee",
+    txHash,
+    amount,
+    fee,
+  };
+}
+
+const { data, error } = await supabase.rpc("credit_usdt_trc20_deposit", {
+  p_user_id: addressRow.user_id,
+  p_tx_hash: txHash,
+  p_from_address: fromAddress || null,
+  p_to_address: toAddress,
+  p_amount: amount,
+  p_raw_payload: {
+    ...transfer,
+    jeezpay_fee: fee,
+  },
+});
 
   if (error) {
     throw error;
@@ -114,7 +172,7 @@ async function scanUsdtDeposits() {
 
   const { data: addresses, error: addressErr } = await supabase
     .from("crypto_deposit_addresses")
-    .select("user_id, address, network, token")
+    .select("user_id, address, network, token, tron_activated")
     .in("network", ["TRON", "TRC20"])
     .eq("token", "USDT")
     .eq("is_active", true);
