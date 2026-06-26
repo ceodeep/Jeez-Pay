@@ -23,6 +23,7 @@ const PROTECTED_ADMIN_ROLES = [
 const {
   sendUsdtTrc20FromPrivateKey,
   waitForTransactionSuccess,
+  getUsdtTrc20Balance,
 } = require("../services/tron.service");
 const {
   sendUsdtBep20FromPrivateKey,
@@ -3634,17 +3635,34 @@ if (lockErr || !lockedWithdrawal) {
   let txHash;
 
   if (lockedNetwork === "TRC20") {
-    await rentTronEnergy({
+    const recipientUsdtBalance = await getUsdtTrc20Balance(
+  lockedWithdrawal.to_address
+);
+
+const withdrawalEnergy =
+  recipientUsdtBalance >= Number(process.env.TRC20_RECIPIENT_USDT_THRESHOLD || 0.5)
+    ? Number(
+        process.env.TRONMAX_WITHDRAWAL_ENERGY_LOW ||
+        process.env.TRONMAX_SWEEP_ENERGY ||
+        65000
+      )
+    : Number(
+        process.env.TRONMAX_WITHDRAWAL_ENERGY_HIGH ||
+        131000
+      );
+
+await rentTronEnergy({
   receiver: process.env.TRON_TREASURY_ADDRESS,
-  amount: Number(process.env.TRONMAX_DEFAULT_ENERGY || 65000),
+  amount: withdrawalEnergy,
   duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
   purpose: "trc20_withdrawal",
 });
-    txHash = await sendUsdtTrc20FromPrivateKey({
-      fromPrivateKey: process.env.TRON_TREASURY_PRIVATE_KEY,
-      toAddress: lockedWithdrawal.to_address,
-      amount: Number(lockedWithdrawal.amount),
-    });
+
+txHash = await sendUsdtTrc20FromPrivateKey({
+  fromPrivateKey: process.env.TRON_TREASURY_PRIVATE_KEY,
+  toAddress: lockedWithdrawal.to_address,
+  amount: Number(lockedWithdrawal.amount),
+});
 
     await supabase
       .from("crypto_withdrawals")
