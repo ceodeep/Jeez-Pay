@@ -3,12 +3,17 @@ const { decryptPrivateKey } = require("./tron.service");
 const {
   sendBnbFromPrivateKey,
   sendUsdtBep20FromPrivateKey,
+  getBnbBalance,
 } = require("./bsc.service");
 
 const TREASURY_ADDRESS = process.env.BSC_TREASURY_ADDRESS;
 const TREASURY_PRIVATE_KEY = process.env.BSC_TREASURY_PRIVATE_KEY;
 
-const BNB_TOPUP_AMOUNT = Number(process.env.BEP20_SWEEP_BNB_TOPUP_AMOUNT || 0.001);
+const BNB_TARGET_BALANCE = Number(
+  process.env.BEP20_SWEEP_BNB_TARGET_BALANCE ||
+  process.env.BEP20_SWEEP_BNB_TOPUP_AMOUNT ||
+  0.001
+);
 const MIN_SWEEP_AMOUNT = Number(process.env.MIN_BEP20_SWEEP_AMOUNT || 1);
 
 async function sweepCreditedBep20Deposits(limit = 10) {
@@ -53,11 +58,22 @@ async function sweepCreditedBep20Deposits(limit = 10) {
 
       const userPrivateKey = decryptPrivateKey(depositAddress.encrypted_private_key);
 
-      const fundingTxHash = await sendBnbFromPrivateKey({
-        fromPrivateKey: TREASURY_PRIVATE_KEY,
-        toAddress: deposit.to_address,
-        amount: BNB_TOPUP_AMOUNT,
-      });
+      const bnbBalanceBefore = await getBnbBalance(deposit.to_address);
+
+let fundingTxHash = null;
+let bnbTopupAmount = 0;
+
+if (bnbBalanceBefore < BNB_TARGET_BALANCE) {
+  bnbTopupAmount =
+    Math.ceil((BNB_TARGET_BALANCE - bnbBalanceBefore) * 100_000_000) /
+    100_000_000;
+
+  fundingTxHash = await sendBnbFromPrivateKey({
+    fromPrivateKey: TREASURY_PRIVATE_KEY,
+    toAddress: deposit.to_address,
+    amount: bnbTopupAmount,
+  });
+}
 
       await supabase
         .from("crypto_deposits")
@@ -78,9 +94,14 @@ async function sweepCreditedBep20Deposits(limit = 10) {
           swept_at: new Date().toISOString(),
           sweep_error: null,
           raw_payload: {
-            ...(deposit.raw_payload || {}),
-            bep20_sweep_funding_tx_hash: fundingTxHash,
-          },
+  ...(deposit.raw_payload || {}),
+  bep20_sweep: {
+    funding_tx_hash: fundingTxHash,
+    bnb_balance_before: bnbBalanceBefore,
+    bnb_target_balance: BNB_TARGET_BALANCE,
+    bnb_topup_amount: bnbTopupAmount,
+  },
+},
         })
         .eq("id", deposit.id);
 

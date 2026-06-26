@@ -7,7 +7,30 @@ const USDT_BEP20_CONTRACT = process.env.USDT_BEP20_CONTRACT;
 
 const ERC20_ABI = [
   "event Transfer(address indexed from, address indexed to, uint256 value)",
+  "function decimals() view returns (uint8)",
 ];
+
+function roundUsdt(value) {
+  return Math.round(Number(value || 0) * 1_000_000) / 1_000_000;
+}
+
+function calculateBep20DepositFee({ amount }) {
+  const networkFeeUsdt = Number(process.env.BEP20_NETWORK_FEE_USDT || 0.35);
+  const platformFeeUsdt = Number(process.env.BEP20_PLATFORM_FEE_USDT || 0.25);
+
+  const totalFeeUsdt = roundUsdt(networkFeeUsdt + platformFeeUsdt);
+  const netAmount = roundUsdt(Number(amount) - totalFeeUsdt);
+
+  return {
+    fee_model: "bep20_fixed_fee_v1",
+    gross_amount: roundUsdt(amount),
+    network_fee_usdt: roundUsdt(networkFeeUsdt),
+    platform_fee_usdt: roundUsdt(platformFeeUsdt),
+    total_fee_usdt: totalFeeUsdt,
+    net_amount: netAmount,
+    fee_currency: "USDT",
+  };
+}
 
 function getProvider() {
   if (!BSC_RPC_URL) throw new Error("BSC_RPC_URL is missing");
@@ -18,11 +41,11 @@ function normalizeBep20Amount(value, decimals = USDT_DECIMALS) {
   return Number(ethers.formatUnits(value, decimals));
 }
 
-async function creditBep20DepositOnce({ addressRow, transfer }) {
+async function creditBep20DepositOnce({ addressRow, transfer, tokenDecimals }) {
   const txHash = transfer.transactionHash;
   const fromAddress = transfer.args.from;
   const toAddress = transfer.args.to;
-  const amount = normalizeBep20Amount(transfer.args.value);
+  const amount = normalizeBep20Amount(transfer.args.value, tokenDecimals);
 
   if (!txHash || !toAddress || amount <= 0) {
     return { credited: false, reason: "invalid_transfer", txHash };
@@ -66,6 +89,7 @@ async function scanUsdtBep20Deposits() {
 
   const provider = getProvider();
   const contract = new ethers.Contract(USDT_BEP20_CONTRACT, ERC20_ABI, provider);
+  const tokenDecimals = Number(await contract.decimals());
 
   const latestBlock = await provider.getBlockNumber();
 
@@ -124,8 +148,11 @@ if (toBlock <= fromBlock) {
         detectedDeposits += 1;
 
         try {
-          const result = await creditBep20DepositOnce({ addressRow, transfer });
-
+         const result = await creditBep20DepositOnce({
+  addressRow,
+  transfer,
+  tokenDecimals,
+});
           if (result.credited) {
             creditedDeposits += 1;
             credited.push(result);
