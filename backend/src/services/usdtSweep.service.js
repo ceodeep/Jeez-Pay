@@ -99,7 +99,7 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
 
       try {
         tronmaxOrder = await rentTronEnergy({
-  receiver: group.address,
+  receiver: deposit.to_address,
   amount: Number(
     process.env.TRONMAX_SWEEP_ENERGY ||
     process.env.TRONMAX_DEFAULT_ENERGY ||
