@@ -99,11 +99,15 @@ async function sweepCreditedUsdtDeposits(limit = 10) {
 
       try {
         tronmaxOrder = await rentTronEnergy({
-          receiver: deposit.to_address,
-          amount: Number(process.env.TRONMAX_DEFAULT_ENERGY || 65000),
-          duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
-          purpose: "trc20_sweep",
-        });
+  receiver: group.address,
+  amount: Number(
+    process.env.TRONMAX_SWEEP_ENERGY ||
+    process.env.TRONMAX_DEFAULT_ENERGY ||
+    65000
+  ),
+  duration: process.env.TRONMAX_DEFAULT_DURATION || "15m",
+  purpose: "trc20_sweep",
+});
       } catch (rentErr) {
         throw new Error(`TronMax energy rental failed: ${rentErr.message}`);
       }
