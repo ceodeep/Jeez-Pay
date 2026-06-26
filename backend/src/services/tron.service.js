@@ -207,17 +207,36 @@ async function getUsdtTrc20Balance(address) {
     throw new Error("USDT_TRC20_CONTRACT is missing");
   }
 
-  const contract = await tronWeb.contract().at(contractAddress);
+  const ownerAddress =
+    process.env.TRON_TREASURY_ADDRESS || address;
+
+  if (!tronWeb.isAddress(ownerAddress)) {
+    throw new Error("Valid TRON_TREASURY_ADDRESS is required for balance check");
+  }
+
+  const readTronWeb = new TronWeb({
+    fullHost,
+    headers: apiKey ? { "TRON-PRO-API-KEY": apiKey } : {},
+  });
+
+  readTronWeb.setAddress(ownerAddress);
+
+  const contract = await readTronWeb.contract().at(contractAddress);
   const result = await contract.balanceOf(address).call();
 
-  const raw =
-    typeof result === "bigint"
-      ? result.toString()
-      : result?._hex
-        ? BigInt(result._hex).toString()
-        : result?.toString
-          ? result.toString()
-          : String(result || "0");
+  let raw;
+
+  if (typeof result === "bigint") {
+    raw = result.toString();
+  } else if (result?._hex) {
+    raw = BigInt(result._hex).toString();
+  } else if (Array.isArray(result) && result[0]) {
+    raw = result[0].toString();
+  } else if (result?.toString) {
+    raw = result.toString();
+  } else {
+    raw = "0";
+  }
 
   return Number(raw) / 1_000_000;
 }
