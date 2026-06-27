@@ -1539,11 +1539,17 @@ if (network === "BEP20") {
 
     await resetPinFail(userId);
 
-    const treasuryPrivateKey = process.env.TRON_TREASURY_PRIVATE_KEY;
+    if (network === "TRC20" && !process.env.TRON_TREASURY_PRIVATE_KEY) {
+  return res.status(500).json({
+    message: "TRC20 treasury wallet not configured",
+  });
+}
 
-    if (!treasuryPrivateKey) {
-      return res.status(500).json({ message: "Treasury wallet not configured" });
-    }
+if (network === "BEP20" && !process.env.BSC_TREASURY_PRIVATE_KEY) {
+  return res.status(500).json({
+    message: "BEP20 treasury wallet not configured",
+  });
+}
 
     const { wallet, error: walletErr } = await ensureWallet(userId, "USDT");
 
