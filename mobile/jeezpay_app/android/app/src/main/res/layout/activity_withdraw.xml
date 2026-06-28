@@ -167,7 +167,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Network: TRON (TRC20)\nMinimum withdrawal: 5 USDT\nWithdrawal fee: 1 USDT"
+                    android:text="Network: TRON (TRC20)\nMinimum withdrawal: 5 USDT\nWithdrawal fee: 2 USDT"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp"
                     android:lineSpacingExtra="3dp" />

@@ -113,7 +113,7 @@ class WithdrawActivity : AppCompatActivity() {
     }
 
     private fun showReviewSheet(address: String, amount: Double) {
-        val fee = 1.0
+        val fee = 2.0
         val total = amount + fee
 
         val dialog = BottomSheetDialog(this, R.style.JeezPayBottomSheet)
@@ -176,7 +176,7 @@ class WithdrawActivity : AppCompatActivity() {
                 is ApiResult.Error -> {
                     progressBar.visibility = View.GONE
                     btnWithdraw.isEnabled = true
-                    toast(result.error.toString())
+                    toast(cleanErrorMessage(result.error))
                 }
             }
         }
@@ -198,6 +198,23 @@ class WithdrawActivity : AppCompatActivity() {
 
         dialog.setContentView(view)
         dialog.show()
+    }
+
+    private fun cleanErrorMessage(error: Any?): String {
+        val raw = error?.toString()?.trim().orEmpty()
+
+        if (raw.isBlank()) {
+            return "Something went wrong. Please try again."
+        }
+
+        val validationRegex = Regex("""Validation\(message=(.*)\)""")
+        val validationMatch = validationRegex.matchEntire(raw)
+
+        if (validationMatch != null) {
+            return validationMatch.groupValues[1].trim()
+        }
+
+        return raw
     }
 
     private fun toast(message: String) {
@@ -291,9 +308,9 @@ class WithdrawActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.tvWithdrawNetworkInfo).text =
             if (selectedNetwork == "BEP20") {
-                "Network: BNB Smart Chain (BEP20)\nMinimum withdrawal: 5 USDT\nWithdrawal fee: 1 USDT"
+                "Network: BNB Smart Chain (BEP20)\nMinimum withdrawal: 10 USDT\nWithdrawal fee: 2 USDT"
             } else {
-                "Network: TRON (TRC20)\nMinimum withdrawal: 5 USDT\nWithdrawal fee: 1 USDT"
+                "Network: TRON (TRC20)\nMinimum withdrawal: 10 USDT\nWithdrawal fee: 2 USDT"
             }
     }
 }
