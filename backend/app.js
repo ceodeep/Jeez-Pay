@@ -1,4 +1,5 @@
 require("dotenv").config();
+app.disable("x-powered-by");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
