@@ -1419,37 +1419,49 @@ router.get("/crypto/deposits", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
     const token = String(req.query.token || "USDT").trim().toUpperCase();
-    const network = String(req.query.network || "TRON").trim().toUpperCase();
+    const requestedNetwork = String(req.query.network || "TRC20").trim().toUpperCase();
 
     if (token !== "USDT") {
-  return res.status(400).json({
-    message: "Only USDT deposits are supported",
-  });
-}
+      return res.status(400).json({
+        message: "Only USDT deposits are supported",
+      });
+    }
 
-if (!["TRON", "BEP20"].includes(network)) {
-  return res.status(400).json({
-    message: "Unsupported network",
-  });
-}
+    if (!["TRC20", "TRON", "BEP20"].includes(requestedNetwork)) {
+      return res.status(400).json({
+        message: "Unsupported network",
+      });
+    }
+
+    const networksToQuery =
+      requestedNetwork === "TRC20" || requestedNetwork === "TRON"
+        ? ["TRON", "TRC20"]
+        : ["BEP20"];
 
     const { data, error } = await supabase
       .from("crypto_deposits")
       .select(`
-  id,
-  network,
-  token,
-  tx_hash,
-  from_address,
-  to_address,
-  amount,
-  confirmations,
-  status,
-  credited_at,
-  created_at
-`)
+        id,
+        network,
+        token,
+        tx_hash,
+        from_address,
+        to_address,
+        amount,
+        gross_amount,
+        net_amount,
+        network_fee_usdt,
+        platform_fee_usdt,
+        total_fee_usdt,
+        fee_model,
+        confirmations,
+        status,
+        sweep_status,
+        credited_at,
+        created_at
+      `)
       .eq("user_id", userId)
-      .eq("network", network)
+      .in("network", networksToQuery)
       .eq("token", token)
       .order("created_at", { ascending: false })
       .limit(50);
