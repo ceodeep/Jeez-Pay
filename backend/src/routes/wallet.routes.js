@@ -242,8 +242,12 @@ async function getCurrencySettings(currency) {
  * Response: { balances: [{currency, balance}] }
  */
 router.get("/balance", authMiddleware, async (req, res) => {
+  const startedAt = Date.now();
+
   try {
     const userId = req.user.userId;
+
+    const beforeWalletQuery = Date.now();
 
     let { data, error } = await supabase
       .from("wallets")
@@ -251,14 +255,19 @@ router.get("/balance", authMiddleware, async (req, res) => {
       .eq("user_id", userId)
       .order("currency", { ascending: true });
 
+    const walletQueryMs = Date.now() - beforeWalletQuery;
+
     if (error) {
       console.error("balance fetch error:", error);
       return res.status(500).json({ message: "Failed to fetch balances" });
     }
 
-    // Safety fallback for old/broken users only.
-    // Do not seed wallets on every balance request.
+    let seeded = false;
+
     if (!data || data.length === 0) {
+      seeded = true;
+      const beforeSeed = Date.now();
+
       for (const cur of DEFAULT_CURRENCIES) {
         const { error: ensureError } = await ensureWallet(userId, cur);
 
@@ -268,19 +277,41 @@ router.get("/balance", authMiddleware, async (req, res) => {
         }
       }
 
+      const seedMs = Date.now() - beforeSeed;
+
+      const beforeRetry = Date.now();
+
       const retry = await supabase
         .from("wallets")
         .select("currency, balance")
         .eq("user_id", userId)
         .order("currency", { ascending: true });
 
+      const retryMs = Date.now() - beforeRetry;
+
       data = retry.data;
       error = retry.error;
+
+      console.log("[perf:/wallet/balance]", {
+        totalMs: Date.now() - startedAt,
+        walletQueryMs,
+        seeded,
+        seedMs,
+        retryMs,
+        count: data?.length || 0,
+      });
 
       if (error) {
         console.error("balance refetch error:", error);
         return res.status(500).json({ message: "Failed to fetch balances" });
       }
+    } else {
+      console.log("[perf:/wallet/balance]", {
+        totalMs: Date.now() - startedAt,
+        walletQueryMs,
+        seeded,
+        count: data.length,
+      });
     }
 
     return res.json({ balances: data || [] });
