@@ -292,26 +292,14 @@ router.get("/balance", authMiddleware, async (req, res) => {
       data = retry.data;
       error = retry.error;
 
-      console.log("[perf:/wallet/balance]", {
-        totalMs: Date.now() - startedAt,
-        walletQueryMs,
-        seeded,
-        seedMs,
-        retryMs,
-        count: data?.length || 0,
-      });
+      
 
       if (error) {
         console.error("balance refetch error:", error);
         return res.status(500).json({ message: "Failed to fetch balances" });
       }
     } else {
-      console.log("[perf:/wallet/balance]", {
-        totalMs: Date.now() - startedAt,
-        walletQueryMs,
-        seeded,
-        count: data.length,
-      });
+      
     }
 
     return res.json({ balances: data || [] });
