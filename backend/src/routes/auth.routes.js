@@ -83,7 +83,12 @@ async function seedWalletsForUser(userId) {
     balance: 0,
   }));
 
-  const { error } = await supabase.from("wallets").insert(seedRows);
+  const { error } = await supabase
+    .from("wallets")
+    .upsert(seedRows, {
+      onConflict: "user_id,currency",
+      ignoreDuplicates: true,
+    });
 
   if (error) {
     throw error;

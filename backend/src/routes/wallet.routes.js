@@ -245,16 +245,7 @@ router.get("/balance", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    // Optional: auto-seed missing currencies for existing users
-    for (const cur of DEFAULT_CURRENCIES) {
-      const { error } = await ensureWallet(userId, cur);
-      if (error) {
-        console.error("ensureWallet error:", error);
-        return res.status(500).json({ message: "Failed to ensure wallets" });
-      }
-    }
-
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("wallets")
       .select("currency, balance")
       .eq("user_id", userId)
@@ -263,6 +254,33 @@ router.get("/balance", authMiddleware, async (req, res) => {
     if (error) {
       console.error("balance fetch error:", error);
       return res.status(500).json({ message: "Failed to fetch balances" });
+    }
+
+    // Safety fallback for old/broken users only.
+    // Do not seed wallets on every balance request.
+    if (!data || data.length === 0) {
+      for (const cur of DEFAULT_CURRENCIES) {
+        const { error: ensureError } = await ensureWallet(userId, cur);
+
+        if (ensureError) {
+          console.error("ensureWallet error:", ensureError);
+          return res.status(500).json({ message: "Failed to ensure wallets" });
+        }
+      }
+
+      const retry = await supabase
+        .from("wallets")
+        .select("currency, balance")
+        .eq("user_id", userId)
+        .order("currency", { ascending: true });
+
+      data = retry.data;
+      error = retry.error;
+
+      if (error) {
+        console.error("balance refetch error:", error);
+        return res.status(500).json({ message: "Failed to fetch balances" });
+      }
     }
 
     return res.json({ balances: data || [] });
