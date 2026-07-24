@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const supabase = require("../config/supabase");
 const authMiddleware = require("../middlewares/auth.middleware");
+const { transferLimiter } = require("../middlewares/rateLimit.middleware");
 const bcrypt = require("bcrypt");
 const { requireAdmin, requirePermission } = require("../middlewares/admin.middleware");
 const {
@@ -765,7 +766,7 @@ router.get("/recipient/resolve", authMiddleware, async (req, res) => {
  * Body: { phone, currency, amount, description }
  * USER -> USER transfer (KYC gated)
  */
-router.post("/transfer", authMiddleware, async (req, res) => {
+router.post("/transfer", authMiddleware, transferLimiter, async (req, res) => {
   try {
     const senderId = req.user.userId;
     const { data: senderUser, error: senderErr } = await supabase
@@ -1246,7 +1247,7 @@ router.get("/agent/operations", authMiddleware, async (req, res) => {
  * POST /wallet/withdraw
  * User creates withdrawal request
  */
-router.post("/withdraw", authMiddleware, async (req, res) => {
+router.post("/withdraw", authMiddleware, transferLimiter, async (req, res) => {
   try {
     const userId = req.user.userId;
     const { amount, currency, method, destination } = req.body;
@@ -1522,7 +1523,7 @@ router.get("/crypto/deposits", authMiddleware, async (req, res) => {
 // POST /wallet/crypto/withdraw/request
 // Body: { toAddress, amount, pin }
 // =====================================
-router.post("/crypto/withdraw", authMiddleware, async (req, res) => {
+router.post("/crypto/withdraw", authMiddleware, transferLimiter, async (req, res) => {
   try {
     const userId = req.user.userId;
 
@@ -1698,5 +1699,163 @@ router.get("/crypto/withdrawals", authMiddleware, async (req, res) => {
     });
   }
 });
+
+
+// =====================================
+// MERCHANT PAYMENT DETAILS
+// GET /wallet/merchant-payments/:id
+// =====================================
+router.get("/merchant-payments/:id", authMiddleware, async (req, res) => {
+  try {
+    const paymentId = String(req.params.id || "").trim();
+
+    const { data, error } = await supabase
+      .from("merchant_payments")
+      .select(`
+        id,
+        merchant_id,
+        merchant_order_id,
+        amount,
+        currency,
+        description,
+        status,
+        expires_at,
+        paid_at,
+        success_url,
+        cancel_url,
+        metadata,
+        merchants (
+          id,
+          name,
+          status
+        )
+      `)
+      .eq("id", paymentId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[merchant-payment-details] fetch error:", error);
+      return res.status(500).json({ message: "Failed to fetch payment" });
+    }
+
+    if (!data) {
+      return res.status(404).json({ message: "Payment not found" });
+    }
+
+    return res.json({ payment: data });
+  } catch (err) {
+    console.error("[merchant-payment-details] crash:", err);
+    return res.status(500).json({ message: "Failed to fetch payment" });
+  }
+});
+
+// =====================================
+// CONFIRM MERCHANT PAYMENT
+// POST /wallet/merchant-payments/:id/confirm
+// Body: { pin }
+// =====================================
+router.post("/merchant-payments/:id/confirm", authMiddleware, transferLimiter, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const paymentId = String(req.params.id || "").trim();
+    const pin = String(req.body.pin || "").trim();
+
+    if (!paymentId) {
+      return res.status(400).json({ message: "Payment ID is required" });
+    }
+
+    if (!pin) {
+      return res.status(400).json({
+        code: "PIN_REQUIRED",
+        message: "PIN is required",
+      });
+    }
+
+    const okKyc = await requireKycApproved(userId);
+    if (!okKyc) {
+      return res.status(403).json({
+        code: "KYC_REQUIRED",
+        message: "KYC must be approved before merchant payments",
+      });
+    }
+
+    const pinState = await getUserPinState(userId);
+    if (!pinState?.pin_hash) {
+      return res.status(400).json({
+        code: "PIN_NOT_SET",
+        message: "PIN not set for this account",
+      });
+    }
+
+    if (pinState.pin_locked_until) {
+      const lockedUntil = new Date(pinState.pin_locked_until);
+      if (lockedUntil > new Date()) {
+        return res.status(403).json({
+          code: "PIN_LOCKED",
+          message: "Too many attempts. Try again later.",
+        });
+      }
+    }
+
+    const okPin = await bcrypt.compare(pin, pinState.pin_hash);
+
+    if (!okPin) {
+      const attempts = Number(pinState.pin_failed_attempts || 0) + 1;
+
+      if (attempts >= 5) {
+        const lockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        await updatePinFail(userId, attempts, lockedUntil);
+
+        return res.status(403).json({
+          code: "PIN_LOCKED",
+          message: "Too many wrong attempts. Locked for 5 minutes.",
+        });
+      }
+
+      await updatePinFail(userId, attempts, null);
+
+      return res.status(403).json({
+        code: "PIN_INVALID",
+        message: "Invalid PIN",
+      });
+    }
+
+    await resetPinFail(userId);
+
+    const { data, error } = await supabase.rpc("confirm_merchant_payment", {
+      p_user_id: userId,
+      p_payment_id: paymentId,
+    });
+
+    if (error) {
+      console.error("[merchant-payment-confirm] rpc error:", error);
+      return res.status(500).json({ message: "Payment confirmation failed" });
+    }
+
+    const result = data || {};
+
+    if (!result.ok) {
+      const code = result.code || "PAYMENT_FAILED";
+
+      const statusByCode = {
+        PAYMENT_NOT_FOUND: 404,
+        PAYMENT_EXPIRED: 400,
+        PAYMENT_NOT_PENDING: 400,
+        INSUFFICIENT_BALANCE: 400,
+        WALLET_NOT_FOUND: 400,
+        MERCHANT_DISABLED: 400,
+        UNSUPPORTED_CURRENCY: 400,
+      };
+
+      return res.status(statusByCode[code] || 400).json(result);
+    }
+
+    return res.json(result);
+  } catch (err) {
+    console.error("[merchant-payment-confirm] crash:", err);
+    return res.status(500).json({ message: "Payment confirmation failed" });
+  }
+});
+
 
 module.exports = router;

@@ -2,6 +2,21 @@ const jwt = require("jsonwebtoken");
 const { jwtSecret } = require("../config/env");
 const supabase = require("../config/supabase");
 
+const LAST_SEEN_UPDATE_INTERVAL_MS = 5 * 60 * 1000;
+const lastSeenUpdateCache = new Map();
+
+function shouldUpdateLastSeen(sessionId) {
+  const now = Date.now();
+  const lastUpdate = lastSeenUpdateCache.get(sessionId) || 0;
+
+  if (now - lastUpdate < LAST_SEEN_UPDATE_INTERVAL_MS) {
+    return false;
+  }
+
+  lastSeenUpdateCache.set(sessionId, now);
+  return true;
+}
+
 async function authMiddleware(req, res, next) {
   const header = req.headers.authorization;
 
@@ -37,10 +52,17 @@ async function authMiddleware(req, res, next) {
         });
       }
 
-      await supabase
-        .from("user_sessions")
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq("id", decoded.sessionId);
+      if (shouldUpdateLastSeen(decoded.sessionId)) {
+        supabase
+          .from("user_sessions")
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq("id", decoded.sessionId)
+          .then(({ error: updateErr }) => {
+            if (updateErr) {
+              console.error("[auth] last_seen update error:", updateErr);
+            }
+          });
+      }
     }
 
     req.user = decoded;

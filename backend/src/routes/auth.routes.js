@@ -5,6 +5,7 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
+const { otpVerifyLimiter, pinVerifyLimiter } = require("../middlewares/rateLimit.middleware");
 const { generateOTP } = require("../utils/otp");
 const { sendEmailOTP,sendPasswordResetAlert,
   sendPinResetAlert,
@@ -512,7 +513,7 @@ router.post("/signup/request-otp", async (req, res) => {
 // =====================================
 // SIGNUP OTP VERIFY
 // =====================================
-router.post("/signup/verify-otp", async (req, res) => {
+router.post("/signup/verify-otp", otpVerifyLimiter, async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
     const fullName = String(req.body.fullName || "").trim();
@@ -1297,7 +1298,7 @@ router.post("/change-email/request-otp", authMiddleware, async (req, res) => {
   }
 });
 
-router.post("/change-email/verify-otp", authMiddleware, async (req, res) => {
+router.post("/change-email/verify-otp", authMiddleware, otpVerifyLimiter, async (req, res) => {
   try {
     const userId = req.user?.userId;
     const newEmail = normalizeEmail(req.body.newEmail);
@@ -1372,7 +1373,7 @@ router.post("/change-email/verify-otp", authMiddleware, async (req, res) => {
 // =====================================
 // VERIFY PIN
 // =====================================
-router.post("/verify-pin", authMiddleware, async (req, res) => {
+router.post("/verify-pin", authMiddleware, pinVerifyLimiter, async (req, res) => {
   try {
     const userId = req.user.userId;
     const pin = String(req.body?.pin ?? "").trim();
@@ -1550,7 +1551,7 @@ router.post("/forgot-password/request-otp", async (req, res) => {
 // =====================================
 // FORGOT PASSWORD OTP VERIFY
 // =====================================
-router.post("/forgot-password/verify-otp", async (req, res) => {
+router.post("/forgot-password/verify-otp", otpVerifyLimiter, async (req, res) => {
   try {
     const rawIdentifier = String(
       req.body.identifier || req.body.email || req.body.phone || ""
@@ -1749,7 +1750,7 @@ router.post("/forgot-pin/request-otp", async (req, res) => {
 // =====================================
 // FORGOT PIN OTP VERIFY
 // =====================================
-router.post("/forgot-pin/verify-otp", async (req, res) => {
+router.post("/forgot-pin/verify-otp", otpVerifyLimiter, async (req, res) => {
   try {
     const rawIdentifier = String(
       req.body.identifier || req.body.email || req.body.phone || ""

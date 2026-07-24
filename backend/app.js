@@ -1,6 +1,6 @@
 require("dotenv").config();
-app.disable("x-powered-by");
 const express = require("express");
+
 const cors = require("cors");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
@@ -11,8 +11,11 @@ const authMiddleware = require("./src/middlewares/auth.middleware");
 const kycRoutes = require("./src/routes/kyc.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const servicesRoutes = require("./src/routes/services.routes");
+const merchantRoutes = require("./src/routes/merchant.routes");
 
 const app = express();
+
+app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
 const authLimiter = rateLimit({
@@ -54,12 +57,14 @@ app.use(express.json());
 app.use("/auth/signup/request-otp", otpLimiter);
 app.use("/auth/forgot-password/request-otp", otpLimiter);
 app.use("/auth/forgot-pin/request-otp", otpLimiter);
+app.use("/auth/change-email/request-otp", otpLimiter);
 app.use("/auth", authLimiter, authRoutes);
 
 app.use("/kyc", kycRoutes);
 app.use("/wallet", authMiddleware, walletRoutes);
 app.use("/admin", adminRoutes);
 app.use("/services", servicesRoutes);
+app.use("/merchant", merchantRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({ ok: true, service: "JeezPay API" });
