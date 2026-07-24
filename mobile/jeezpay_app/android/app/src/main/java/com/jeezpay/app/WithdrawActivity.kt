@@ -1,4 +1,4 @@
-package com.jeezpay.app
+﻿package com.jeezpay.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -277,7 +277,7 @@ class WithdrawActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun showSuccessSheet(amount: Double, reference: Long?, txHash: String?) {
+    private fun showSuccessSheet(amount: Double, reference: String?, txHash: String?) {
         val dialog = BottomSheetDialog(this, R.style.JeezPayBottomSheet)
         val view = layoutInflater.inflate(R.layout.bottom_sheet_withdraw_success, null)
 
