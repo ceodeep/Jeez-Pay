@@ -20,6 +20,10 @@
         android:roundIcon="@drawable/ic_jeezpay_logo"
         android:supportsRtl="false"
         android:theme="@style/JeezPayTheme">
+	<meta-data
+    android:name="flutterEmbedding"
+    android:value="2" />
+
         <activity android:name=".KycActivity"  android:exported="false"/>
 
         <provider
@@ -35,7 +39,6 @@
 
 
 
-        <!-- AUTH is the ONLY launcher -->
         <!-- AUTH is the ONLY launcher -->
 <activity
     android:name=".AuthActivity"

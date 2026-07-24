@@ -1,4 +1,4 @@
-package com.jeezpay.app.network.dto
+﻿package com.jeezpay.app.network.dto
 
 data class TransactionDto(
     val id: String? = null,
@@ -6,6 +6,6 @@ data class TransactionDto(
     val type: String? = null,
     val amount: Double? = null,
     val description: String? = null,
-    val reference: Long? = null,
+    val reference: String? = null,
     val created_at: String? = null
 )

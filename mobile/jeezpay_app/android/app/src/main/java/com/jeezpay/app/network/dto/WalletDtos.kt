@@ -1,4 +1,4 @@
-package com.jeezpay.app.network.dto
+﻿package com.jeezpay.app.network.dto
 
 import com.google.gson.annotations.SerializedName
 
@@ -171,5 +171,5 @@ data class CryptoWithdrawResponse(
     val fee: Double? = null,
     val totalDebit: Double? = null,
     val txHash: String? = null,
-    val reference: Long? = null
+    val reference: String? = null
 )
