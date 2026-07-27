@@ -122,6 +122,9 @@
             android:theme="@style/zxing_CaptureTheme" />
 
 
+            <activity android:name=".MerchantPaymentActivity" android:exported="false" />
+
     </application>
 
 </manifest>
+

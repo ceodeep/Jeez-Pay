@@ -1,4 +1,4 @@
-package com.jeezpay.app.network
+﻿package com.jeezpay.app.network
 
 import com.jeezpay.app.storage.SessionManager
 import okhttp3.Interceptor
@@ -61,6 +61,11 @@ object ApiClient {
         retrofit.create(WalletApi::class.java)
     }
 
+    val merchantPaymentApi: MerchantPaymentApi by lazy {
+        retrofit.create(MerchantPaymentApi::class.java)
+    }
+
+
     val servicesApi: ServicesApi by lazy {
         retrofit.create(ServicesApi::class.java)
     }
@@ -69,3 +74,4 @@ object ApiClient {
         retrofit.create(KycApi::class.java)
     }
 }
+
