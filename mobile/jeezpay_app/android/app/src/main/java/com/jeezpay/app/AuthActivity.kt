@@ -1,4 +1,4 @@
-package com.jeezpay.app
+﻿package com.jeezpay.app
 
 
 import android.content.Intent
@@ -168,6 +168,8 @@ class AuthActivity : BaseFintechActivity() {
 
         session = SessionManager(this)
         ApiClient.init(session)
+
+        savePendingMerchantPaymentIfAny()
 
         bindViews()
         setupCountryCodeDropdown()
@@ -1126,8 +1128,44 @@ class AuthActivity : BaseFintechActivity() {
         }
     }
 
+    private fun extractMerchantPaymentIdFromIntent(inputIntent: Intent?): String? {
+        val data = inputIntent?.data ?: return null
+
+        if (data.scheme != "jeezpay") return null
+        if (data.host != "merchant-pay") return null
+
+        return data.pathSegments.firstOrNull()?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun savePendingMerchantPaymentIfAny() {
+        val id = extractMerchantPaymentIdFromIntent(intent) ?: return
+
+        getSharedPreferences("jeezpay_prefs", MODE_PRIVATE)
+            .edit()
+            .putString("pending_merchant_payment_id", id)
+            .apply()
+
+        android.util.Log.d("JeezPayDeepLink", "Saved pending merchant payment id=$id")
+    }
+
     private fun openMain() {
-        startActivity(Intent(this, MainActivity::class.java))
+        val prefs = getSharedPreferences("jeezpay_prefs", MODE_PRIVATE)
+
+        val merchantPaymentId =
+            extractMerchantPaymentIdFromIntent(intent)
+                ?: prefs.getString("pending_merchant_payment_id", null)
+
+        val nextIntent = if (!merchantPaymentId.isNullOrBlank()) {
+            prefs.edit().remove("pending_merchant_payment_id").apply()
+
+            Intent(this, MerchantPaymentActivity::class.java).apply {
+                putExtra(MerchantPaymentActivity.EXTRA_PAYMENT_ID, merchantPaymentId)
+            }
+        } else {
+            Intent(this, MainActivity::class.java)
+        }
+
+        startActivity(nextIntent)
         finish()
     }
 
@@ -1610,3 +1648,4 @@ class AuthActivity : BaseFintechActivity() {
         super.onDestroy()
     }
 }
+

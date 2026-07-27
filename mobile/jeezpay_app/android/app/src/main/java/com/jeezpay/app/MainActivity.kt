@@ -1,4 +1,4 @@
-package com.jeezpay.app
+﻿package com.jeezpay.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -48,6 +48,7 @@ class MainActivity : BaseFintechActivity() {
     private lateinit var screenFlipper: android.widget.ViewFlipper
     private lateinit var loaderOverlay: LoaderOverlayController
     private var isPagingTransactions = false
+    private var handledPendingMerchantPayment = false
 
     // top/balance UI
     private lateinit var tvBalance: TextView
@@ -105,7 +106,7 @@ class MainActivity : BaseFintechActivity() {
 
     private fun setBalanceLoading() {
         if (isBalanceHidden) {
-            fadeBalanceText("••••••")
+            fadeBalanceText("â€¢â€¢â€¢â€¢â€¢â€¢")
         } else {
             fadeBalanceText("Loading...")
         }
@@ -322,8 +323,26 @@ class MainActivity : BaseFintechActivity() {
         setupBalanceToggle()
         setupActionButtons()
         setupCustomBottomNav()
+        openPendingMerchantPaymentIfAny()
     }
 
+    private fun openPendingMerchantPaymentIfAny() {
+        if (handledPendingMerchantPayment) return
+
+        val id = prefs.getString("pending_merchant_payment_id", null)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+
+        handledPendingMerchantPayment = true
+        prefs.edit().remove("pending_merchant_payment_id").apply()
+
+        startActivity(
+            Intent(this, MerchantPaymentActivity::class.java).apply {
+                putExtra(MerchantPaymentActivity.EXTRA_PAYMENT_ID, id)
+            }
+        )
+    }
     private fun bindViews() {
         screenFlipper = findViewById(R.id.screenFlipper)
 
@@ -391,7 +410,7 @@ class MainActivity : BaseFintechActivity() {
             applySelectedWallet(selectedCode)
             walletStripAdapter?.setSelected(selectedCode)
 
-            // ✅ Important: reload balance + transactions for the newly selected currency
+            // âœ… Important: reload balance + transactions for the newly selected currency
             setMainBlockingLoading(true)
             fetchBalanceAndHistory()
         }
@@ -407,7 +426,7 @@ class MainActivity : BaseFintechActivity() {
                 applySelectedWallet(selectedCode)
                 walletStripAdapter?.setSelected(selectedCode)
 
-                // ✅ reload for chosen currency
+                // âœ… reload for chosen currency
                 setMainBlockingLoading(true)
                 fetchBalanceAndHistory()
             }
@@ -460,8 +479,8 @@ class MainActivity : BaseFintechActivity() {
             if (!billsServicesEnabled) {
                 showComingSoon(
                     title = "Bills & Services",
-                    message = "Bill payments and service requests are currently in development. Soon you’ll be able to pay bills, request services, and manage payments directly from JeezPay.",
-                    icon = "🧾"
+                    message = "Bill payments and service requests are currently in development. Soon youâ€™ll be able to pay bills, request services, and manage payments directly from JeezPay.",
+                    icon = "ðŸ§¾"
                 )
                 return@setOnClickListener
             }
@@ -496,8 +515,8 @@ class MainActivity : BaseFintechActivity() {
         navCard.setOnClickListener {
             showComingSoon(
                 title = "JeezPay Cards",
-                message = "Virtual and physical cards are currently in development. Soon you’ll be able to pay online, withdraw from ATMs, and manage your cards directly from JeezPay.",
-                icon = "💳"
+                message = "Virtual and physical cards are currently in development. Soon youâ€™ll be able to pay online, withdraw from ATMs, and manage your cards directly from JeezPay.",
+                icon = "ðŸ’³"
             )
         }
 
@@ -550,7 +569,7 @@ class MainActivity : BaseFintechActivity() {
         val w = wallets.firstOrNull { it.code == selectedCode } ?: wallets.first()
 
         if (isBalanceHidden) {
-            fadeBalanceText("••••••")
+            fadeBalanceText("â€¢â€¢â€¢â€¢â€¢â€¢")
             btnToggleBalance.setImageResource(R.drawable.ic_eye_off)
         } else {
             fadeBalanceText("${nf.format(w.amount)} ${w.code}")
@@ -587,7 +606,7 @@ class MainActivity : BaseFintechActivity() {
 
     override fun onResume() {
         super.onResume()
-        applyHeaderAvatar() // ✅ refresh avatar
+        applyHeaderAvatar() // âœ… refresh avatar
         fetchBalanceAndHistory()
     }
 
@@ -747,7 +766,7 @@ class MainActivity : BaseFintechActivity() {
     private fun showComingSoon(
         title: String,
         message: String,
-        icon: String = "✨"
+        icon: String = "âœ¨"
     ) {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.bottom_sheet_coming_soon, null)
@@ -764,4 +783,6 @@ class MainActivity : BaseFintechActivity() {
         dialog.show()
     }
 }
+
+
 
