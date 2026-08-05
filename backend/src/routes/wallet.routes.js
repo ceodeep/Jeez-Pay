@@ -1850,6 +1850,57 @@ router.post("/merchant-payments/:id/confirm", authMiddleware, transferLimiter, a
       return res.status(statusByCode[code] || 400).json(result);
     }
 
+    const { data: paidPayment, error: paidPaymentError } = await supabase
+      .from("merchant_payments")
+      .select("id, merchant_id, merchant_order_id, amount, currency, status, paid_at, metadata")
+      .eq("id", paymentId)
+      .maybeSingle();
+
+    if (paidPaymentError) {
+      console.error("[merchant-payment-confirm] fetch paid payment error:", paidPaymentError);
+    }
+
+    if (paidPayment && paidPayment.status === "paid") {
+      const { data: existingWebhook, error: existingWebhookError } = await supabase
+        .from("merchant_webhook_events")
+        .select("id")
+        .eq("merchant_payment_id", paidPayment.id)
+        .eq("event_type", "merchant_payment.paid")
+        .maybeSingle();
+
+      if (existingWebhookError) {
+        console.error("[merchant-payment-confirm] webhook lookup error:", existingWebhookError);
+      }
+
+      if (!existingWebhook) {
+        const payload = {
+          event: "merchant_payment.paid",
+          status: "paid",
+          payment_id: paidPayment.id,
+          merchant_order_id: paidPayment.merchant_order_id,
+          paid_at: paidPayment.paid_at || new Date().toISOString(),
+          amount: paidPayment.amount,
+          currency: paidPayment.currency,
+          metadata: paidPayment.metadata || {},
+        };
+
+        const { error: webhookInsertError } = await supabase
+          .from("merchant_webhook_events")
+          .insert({
+            merchant_id: paidPayment.merchant_id,
+            merchant_payment_id: paidPayment.id,
+            event_type: "merchant_payment.paid",
+            payload,
+            status: "pending",
+            attempts: 0,
+          });
+
+        if (webhookInsertError) {
+          console.error("[merchant-payment-confirm] webhook insert error:", webhookInsertError);
+        }
+      }
+    }
+
     return res.json(result);
   } catch (err) {
     console.error("[merchant-payment-confirm] crash:", err);
