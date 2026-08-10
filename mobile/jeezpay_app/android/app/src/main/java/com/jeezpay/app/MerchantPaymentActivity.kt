@@ -26,6 +26,9 @@ import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.AppError
+import com.jeezpay.app.network.safeApiCall
 
 class MerchantPaymentActivity : BaseFintechActivity() {
 
@@ -366,16 +369,21 @@ class MerchantPaymentActivity : BaseFintechActivity() {
     }
 
     private fun confirmPayment(pin: String) {
-        setPageLoading(true)
+    setPageLoading(true)
 
-        lifecycleScope.launch {
-            try {
-                val response = withContext(Dispatchers.IO) {
-                    ApiClient.merchantPaymentApi.confirmMerchantPayment(
-                        paymentId,
-                        ConfirmMerchantPaymentRequest(pin = pin)
-                    )
-                }
+    lifecycleScope.launch {
+        val result = withContext(Dispatchers.IO) {
+            safeApiCall {
+                ApiClient.merchantPaymentApi.confirmMerchantPayment(
+                    paymentId,
+                    ConfirmMerchantPaymentRequest(pin = pin)
+                )
+            }
+        }
+
+        when (result) {
+            is ApiResult.Success -> {
+                val response = result.data
 
                 if (response.ok == true) {
                     showSuccess(response)
@@ -383,12 +391,25 @@ class MerchantPaymentActivity : BaseFintechActivity() {
                     showError(response.message ?: "Payment failed")
                     setPageLoading(false)
                 }
-            } catch (error: Exception) {
-                showError(error.message ?: "Payment confirmation failed")
+            }
+
+            is ApiResult.Error -> {
+                showError(appErrorMessage(result.error))
                 setPageLoading(false)
             }
         }
     }
+}
+
+private fun appErrorMessage(error: AppError): String {
+    return when (error) {
+        is AppError.NoInternet -> "Check your internet connection and try again."
+        is AppError.Server -> error.message
+        is AppError.Unauthorized -> error.message
+        is AppError.Validation -> error.message
+        is AppError.Unknown -> error.message
+    }
+}
 
     private fun showSuccess(response: ConfirmMerchantPaymentResponse) {
         loadPayment()
