@@ -161,4 +161,86 @@ router.get("/payments/by-order/:merchantOrderId", merchantAuthMiddleware, async 
   }
 });
 
+
+/**
+ * GET /merchant/recipients/resolve?account_number=...
+ *
+ * Merchant-only payout destination resolver.
+ */
+router.get("/recipients/resolve", merchantAuthMiddleware, async (req, res) => {
+  try {
+    const rawAccountNumber = cleanString(req.query.account_number, 40);
+
+    if (!rawAccountNumber || !/^\d+$/.test(rawAccountNumber)) {
+      return res.status(400).json({
+        code: "INVALID_ACCOUNT_NUMBER",
+        message: "A valid JeezPay account number is required",
+      });
+    }
+
+    // Postgres stores this as bigint. Keep it as a decimal string in JS.
+    const accountNumber = rawAccountNumber.replace(/^0+(?=\d)/, "");
+
+    const { data: user, error: userErr } = await supabase
+      .from("users")
+      .select("id, wallet_account_number, fullName, is_active")
+      .eq("wallet_account_number", accountNumber)
+      .maybeSingle();
+
+    if (userErr) {
+      console.error("[merchant-recipient-resolve] user lookup error:", userErr);
+      return res.status(500).json({ message: "Recipient lookup failed" });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        code: "RECIPIENT_NOT_FOUND",
+        message: "JeezPay account not found",
+      });
+    }
+
+    if (user.is_active !== true) {
+      return res.status(400).json({
+        code: "RECIPIENT_NOT_ELIGIBLE",
+        message: "JeezPay account is not eligible to receive payouts",
+      });
+    }
+
+    const { data: kyc, error: kycErr } = await supabase
+      .from("kyc_profiles")
+      .select("fullName, status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (kycErr) {
+      console.error("[merchant-recipient-resolve] KYC lookup error:", kycErr);
+      return res.status(500).json({ message: "Recipient lookup failed" });
+    }
+
+    if (!kyc || kyc.status !== "approved") {
+      return res.status(400).json({
+        code: "KYC_REQUIRED",
+        message: "JeezPay account must have approved KYC before receiving payouts",
+      });
+    }
+
+    const fullName =
+      cleanString(kyc.fullName, 255) ||
+      cleanString(user.fullName, 255) ||
+      "JeezPay User";
+
+    return res.json({
+      recipient: {
+        provider_user_id: user.id,
+        wallet_account_number: String(user.wallet_account_number),
+        full_name: fullName,
+        kyc_status: "approved",
+      },
+    });
+  } catch (err) {
+    console.error("[merchant-recipient-resolve] crash:", err);
+    return res.status(500).json({ message: "Recipient lookup failed" });
+  }
+});
+
 module.exports = router;
