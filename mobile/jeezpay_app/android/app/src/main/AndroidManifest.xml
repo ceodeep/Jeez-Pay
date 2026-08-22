@@ -61,6 +61,17 @@
             android:host="merchant-pay" />
     </intent-filter>
 
+    <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+
+        <data
+            android:scheme="jeezpay"
+            android:host="account-link" />
+    </intent-filter>
+
 </activity>
         <!-- MAIN must NOT be launcher -->
         <activity
@@ -120,6 +131,7 @@
 
 
             <activity android:name=".MerchantPaymentActivity" android:exported="false" />
+            <activity android:name=".AccountLinkActivity" android:exported="false" />
 
     </application>
 

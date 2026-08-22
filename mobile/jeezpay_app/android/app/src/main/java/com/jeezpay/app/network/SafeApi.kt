@@ -34,7 +34,7 @@ suspend fun <T> safeApiCall(apiCall: suspend () -> T): ApiResult<T> {
                 )
             }
 
-            400, 403, 404, 409, 422, 429 -> {
+            400, 403, 404, 409, 410, 422, 423, 429 -> {
                 ApiResult.Error(
                     AppError.Validation(
                         message.ifBlank {
@@ -135,10 +135,17 @@ private fun friendlyBackendMessage(
     val normalizedCode = code.trim().uppercase()
 
     return when (normalizedCode) {
-        "KYC_REQUIRED" -> "Complete KYC before merchant payments."
-        "PIN_INVALID", "INVALID_PIN" -> "Invalid PIN. Please check your PIN and try again."
+        "KYC_REQUIRED" -> "Complete KYC to continue."
+        "PIN_INVALID", "INVALID_PIN", "WRONG_PIN" -> "Invalid PIN. Please check your PIN and try again."
         "PIN_LOCKED" -> "Too many wrong PIN attempts. Try again later."
         "PIN_REQUIRED" -> "Enter your transaction PIN to continue."
+        "PIN_NOT_SET" -> "Set a transaction PIN before continuing."
+        "ACCOUNT_NOT_ELIGIBLE" -> "Your JeezPay account is not eligible for this connection."
+        "ACCOUNT_LINK_NOT_FOUND" -> "This account connection request was not found."
+        "AUTHORIZATION_EXPIRED" -> "This account connection request has expired."
+        "AUTHORIZATION_CANCELLED" -> "This account connection request was cancelled."
+        "AUTHORIZATION_NOT_PENDING" -> "This account connection request is no longer pending."
+        "MERCHANT_NOT_AVAILABLE" -> "This merchant is currently unavailable."
         "INSUFFICIENT_BALANCE" -> "Insufficient balance."
         "PAYMENT_EXPIRED" -> "This payment has expired. Please create a new checkout."
         "PAYMENT_NOT_PENDING" -> "This payment is no longer pending."
@@ -156,7 +163,9 @@ private fun friendlyBackendMessage(
                 403 -> "You cannot complete this action right now. Please check your account requirements."
                 404 -> "The requested item was not found."
                 409 -> "This action conflicts with the current status. Please refresh and try again."
+                410 -> "This request has expired."
                 422 -> "Some details are invalid. Please check and try again."
+                423 -> "Your transaction PIN is temporarily locked."
                 429 -> "Too many attempts. Please wait and try again."
                 in 500..599 -> "Service temporarily unavailable. Please try again."
                 else -> "Something went wrong. Please try again."

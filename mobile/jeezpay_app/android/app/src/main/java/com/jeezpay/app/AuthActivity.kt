@@ -170,6 +170,7 @@ class AuthActivity : BaseFintechActivity() {
         ApiClient.init(session)
 
         savePendingMerchantPaymentIfAny()
+        savePendingAccountLinkIfAny()
 
         bindViews()
         setupCountryCodeDropdown()
@@ -1143,26 +1144,98 @@ class AuthActivity : BaseFintechActivity() {
         getSharedPreferences("jeezpay_prefs", MODE_PRIVATE)
             .edit()
             .putString("pending_merchant_payment_id", id)
+            .remove("pending_account_link_id")
             .apply()
 
-        android.util.Log.d("JeezPayDeepLink", "Saved pending merchant payment id=$id")
+        android.util.Log.d(
+            "JeezPayDeepLink",
+            "Saved pending merchant payment id=$id"
+        )
+    }
+
+    private fun extractAccountLinkIdFromIntent(inputIntent: Intent?): String? {
+        val data = inputIntent?.data ?: return null
+
+        if (data.scheme != "jeezpay") return null
+        if (data.host != "account-link") return null
+
+        return data.pathSegments
+            .firstOrNull()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun savePendingAccountLinkIfAny() {
+        val id = extractAccountLinkIdFromIntent(intent) ?: return
+
+        getSharedPreferences("jeezpay_prefs", MODE_PRIVATE)
+            .edit()
+            .putString("pending_account_link_id", id)
+            .remove("pending_merchant_payment_id")
+            .apply()
+
+        android.util.Log.d(
+            "JeezPayDeepLink",
+            "Saved pending account link id=$id"
+        )
     }
 
     private fun openMain() {
-        val prefs = getSharedPreferences("jeezpay_prefs", MODE_PRIVATE)
+        val prefs = getSharedPreferences(
+            "jeezpay_prefs",
+            MODE_PRIVATE
+        )
+
+        val accountLinkId =
+            extractAccountLinkIdFromIntent(intent)
+                ?: prefs.getString(
+                    "pending_account_link_id",
+                    null
+                )
 
         val merchantPaymentId =
             extractMerchantPaymentIdFromIntent(intent)
-                ?: prefs.getString("pending_merchant_payment_id", null)
+                ?: prefs.getString(
+                    "pending_merchant_payment_id",
+                    null
+                )
 
-        val nextIntent = if (!merchantPaymentId.isNullOrBlank()) {
-            prefs.edit().remove("pending_merchant_payment_id").apply()
+        val nextIntent = when {
+            !accountLinkId.isNullOrBlank() -> {
+                prefs.edit()
+                    .remove("pending_account_link_id")
+                    .apply()
 
-            Intent(this, MerchantPaymentActivity::class.java).apply {
-                putExtra(MerchantPaymentActivity.EXTRA_PAYMENT_ID, merchantPaymentId)
+                Intent(
+                    this,
+                    AccountLinkActivity::class.java
+                ).apply {
+                    putExtra(
+                        AccountLinkActivity.EXTRA_ACCOUNT_LINK_ID,
+                        accountLinkId
+                    )
+                }
             }
-        } else {
-            Intent(this, MainActivity::class.java)
+
+            !merchantPaymentId.isNullOrBlank() -> {
+                prefs.edit()
+                    .remove("pending_merchant_payment_id")
+                    .apply()
+
+                Intent(
+                    this,
+                    MerchantPaymentActivity::class.java
+                ).apply {
+                    putExtra(
+                        MerchantPaymentActivity.EXTRA_PAYMENT_ID,
+                        merchantPaymentId
+                    )
+                }
+            }
+
+            else -> {
+                Intent(this, MainActivity::class.java)
+            }
         }
 
         startActivity(nextIntent)

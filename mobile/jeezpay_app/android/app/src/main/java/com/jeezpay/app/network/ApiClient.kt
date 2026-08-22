@@ -65,6 +65,10 @@ object ApiClient {
         retrofit.create(MerchantPaymentApi::class.java)
     }
 
+    val accountLinkApi: AccountLinkApi by lazy {
+        retrofit.create(AccountLinkApi::class.java)
+    }
+
 
     val servicesApi: ServicesApi by lazy {
         retrofit.create(ServicesApi::class.java)
