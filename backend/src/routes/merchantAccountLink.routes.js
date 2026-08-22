@@ -611,4 +611,120 @@ router.post(
   },
 );
 
+
+/**
+ * POST /merchant/account-links/:id/recover
+ *
+ * Body:
+ * { state }
+ *
+ * Recovery is available only AFTER a successful one-time exchange has
+ * consumed the authorization. It exists for the narrow case where JeezPay
+ * committed the consume operation but the merchant never received the HTTP
+ * response.
+ *
+ * This does NOT make /exchange replayable:
+ * - merchant authentication must still match
+ * - original high-entropy state must still match
+ * - authorization must already be consumed
+ */
+router.post(
+  "/:id/recover",
+  merchantAuthMiddleware,
+  async (req, res) => {
+    try {
+      const merchant = req.merchant;
+      const id = cleanString(req.params.id, 80);
+
+      const state =
+        typeof req.body.state === "string"
+          ? req.body.state.trim()
+          : "";
+
+      if (!validState(state)) {
+        return res.status(400).json({
+          code: "INVALID_STATE",
+          message: "A valid authorization state is required",
+        });
+      }
+
+      const { data: row, error: lookupError } = await supabase
+        .from("merchant_account_links")
+        .select("*")
+        .eq("id", id)
+        .eq("merchant_id", String(merchant.id))
+        .maybeSingle();
+
+      if (lookupError) {
+        console.error(
+          "[merchant-account-links] recovery lookup error:",
+          lookupError,
+        );
+
+        return res.status(500).json({
+          message: "Failed to recover account authorization",
+        });
+      }
+
+      if (!row) {
+        return res.status(404).json({
+          code: "ACCOUNT_LINK_NOT_FOUND",
+          message: "Account connection request not found",
+        });
+      }
+
+      if (!safeEqualHex(row.state_hash, hashState(state))) {
+        return res.status(401).json({
+          code: "INVALID_STATE",
+          message: "Invalid account authorization state",
+        });
+      }
+
+      if (row.status !== "consumed" || !row.consumed_at) {
+        return res.status(409).json({
+          code: "AUTHORIZATION_NOT_CONSUMED",
+          message:
+            "Account authorization has not been consumed and cannot be recovered",
+        });
+      }
+
+      if (
+        !row.provider_user_id ||
+        !row.wallet_account_number
+      ) {
+        return res.status(409).json({
+          code: "AUTHORIZATION_RECOVERY_UNAVAILABLE",
+          message:
+            "Verified account identity is unavailable for this authorization",
+        });
+      }
+
+      return res.json({
+        authorization: {
+          request_id: row.id,
+          client_reference: row.client_reference,
+
+          provider_user_id: row.provider_user_id,
+          wallet_account_number: row.wallet_account_number,
+
+          full_name:
+            row.full_name || "JeezPay User",
+
+          approved_at: row.approved_at,
+          consumed_at: row.consumed_at,
+        },
+      });
+    } catch (err) {
+      console.error(
+        "[merchant-account-links] recovery crash:",
+        err,
+      );
+
+      return res.status(500).json({
+        message: "Failed to recover account authorization",
+      });
+    }
+  },
+);
+
 module.exports = router;
