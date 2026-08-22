@@ -12,6 +12,8 @@ const kycRoutes = require("./src/routes/kyc.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const servicesRoutes = require("./src/routes/services.routes");
 const merchantRoutes = require("./src/routes/merchant.routes");
+const accountLinkRoutes = require("./src/routes/accountLink.routes");
+const merchantAccountLinkRoutes = require("./src/routes/merchantAccountLink.routes");
 
 const app = express();
 
@@ -61,9 +63,26 @@ app.use("/auth/change-email/request-otp", otpLimiter);
 app.use("/auth", authLimiter, authRoutes);
 
 app.use("/kyc", kycRoutes);
+
+// Secure external-account authorization.
+// Keep this before the generic /wallet router.
+app.use(
+  "/wallet/account-links",
+  authMiddleware,
+  accountLinkRoutes,
+);
+
 app.use("/wallet", authMiddleware, walletRoutes);
 app.use("/admin", adminRoutes);
 app.use("/services", servicesRoutes);
+
+// Merchant account-link endpoints are isolated from the existing
+// merchant payment/payout router.
+app.use(
+  "/merchant/account-links",
+  merchantAccountLinkRoutes,
+);
+
 app.use("/merchant", merchantRoutes);
 
 app.get("/", (req, res) => {
