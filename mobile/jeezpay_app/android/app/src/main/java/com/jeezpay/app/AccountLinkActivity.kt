@@ -100,7 +100,6 @@ class AccountLinkActivity : BaseFintechActivity() {
             R.layout.activity_account_link
         )
 
-        initBlockingLoader()
         bindViews()
         setupClicks()
         loadLink()
@@ -514,12 +513,6 @@ class AccountLinkActivity : BaseFintechActivity() {
     private fun setPageLoading(
         loading: Boolean
     ) {
-        if (loading) {
-            showBlockingLoader()
-        } else {
-            hideBlockingLoader()
-        }
-
         btnNotNow.isEnabled =
             !loading
 
