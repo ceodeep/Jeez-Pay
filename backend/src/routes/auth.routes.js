@@ -6,7 +6,12 @@ const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
 const { otpVerifyLimiter, pinVerifyLimiter } = require("../middlewares/rateLimit.middleware");
-const { generateOTP } = require("../utils/otp");
+const {
+  generateOTP,
+  hashOTP,
+  verifyOTPHash,
+  secureRandomIndex,
+} = require("../utils/otp");
 const { sendEmailOTP,sendPasswordResetAlert,
   sendPinResetAlert,
   sendNewLoginAlert } = require("../services/email.service");
@@ -15,6 +20,7 @@ const bcrypt = require("bcrypt");
 // You can keep your currencies here
 const DEFAULT_CURRENCIES = ["USDT", "SDG", "SSP", "EGP", "UGX"];
 const OTP_EXPIRY_MINUTES = 5;
+const MAX_OTP_ATTEMPTS = 5;
 
 function normalizePhone(raw) {
   const p = String(raw || "").trim();
@@ -49,7 +55,7 @@ function generateReferralCode() {
   let code = "JZ";
 
   for (let i = 0; i < 4; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += chars[secureRandomIndex(chars.length)];
   }
 
   return code;
@@ -98,7 +104,13 @@ async function seedWalletsForUser(userId) {
 
 async function createAndSendOtp(email, purpose) {
   const normalizedEmail = normalizeEmail(email);
+  const normalizedPurpose = String(purpose || "").trim().toLowerCase();
   const code = generateOTP();
+  const codeHash = hashOTP({
+    email: normalizedEmail,
+    purpose: normalizedPurpose,
+    code,
+  });
 
   const expiresAt = new Date(
     Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000
@@ -108,7 +120,7 @@ async function createAndSendOtp(email, purpose) {
     .from("otp_codes")
     .delete()
     .eq("email", normalizedEmail)
-    .eq("purpose", purpose);
+    .eq("purpose", normalizedPurpose);
 
   if (deleteErr) {
     console.error("[createAndSendOtp] delete error:", deleteErr);
@@ -117,8 +129,14 @@ async function createAndSendOtp(email, purpose) {
 
   const { error: insertErr } = await supabase.from("otp_codes").insert({
     email: normalizedEmail,
-    purpose,
-    code,
+    purpose: normalizedPurpose,
+
+    // Keep the legacy code column populated during the transition so the
+    // schema remains compatible with the currently deployed backend.
+    // Both values contain only the one-way HMAC, never the plaintext OTP.
+    code: codeHash,
+    code_hash: codeHash,
+    attempt_count: 0,
     expires_at: expiresAt,
   });
 
@@ -134,17 +152,24 @@ async function createAndSendOtp(email, purpose) {
 
 async function verifyOtpCode(email, purpose, code) {
   const normalizedEmail = normalizeEmail(email);
+  const normalizedPurpose = String(purpose || "").trim().toLowerCase();
   const normalizedCode = String(code || "").trim();
 
-  if (!normalizedEmail || !normalizedCode) {
-    return { ok: false, status: 400, message: "OTP is required" };
+  if (!normalizedEmail || !/^\d{6}$/.test(normalizedCode)) {
+    return {
+      ok: false,
+      status: 400,
+      message: "A valid 6-digit OTP is required",
+    };
   }
 
   const { data: otpRow, error } = await supabase
     .from("otp_codes")
-    .select("id, email, purpose, code, expires_at")
+    .select(
+      "id, email, purpose, code, code_hash, attempt_count, expires_at"
+    )
     .eq("email", normalizedEmail)
-    .eq("purpose", purpose)
+    .eq("purpose", normalizedPurpose)
     .maybeSingle();
 
   if (error) {
@@ -156,15 +181,97 @@ async function verifyOtpCode(email, purpose, code) {
     return { ok: false, status: 401, message: "Invalid OTP" };
   }
 
-  if (String(otpRow.code || "").trim() !== normalizedCode) {
-    return { ok: false, status: 401, message: "Invalid OTP" };
-  }
-
   if (Date.now() > new Date(otpRow.expires_at).getTime()) {
+    await supabase.from("otp_codes").delete().eq("id", otpRow.id);
+
     return { ok: false, status: 401, message: "OTP expired" };
   }
 
-  await supabase.from("otp_codes").delete().eq("id", otpRow.id);
+  const storedCode = String(otpRow.code || "").trim();
+  const storedHash = String(otpRow.code_hash || storedCode).trim();
+
+  // Temporary compatibility for OTP challenges created by the old backend
+  // during a rolling deployment. They expire within five minutes.
+  const isLegacyPlaintext =
+    !otpRow.code_hash && /^\d{6}$/.test(storedCode);
+
+  const matches = isLegacyPlaintext
+    ? storedCode === normalizedCode
+    : verifyOTPHash({
+        storedHash,
+        email: normalizedEmail,
+        purpose: normalizedPurpose,
+        code: normalizedCode,
+      });
+
+  if (!matches) {
+    const currentAttemptCount = Number(otpRow.attempt_count || 0);
+    const nextAttemptCount = currentAttemptCount + 1;
+
+    if (nextAttemptCount >= MAX_OTP_ATTEMPTS) {
+      const { error: deleteErr } = await supabase
+        .from("otp_codes")
+        .delete()
+        .eq("id", otpRow.id);
+
+      if (deleteErr) {
+        console.error("[verifyOtpCode] attempt delete error:", deleteErr);
+        return {
+          ok: false,
+          status: 500,
+          message: "OTP verification failed",
+        };
+      }
+
+      return {
+        ok: false,
+        status: 429,
+        message: "Too many invalid OTP attempts. Request a new code.",
+      };
+    }
+
+    const { error: attemptErr } = await supabase
+      .from("otp_codes")
+      .update({ attempt_count: nextAttemptCount })
+      .eq("id", otpRow.id);
+
+    if (attemptErr) {
+      console.error("[verifyOtpCode] attempt update error:", attemptErr);
+      return {
+        ok: false,
+        status: 500,
+        message: "OTP verification failed",
+      };
+    }
+
+    return { ok: false, status: 401, message: "Invalid OTP" };
+  }
+
+  // Conditional consumption makes a valid OTP single-use even when two
+  // verification requests arrive almost simultaneously.
+  const { data: consumedOtp, error: consumeErr } = await supabase
+    .from("otp_codes")
+    .delete()
+    .eq("id", otpRow.id)
+    .select("id")
+    .maybeSingle();
+
+  if (consumeErr) {
+    console.error("[verifyOtpCode] consume error:", consumeErr);
+    return {
+      ok: false,
+      status: 500,
+      message: "OTP verification failed",
+    };
+  }
+
+  if (!consumedOtp) {
+    return {
+      ok: false,
+      status: 401,
+      message: "OTP already used or expired",
+    };
+  }
 
   return { ok: true };
 }
@@ -666,9 +773,8 @@ router.post("/signup/verify-otp", otpVerifyLimiter, async (req, res) => {
             fullName,
             password_hash: passwordHash,
 
-            // TEMPORARY
-            phone_verified: true,
-
+            // Signup currently proves email ownership only.
+            phone_verified: false,
             email_verified: true,
 
             account_type: accountType,
@@ -725,7 +831,7 @@ router.post("/signup/verify-otp", otpVerifyLimiter, async (req, res) => {
             fullName,
             password_hash: passwordHash,
 
-            phone_verified: true,
+            phone_verified: false,
             email_verified: true,
 
             account_type: accountType,
@@ -1931,7 +2037,9 @@ router.get("/referrals/summary", authMiddleware, async (req, res) => {
 
     const { data: invitedRows, error } = await supabase
       .from("users")
-      .select("id, phone, fullName, phone_verified, created_at")
+      .select(
+        "id, phone, fullName, phone_verified, email_verified, created_at"
+      )
       .eq("referred_by_user_id", userId)
       .order("created_at", { ascending: false });
 
@@ -1955,7 +2063,9 @@ router.get("/referrals/summary", authMiddleware, async (req, res) => {
     const rewardedRows = rewards || [];
 
     const invitedCount = rows.length;
-    const successfulCount = rows.filter((u) => u.phone_verified).length;
+    const successfulCount = rows.filter(
+      (u) => u.email_verified || u.phone_verified
+    ).length;
 
     const currency = rewardedRows[0]?.currency || "USDT";
 
@@ -1981,7 +2091,11 @@ router.get("/referrals/summary", authMiddleware, async (req, res) => {
         id: u.id,
         name: u.fullName || "JeezPay user",
         phone: maskPhone(u.phone),
-        status: reward ? "rewarded" : u.phone_verified ? "successful" : "pending",
+        status: reward
+          ? "rewarded"
+          : u.email_verified || u.phone_verified
+            ? "successful"
+            : "pending",
         rewardAmount: reward?.amount || 0,
         currency: reward?.currency || "USDT",
         joinedAt: u.created_at,
