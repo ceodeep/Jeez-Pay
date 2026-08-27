@@ -1019,11 +1019,17 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    if (!user.email_verified && !user.phone_verified) {
-  return res.status(403).json({
-    message: "Account is not verified",
-  });
-}
+    if (isEmail && !user.email_verified) {
+      return res.status(403).json({
+        message: "Email is not verified",
+      });
+    }
+
+    if (!isEmail && !user.phone_verified) {
+      return res.status(403).json({
+        message: "Phone is not verified. Sign in with your email.",
+      });
+    }
 
     if (user.is_active === false) {
       return res.status(403).json({ message: "Account is suspended" });
@@ -1637,9 +1643,9 @@ router.post("/forgot-password/request-otp", async (req, res) => {
       });
     }
 
-    if (!user.email_verified && !user.phone_verified) {
+    if (!user.email_verified) {
       return res.status(403).json({
-        message: "Account is not verified",
+        message: "Verified email is required for account recovery",
       });
     }
 
@@ -1836,9 +1842,9 @@ router.post("/forgot-pin/request-otp", async (req, res) => {
       });
     }
 
-    if (!user.email_verified && !user.phone_verified) {
+    if (!user.email_verified) {
       return res.status(403).json({
-        message: "Account is not verified",
+        message: "Verified email is required for account recovery",
       });
     }
 

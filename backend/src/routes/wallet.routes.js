@@ -64,8 +64,9 @@ async function getUserRole(userId) {
 async function getUserByPhone(phone) {
   const { data, error } = await supabase
     .from("users")
-    .select("id, phone, role")
+    .select("id, phone, role, phone_verified")
     .eq("phone", phone)
+    .eq("phone_verified", true)
     .maybeSingle();
 
   if (error) throw error;
@@ -79,8 +80,11 @@ async function getUserByIdentifier(identifierRaw) {
   // 1️⃣ Try phone exact
   let { data, error } = await supabase
     .from("users")
-    .select("id, phone, role, wallet_account_number, fullName")
+    .select(
+      "id, phone, role, wallet_account_number, fullName, phone_verified"
+    )
     .eq("phone", raw)
+    .eq("phone_verified", true)
     .maybeSingle();
 
   if (error) throw error;
@@ -91,8 +95,11 @@ async function getUserByIdentifier(identifierRaw) {
   if (phoneNorm !== raw) {
     const r2 = await supabase
       .from("users")
-      .select("id, phone, role, wallet_account_number, fullName")
+      .select(
+        "id, phone, role, wallet_account_number, fullName, phone_verified"
+      )
       .eq("phone", phoneNorm)
+      .eq("phone_verified", true)
       .maybeSingle();
 
     if (r2.error) throw r2.error;
