@@ -1,4 +1,4 @@
-﻿package com.jeezpay.app.network
+package com.jeezpay.app.network
 
 import com.jeezpay.app.storage.SessionManager
 import okhttp3.Interceptor
@@ -9,7 +9,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiClient {
 
-    private const val BASE_URL = "http://217.144.154.171/"
+    private const val BASE_URL = "https://api.jeezpay.co/"
 
     private var sessionManager: SessionManager? = null
 
@@ -78,4 +78,3 @@ object ApiClient {
         retrofit.create(KycApi::class.java)
     }
 }
-
