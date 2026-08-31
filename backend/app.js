@@ -10,6 +10,7 @@ const walletRoutes = require("./src/routes/wallet.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
 const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
 const {
+  adminProductPolicy,
   merchantProductPolicy,
   serviceProductPolicy,
 } = require("./src/middlewares/nonWalletProductPolicy.middleware");
@@ -86,7 +87,10 @@ app.use(
 // Product policy is evaluated after authentication and before legacy wallet
 // route code so disabled currencies cannot reach money-moving handlers.
 app.use("/wallet", authMiddleware, walletProductPolicy, walletRoutes);
-app.use("/admin", adminRoutes);
+
+// Admin reporting stays available, but manual balance/crypto configuration and
+// money actions must obey the same launch product policy as customer routes.
+app.use("/admin", adminProductPolicy, adminRoutes);
 
 // Service payments sit outside /wallet, so enforce the same launch product
 // policy before their legacy route code executes.
