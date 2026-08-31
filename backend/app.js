@@ -8,6 +8,7 @@ const rateLimit = require("express-rate-limit");
 const authRoutes = require("./src/routes/auth.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
+const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
 const kycRoutes = require("./src/routes/kyc.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const servicesRoutes = require("./src/routes/services.routes");
@@ -78,7 +79,9 @@ app.use(
   accountLinkRoutes,
 );
 
-app.use("/wallet", authMiddleware, walletRoutes);
+// Product policy is evaluated after authentication and before legacy wallet
+// route code so disabled currencies cannot reach money-moving handlers.
+app.use("/wallet", authMiddleware, walletProductPolicy, walletRoutes);
 app.use("/admin", adminRoutes);
 app.use("/services", servicesRoutes);
 
