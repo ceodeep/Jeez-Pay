@@ -1,3 +1,8 @@
+const path = require("path");
+require("dotenv").config({
+  path: path.resolve(__dirname, "../../.env"),
+});
+
 function requireEnv(name) {
   const value = String(process.env[name] || "").trim();
 
