@@ -2,6 +2,22 @@ const supabase = require("../config/supabase");
 
 const DEFAULT_COUNTRY_CODE = "SS";
 
+const COUNTRY_CODE_ALIASES = Object.freeze({
+  SS: "SS",
+  "+211": "SS",
+  "211": "SS",
+  SD: "SD",
+  "+249": "SD",
+  "249": "SD",
+  UG: "UG",
+  "+256": "UG",
+  "256": "UG",
+  EG: "EG",
+  "+20": "EG",
+  "20": "EG",
+  GLOBAL: "GLOBAL",
+});
+
 const CAPABILITIES = Object.freeze({
   FIAT_HOLD: "FIAT_HOLD",
   P2P_TRANSFER: "P2P_TRANSFER",
@@ -19,11 +35,10 @@ const CAPABILITIES = Object.freeze({
 });
 
 function normalizeCountryCode(value) {
-  const normalized = String(value || DEFAULT_COUNTRY_CODE)
-    .trim()
-    .toUpperCase();
+  const raw = String(value || DEFAULT_COUNTRY_CODE).trim().toUpperCase();
+  const normalized = raw || DEFAULT_COUNTRY_CODE;
 
-  return normalized || DEFAULT_COUNTRY_CODE;
+  return COUNTRY_CODE_ALIASES[normalized] || normalized;
 }
 
 function normalizeCurrency(value) {
@@ -139,6 +154,7 @@ async function isCapabilityEnabled({ countryCode, currency, capability }) {
 
 module.exports = {
   CAPABILITIES,
+  COUNTRY_CODE_ALIASES,
   DEFAULT_COUNTRY_CODE,
   normalizeCountryCode,
   normalizeCurrency,
