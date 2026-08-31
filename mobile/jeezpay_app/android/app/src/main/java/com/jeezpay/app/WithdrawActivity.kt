@@ -1,4 +1,4 @@
-﻿package com.jeezpay.app
+package com.jeezpay.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -11,26 +11,33 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.dto.ProductCapability
+import com.jeezpay.app.network.dto.ProductCapabilitiesResponse
+import com.jeezpay.app.repository.ProductPolicyStore
+import com.jeezpay.app.repository.ProductRepository
 import com.jeezpay.app.repository.WalletRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-
 class WithdrawActivity : AppCompatActivity() {
 
     private val repo = WalletRepository()
+    private val productRepo = ProductRepository()
 
-    private var selectedCurrency = "USDT"
+    private val selectedCurrency = "USDT"
     private var selectedNetwork = "TRC20"
+    private var cryptoPolicyReady = false
+    private var cryptoPolicyLoading = false
 
     private lateinit var etAddress: TextInputEditText
     private lateinit var etAmount: TextInputEditText
     private lateinit var btnWithdraw: MaterialButton
     private lateinit var progressBar: ProgressBar
+    private lateinit var tvCurrency: TextView
+    private lateinit var tvNetwork: TextView
 
     private var pendingAddress = ""
     private var pendingAmount = 0.0
@@ -49,55 +56,120 @@ class WithdrawActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_withdraw)
 
-        selectedCurrency = intent.getStringExtra("currency") ?: "USDT"
-
         val btnBack = findViewById<View>(R.id.btnBack)
-        val tvCurrency = findViewById<TextView>(R.id.tvCurrency)
-        val tvNetwork = findViewById<TextView>(R.id.tvNetwork)
+        tvCurrency = findViewById(R.id.tvCurrency)
+        tvNetwork = findViewById(R.id.tvNetwork)
 
         etAddress = findViewById(R.id.etAddress)
         etAmount = findViewById(R.id.etAmount)
         btnWithdraw = findViewById(R.id.btnWithdraw)
         val tvViewHistory = findViewById<TextView>(R.id.tvViewHistory)
+        progressBar = findViewById(R.id.progressBar)
 
         tvViewHistory.setOnClickListener {
-            startActivity(
-                Intent(this, WithdrawHistoryActivity::class.java)
-            )
+            startActivity(Intent(this, WithdrawHistoryActivity::class.java))
         }
-        progressBar = findViewById(R.id.progressBar)
 
         tvCurrency.text = selectedCurrency
         tvNetwork.text = selectedNetwork
         updateNetworkUi()
+        setCryptoUiEnabled(false)
 
         btnBack.setOnClickListener { finish() }
 
+        // This activity implements crypto withdrawal only. Fiat cash-out is a
+        // separate launch capability/flow and must not be mixed into this screen.
         tvCurrency.setOnClickListener {
-            showCurrencySheet()
+            toast("This withdrawal screen supports USDT only")
         }
 
         tvNetwork.setOnClickListener {
+            if (!requireCryptoWithdrawalPolicy()) return@setOnClickListener
             showNetworkSheet()
         }
 
         btnWithdraw.setOnClickListener {
             validateAndShowReview()
         }
+
+        loadCryptoWithdrawalPolicy()
     }
 
-    private fun validateAndShowReview() {
-        if (selectedCurrency != "USDT") {
-            showComingSoon("Withdrawals for $selectedCurrency are coming soon.")
+    private fun loadCryptoWithdrawalPolicy(forceRefresh: Boolean = false) {
+        if (cryptoPolicyLoading) return
+
+        val cached = ProductPolicyStore.current(ProductPolicyStore.GLOBAL_COUNTRY_CODE)
+        if (!forceRefresh && cached != null) {
+            applyCryptoWithdrawalPolicy(cached)
             return
         }
 
+        cryptoPolicyLoading = true
+        cryptoPolicyReady = false
+        setCryptoUiEnabled(false)
+        updateUnavailableMessage("Checking crypto withdrawal availability...")
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                productRepo.fetchCapabilitiesSafe(ProductPolicyStore.GLOBAL_COUNTRY_CODE)
+            }) {
+                is ApiResult.Success -> {
+                    cryptoPolicyLoading = false
+                    ProductPolicyStore.replace(result.data)
+                    applyCryptoWithdrawalPolicy(result.data)
+                }
+
+                is ApiResult.Error -> {
+                    cryptoPolicyLoading = false
+                    cryptoPolicyReady = false
+                    ProductPolicyStore.clear(ProductPolicyStore.GLOBAL_COUNTRY_CODE)
+                    setCryptoUiEnabled(false)
+                    updateUnavailableMessage("USDT withdrawals are not available right now")
+                }
+            }
+        }
+    }
+
+    private fun applyCryptoWithdrawalPolicy(config: ProductCapabilitiesResponse) {
+        ProductPolicyStore.replace(config)
+
+        cryptoPolicyReady = ProductPolicyStore.isCapabilityEnabled(
+            selectedCurrency,
+            ProductCapability.USDT_SEND,
+            ProductPolicyStore.GLOBAL_COUNTRY_CODE
+        )
+
+        setCryptoUiEnabled(cryptoPolicyReady)
+
+        if (cryptoPolicyReady) {
+            updateNetworkUi()
+        } else {
+            updateUnavailableMessage("USDT withdrawals are not available right now")
+        }
+    }
+
+    private fun requireCryptoWithdrawalPolicy(): Boolean {
+        val allowed = cryptoPolicyReady && ProductPolicyStore.isCapabilityEnabled(
+            selectedCurrency,
+            ProductCapability.USDT_SEND,
+            ProductPolicyStore.GLOBAL_COUNTRY_CODE
+        )
+
+        if (!allowed) {
+            toast("USDT withdrawals are not available right now")
+        }
+
+        return allowed
+    }
+
+    private fun validateAndShowReview() {
+        if (!requireCryptoWithdrawalPolicy()) return
 
         val address = etAddress.text?.toString()?.trim().orEmpty()
         val amount = etAmount.text?.toString()?.toDoubleOrNull() ?: 0.0
 
         if (address.isBlank()) {
-            toast("Enter recipient TRON address")
+            toast("Enter recipient wallet address")
             return
         }
 
@@ -113,6 +185,8 @@ class WithdrawActivity : AppCompatActivity() {
     }
 
     private fun showReviewSheet(address: String, amount: Double) {
+        if (!requireCryptoWithdrawalPolicy()) return
+
         val fee = 2.0
         val total = amount + fee
 
@@ -128,21 +202,18 @@ class WithdrawActivity : AppCompatActivity() {
                 "BNB Smart Chain (BEP20)"
             }
 
-        view.findViewById<TextView>(R.id.tvReviewAmount).text =
-            "$amount USDT"
-
-        view.findViewById<TextView>(R.id.tvReviewFee).text =
-            "$fee USDT"
-
-        view.findViewById<TextView>(R.id.tvReviewTotal).text =
-            "$total USDT"
+        view.findViewById<TextView>(R.id.tvReviewAmount).text = "$amount USDT"
+        view.findViewById<TextView>(R.id.tvReviewFee).text = "$fee USDT"
+        view.findViewById<TextView>(R.id.tvReviewTotal).text = "$total USDT"
 
         view.findViewById<MaterialButton>(R.id.btnConfirmWithdrawal).setOnClickListener {
-            dialog.dismiss()
+            if (!requireCryptoWithdrawalPolicy()) {
+                dialog.dismiss()
+                return@setOnClickListener
+            }
 
-            pinLauncher.launch(
-                Intent(this, PinVerifyActivity::class.java)
-            )
+            dialog.dismiss()
+            pinLauncher.launch(Intent(this, PinVerifyActivity::class.java))
         }
 
         dialog.setContentView(view)
@@ -150,6 +221,8 @@ class WithdrawActivity : AppCompatActivity() {
     }
 
     private fun submitWithdrawal(pin: String) {
+        if (!requireCryptoWithdrawalPolicy()) return
+
         progressBar.visibility = View.VISIBLE
         btnWithdraw.isEnabled = false
 
@@ -164,7 +237,7 @@ class WithdrawActivity : AppCompatActivity() {
             }) {
                 is ApiResult.Success -> {
                     progressBar.visibility = View.GONE
-                    btnWithdraw.isEnabled = true
+                    setCryptoUiEnabled(cryptoPolicyReady)
 
                     showSuccessSheet(
                         amount = result.data.amount ?: pendingAmount,
@@ -175,29 +248,11 @@ class WithdrawActivity : AppCompatActivity() {
 
                 is ApiResult.Error -> {
                     progressBar.visibility = View.GONE
-                    btnWithdraw.isEnabled = true
+                    setCryptoUiEnabled(cryptoPolicyReady)
                     toast(cleanErrorMessage(result.error))
                 }
             }
         }
-    }
-
-    private fun showComingSoon(message: String) {
-        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
-
-        val view = layoutInflater.inflate(
-            R.layout.bottom_sheet_coming_soon,
-            null
-        )
-
-        view.findViewById<TextView>(R.id.tvComingSoonMessage).text = message
-
-        view.findViewById<View>(R.id.btnComingSoonClose).setOnClickListener {
-            dialog.dismiss()
-        }
-
-        dialog.setContentView(view)
-        dialog.show()
     }
 
     private fun cleanErrorMessage(error: Any?): String {
@@ -222,55 +277,23 @@ class WithdrawActivity : AppCompatActivity() {
     }
 
     private fun showNetworkSheet() {
+        if (!requireCryptoWithdrawalPolicy()) return
+
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.bottom_sheet_network_picker, null)
 
         view.findViewById<View>(R.id.rowTrc20).setOnClickListener {
             selectedNetwork = "TRC20"
             updateNetworkUi()
-            findViewById<TextView>(R.id.tvNetwork).text = selectedNetwork
+            tvNetwork.text = selectedNetwork
             dialog.dismiss()
         }
 
         view.findViewById<View>(R.id.rowBep20).setOnClickListener {
             selectedNetwork = "BEP20"
             updateNetworkUi()
-            findViewById<TextView>(R.id.tvNetwork).text = selectedNetwork
+            tvNetwork.text = selectedNetwork
             dialog.dismiss()
-        }
-
-        dialog.setContentView(view)
-        dialog.show()
-    }
-
-    private fun showCurrencySheet() {
-        val dialog = BottomSheetDialog(this, R.style.JeezPayBottomSheet)
-        val view = layoutInflater.inflate(R.layout.bottom_sheet_currency_picker, null)
-
-        view.findViewById<View>(R.id.rowUsdt).setOnClickListener {
-            selectedCurrency = "USDT"
-            findViewById<TextView>(R.id.tvCurrency).text = selectedCurrency
-            dialog.dismiss()
-        }
-
-        view.findViewById<View>(R.id.rowSdg).setOnClickListener {
-            dialog.dismiss()
-            showComingSoon("SDG withdrawals will be available in a future JeezPay update.")
-        }
-
-        view.findViewById<View>(R.id.rowSsp).setOnClickListener {
-            dialog.dismiss()
-            showComingSoon("SSP withdrawals will be available in a future JeezPay update.")
-        }
-
-        view.findViewById<View>(R.id.rowEgp).setOnClickListener {
-            dialog.dismiss()
-            showComingSoon("EGP withdrawals will be available in a future JeezPay update.")
-        }
-
-        view.findViewById<View>(R.id.rowUgx).setOnClickListener {
-            dialog.dismiss()
-            showComingSoon("UGX withdrawals will be available in a future JeezPay update.")
         }
 
         dialog.setContentView(view)
@@ -294,6 +317,26 @@ class WithdrawActivity : AppCompatActivity() {
 
         dialog.setContentView(view)
         dialog.show()
+    }
+
+    private fun setCryptoUiEnabled(enabled: Boolean) {
+        etAddress.isEnabled = enabled
+        etAmount.isEnabled = enabled
+        btnWithdraw.isEnabled = enabled
+        tvNetwork.isEnabled = enabled
+
+        val alpha = if (enabled) 1f else 0.55f
+        etAddress.alpha = alpha
+        etAmount.alpha = alpha
+        btnWithdraw.alpha = alpha
+        tvNetwork.alpha = alpha
+    }
+
+    private fun updateUnavailableMessage(message: String) {
+        findViewById<TextView>(R.id.tvWithdrawBadge).text = "USDT unavailable"
+        findViewById<TextView>(R.id.tvWithdrawInfo).text = message
+        findViewById<TextView>(R.id.tvWithdrawNetworkInfo).text =
+            "Crypto withdrawal is disabled by JeezPay product policy."
     }
 
     private fun updateNetworkUi() {
