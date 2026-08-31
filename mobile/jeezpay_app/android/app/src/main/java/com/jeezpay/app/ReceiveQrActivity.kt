@@ -15,12 +15,19 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
+import com.jeezpay.app.network.dto.ProductCapability
+import com.jeezpay.app.network.dto.ProductCapabilitiesResponse
 import com.jeezpay.app.repository.AuthRepository
+import com.jeezpay.app.repository.ProductPolicyStore
+import com.jeezpay.app.repository.ProductRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ReceiveQrActivity : AppCompatActivity() {
 
     private val authRepo = AuthRepository()
+    private val productRepo = ProductRepository()
 
     private lateinit var btnBack: View
     private lateinit var ivQrCode: ImageView
@@ -29,6 +36,9 @@ class ReceiveQrActivity : AppCompatActivity() {
     private lateinit var tvStatus: TextView
 
     private var currentAccountNumber: String = ""
+    private var receiveCurrency: String = ""
+    private var receivePolicyReady = false
+    private var receivePolicyLoading = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,6 +55,11 @@ class ReceiveQrActivity : AppCompatActivity() {
         }
 
         btnCopyAccountNumber.setOnClickListener {
+            if (!receivePolicyReady) {
+                toast("Receiving is not available right now")
+                return@setOnClickListener
+            }
+
             if (currentAccountNumber.isBlank()) {
                 toast("Account number unavailable")
                 return@setOnClickListener
@@ -54,15 +69,108 @@ class ReceiveQrActivity : AppCompatActivity() {
             toast("Account number copied")
         }
 
+        clearReceiveUi()
+        loadReceivePolicy()
+    }
+
+    private fun loadReceivePolicy(forceRefresh: Boolean = false) {
+        if (receivePolicyLoading) return
+
+        val cached = ProductPolicyStore.current()
+        if (!forceRefresh && cached != null) {
+            applyReceivePolicy(cached)
+            return
+        }
+
+        receivePolicyLoading = true
+        receivePolicyReady = false
+        setStatus("Loading receive options...")
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                productRepo.fetchCapabilitiesSafe(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
+            }) {
+                is ApiResult.Success -> {
+                    receivePolicyLoading = false
+                    ProductPolicyStore.replace(result.data)
+                    applyReceivePolicy(result.data)
+                }
+
+                is ApiResult.Error -> {
+                    receivePolicyLoading = false
+                    receivePolicyReady = false
+                    ProductPolicyStore.clear()
+                    clearReceiveUi()
+                    setStatus(errorMessage(result.error))
+                }
+            }
+        }
+    }
+
+    private fun applyReceivePolicy(config: ProductCapabilitiesResponse) {
+        ProductPolicyStore.replace(config)
+
+        val allowedCurrencies = ProductPolicyStore
+            .currenciesWithCapability(ProductCapability.P2P_TRANSFER)
+
+        if (allowedCurrencies.isEmpty()) {
+            failReceivePolicy("Receiving is not available right now")
+            return
+        }
+
+        val requested = intent.getStringExtra("currency")
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it in allowedCurrencies }
+
+        val defaultCurrency = ProductPolicyStore.defaultCurrency()
+            ?.takeIf { it in allowedCurrencies }
+
+        receiveCurrency = requested
+            ?: defaultCurrency
+            ?: allowedCurrencies.first()
+
+        receivePolicyReady = ProductPolicyStore.isCapabilityEnabled(
+            receiveCurrency,
+            ProductCapability.P2P_TRANSFER
+        )
+
+        if (!receivePolicyReady) {
+            failReceivePolicy("Receiving is not available right now")
+            return
+        }
+
         loadAccountNumber()
     }
 
+    private fun failReceivePolicy(message: String) {
+        receivePolicyLoading = false
+        receivePolicyReady = false
+        receiveCurrency = ""
+        clearReceiveUi()
+        setStatus(message)
+    }
+
     private fun loadAccountNumber() {
+        if (!receivePolicyReady) {
+            failReceivePolicy("Receiving is not available right now")
+            return
+        }
+
         setStatus("Loading QR code...")
 
         lifecycleScope.launch {
             when (val result = authRepo.meSafe()) {
                 is ApiResult.Success -> {
+                    if (!receivePolicyReady || !ProductPolicyStore.isCapabilityEnabled(
+                            receiveCurrency,
+                            ProductCapability.P2P_TRANSFER
+                        )
+                    ) {
+                        failReceivePolicy("Receiving is not available right now")
+                        return@launch
+                    }
+
                     val accountNumber = result.data.user
                         ?.wallet_account_number
                         ?.toString()
@@ -70,9 +178,7 @@ class ReceiveQrActivity : AppCompatActivity() {
                         .orEmpty()
 
                     if (accountNumber.isBlank()) {
-                        currentAccountNumber = ""
-                        tvAccountNumber.text = "Account No: -"
-                        ivQrCode.setImageDrawable(null)
+                        clearReceiveUi()
                         setStatus("Account number unavailable")
                         return@launch
                     }
@@ -80,19 +186,24 @@ class ReceiveQrActivity : AppCompatActivity() {
                     currentAccountNumber = accountNumber
                     tvAccountNumber.text = "Account No: $currentAccountNumber"
 
-                    val qrContent = "jeezpay://pay?uid=$currentAccountNumber"
+                    val qrContent =
+                        "jeezpay://pay?uid=$currentAccountNumber&currency=$receiveCurrency"
                     ivQrCode.setImageBitmap(generateQrBitmap(qrContent))
                     hideStatus()
                 }
 
                 is ApiResult.Error -> {
-                    currentAccountNumber = ""
-                    tvAccountNumber.text = "Account No: -"
-                    ivQrCode.setImageDrawable(null)
+                    clearReceiveUi()
                     setStatus(errorMessage(result.error))
                 }
             }
         }
+    }
+
+    private fun clearReceiveUi() {
+        currentAccountNumber = ""
+        if (::tvAccountNumber.isInitialized) tvAccountNumber.text = "Account No: -"
+        if (::ivQrCode.isInitialized) ivQrCode.setImageDrawable(null)
     }
 
     private fun generateQrBitmap(content: String): Bitmap {
