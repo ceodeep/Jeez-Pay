@@ -1,5 +1,6 @@
 package com.jeezpay.app.network
 
+import com.jeezpay.app.BuildConfig
 import com.jeezpay.app.storage.SessionManager
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -15,7 +16,11 @@ object ApiClient {
 
     private val logging: HttpLoggingInterceptor by lazy {
         HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
     }
 
@@ -68,7 +73,6 @@ object ApiClient {
     val accountLinkApi: AccountLinkApi by lazy {
         retrofit.create(AccountLinkApi::class.java)
     }
-
 
     val servicesApi: ServicesApi by lazy {
         retrofit.create(ServicesApi::class.java)
