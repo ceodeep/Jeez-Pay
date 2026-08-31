@@ -19,9 +19,11 @@ WHERE phone_verified IS TRUE
 ALTER TABLE public.users
   DROP CONSTRAINT IF EXISTS users_phone_verified_at_requires_verified;
 
+-- Defense in depth: the database must never accept a trusted phone flag unless
+-- the successful ownership-verification time is recorded as well.
 ALTER TABLE public.users
   ADD CONSTRAINT users_phone_verified_at_requires_verified
-  CHECK (phone_verified_at IS NULL OR phone_verified IS TRUE);
+  CHECK (phone_verified IS NOT TRUE OR phone_verified_at IS NOT NULL);
 
 COMMENT ON COLUMN public.users.phone_verified_at IS
   'Timestamp set only after successful proof of phone ownership.';
