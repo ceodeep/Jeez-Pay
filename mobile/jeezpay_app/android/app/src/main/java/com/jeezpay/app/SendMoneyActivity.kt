@@ -35,7 +35,10 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import com.jeezpay.app.PortraitCaptureActivity
 import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.dto.ProductCapability
 import com.jeezpay.app.repository.AuthRepository
+import com.jeezpay.app.repository.ProductPolicyStore
+import com.jeezpay.app.repository.ProductRepository
 import com.jeezpay.app.repository.WalletRepository
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -70,7 +73,11 @@ class SendMoneyActivity : BaseFintechActivity() {
     private lateinit var tvRecipientName: TextView
     private lateinit var tvAvailable: TextView
 
-    private val currencies = arrayOf("USDT", "SDG", "SSP", "EGP", "UGX")
+    private val productRepo = ProductRepository()
+    private var currencies: Array<String> = emptyArray()
+    private var productPolicyReady = false
+    private var productPolicyLoading = false
+
     private val df = DecimalFormat("#,##0.##")
 
     private enum class IdMode { UID, PHONE }
@@ -209,6 +216,11 @@ class SendMoneyActivity : BaseFintechActivity() {
         })
 
         btnNext.setOnClickListener {
+            if (!productPolicyReady) {
+                showError("Transfers are not available right now")
+                return@setOnClickListener
+            }
+
             val receiverIdentifier = etPhone.text.toString().trim()
             if (receiverIdentifier.isEmpty()) {
                 showError("Receiver UID or phone is required")
@@ -218,8 +230,11 @@ class SendMoneyActivity : BaseFintechActivity() {
             resolveReceiverAndContinue(receiverIdentifier)
         }
 
-        ddCurrency.text = "SSP"
-        refreshFeeAndAvailable()
+        ddCurrency.text = "--"
+        tvAvailable.text = "Available: --"
+        tvFee.text = "Fee: --"
+        setSendLoading(false)
+        loadTransferPolicy()
 
         currencyPill.setOnClickListener { showCurrencyPicker() }
 
@@ -231,6 +246,11 @@ class SendMoneyActivity : BaseFintechActivity() {
 
             val amount = amountText.toDoubleOrNull()
 
+            if (!isTransferCurrencyAllowed(currency)) {
+                showError("Transfers in this currency are not available right now")
+                return@setOnClickListener
+            }
+
             if (receiverIdentifier.isEmpty()) {
                 showError("Receiver UID or phone is required")
                 return@setOnClickListener
@@ -238,11 +258,6 @@ class SendMoneyActivity : BaseFintechActivity() {
 
             if (amount == null || amount <= 0) {
                 showError("Enter a valid amount")
-                return@setOnClickListener
-            }
-
-            if (currency !in currencies) {
-                showError("Select a valid currency")
                 return@setOnClickListener
             }
 
@@ -374,11 +389,121 @@ class SendMoneyActivity : BaseFintechActivity() {
         }
     }
 
+    private fun loadTransferPolicy(forceRefresh: Boolean = false) {
+        if (productPolicyLoading) return
 
+        val cached = ProductPolicyStore.current()
+        if (!forceRefresh && cached != null) {
+            applyTransferPolicy(cached)
+            return
+        }
+
+        productPolicyLoading = true
+        productPolicyReady = false
+        setSendLoading(false)
+        showBlockingLoader()
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                productRepo.fetchCapabilitiesSafe(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
+            }) {
+                is ApiResult.Success -> {
+                    productPolicyLoading = false
+                    ProductPolicyStore.replace(result.data)
+                    applyTransferPolicy(result.data)
+                }
+
+                is ApiResult.Error -> {
+                    productPolicyLoading = false
+                    productPolicyReady = false
+                    currencies = emptyArray()
+                    ProductPolicyStore.clear()
+                    ddCurrency.text = "--"
+                    quotedFee = 0.0
+                    quotedTotalDebit = 0.0
+                    tvAvailable.text = "Available: --"
+                    tvFee.text = "Fee: --"
+                    hideBlockingLoader()
+                    setSendLoading(false)
+                    handleSendError(result.error) {
+                        loadTransferPolicy(forceRefresh = true)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyTransferPolicy(config: com.jeezpay.app.network.dto.ProductCapabilitiesResponse) {
+        ProductPolicyStore.replace(config)
+
+        val allowedCurrencies = ProductPolicyStore
+            .currenciesWithCapability(ProductCapability.P2P_TRANSFER)
+
+        if (allowedCurrencies.isEmpty()) {
+            failTransferPolicy("Transfers are not available right now")
+            return
+        }
+
+        currencies = allowedCurrencies.toTypedArray()
+
+        val requestedCurrency = intent.getStringExtra("currency")
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it in currencies }
+
+        val defaultCurrency = ProductPolicyStore.defaultCurrency()
+            ?.takeIf { it in currencies }
+
+        val selectedCurrency = requestedCurrency
+            ?: defaultCurrency
+            ?: currencies.first()
+
+        productPolicyReady = true
+        ddCurrency.text = selectedCurrency
+        hideBlockingLoader()
+        setSendLoading(false)
+        setNextEnabled(!etPhone.text.isNullOrBlank())
+        vm.loadBalances()
+        refreshFeeAndAvailable()
+    }
+
+    private fun failTransferPolicy(message: String) {
+        productPolicyLoading = false
+        productPolicyReady = false
+        currencies = emptyArray()
+        quotedFee = 0.0
+        quotedTotalDebit = 0.0
+        ddCurrency.text = "--"
+        tvAvailable.text = "Available: --"
+        tvFee.text = "Fee: --"
+        hideBlockingLoader()
+        setSendLoading(false)
+        showError(message)
+    }
+
+    private fun isTransferCurrencyAllowed(currency: String): Boolean {
+        val normalized = currency.trim().uppercase()
+        if (!productPolicyReady || normalized.isBlank()) return false
+        if (normalized !in currencies) return false
+
+        return ProductPolicyStore.isCapabilityEnabled(
+            normalized,
+            ProductCapability.P2P_TRANSFER
+        )
+    }
 
     private fun refreshFeeAndAvailable() {
-        val cur = ddCurrency.text.toString().uppercase()
+        val cur = ddCurrency.text.toString().trim().uppercase()
         val amount = etAmount.text.toString().trim().toDoubleOrNull()
+
+        if (!isTransferCurrencyAllowed(cur)) {
+            quotedFee = 0.0
+            quotedTotalDebit = 0.0
+            quoteLoading = false
+            tvAvailable.text = "Available: --"
+            tvFee.text = "Fee: --"
+            return
+        }
 
         val avail = vm.availableFor(cur)
         tvAvailable.text = "Available: ${df.format(avail)}"
@@ -398,6 +523,12 @@ class SendMoneyActivity : BaseFintechActivity() {
                 WalletRepository().transferQuoteSafe(cur, amount)
             }) {
                 is ApiResult.Success -> {
+                    if (!isTransferCurrencyAllowed(cur) ||
+                        ddCurrency.text.toString().trim().uppercase() != cur
+                    ) {
+                        return@launch
+                    }
+
                     quoteLoading = false
                     val quote = result.data
                     quotedFee = quote.fee ?: 0.0
@@ -406,6 +537,10 @@ class SendMoneyActivity : BaseFintechActivity() {
                 }
 
                 is ApiResult.Error -> {
+                    if (ddCurrency.text.toString().trim().uppercase() != cur) {
+                        return@launch
+                    }
+
                     quoteLoading = false
                     quotedFee = 0.0
                     quotedTotalDebit = 0.0
@@ -416,6 +551,13 @@ class SendMoneyActivity : BaseFintechActivity() {
     }
 
     private fun showCurrencyPicker() {
+        if (!productPolicyReady) {
+            showError("Transfer products are still loading")
+            return
+        }
+
+        if (currencies.size <= 1) return
+
         val current = ddCurrency.text.toString().uppercase()
         val checked = currencies.indexOf(current).coerceAtLeast(0)
 
@@ -446,8 +588,9 @@ class SendMoneyActivity : BaseFintechActivity() {
     }
 
     private fun setNextEnabled(enabled: Boolean) {
-        btnNext.isEnabled = enabled
-        btnNext.alpha = if (enabled) 1f else 0.75f
+        val canContinue = enabled && productPolicyReady
+        btnNext.isEnabled = canContinue
+        btnNext.alpha = if (canContinue) 1f else 0.75f
     }
 
     private fun showError(msg: String) {
@@ -538,17 +681,17 @@ class SendMoneyActivity : BaseFintechActivity() {
 
 
     private fun setSendLoading(loading: Boolean) {
-        if (loading) showBlockingLoader() else hideBlockingLoader()
+        if (loading) showBlockingLoader() else if (!productPolicyLoading) hideBlockingLoader()
 
-        btnSend.isEnabled = !loading
-        btnSend.alpha = if (loading) 0.7f else 1f
+        btnSend.isEnabled = !loading && productPolicyReady
+        btnSend.alpha = if (btnSend.isEnabled) 1f else 0.7f
 
-        etAmount.isEnabled = !loading
-        etDesc.isEnabled = !loading
-        currencyPill.isEnabled = !loading
+        etAmount.isEnabled = !loading && productPolicyReady
+        etDesc.isEnabled = !loading && productPolicyReady
+        currencyPill.isEnabled = !loading && productPolicyReady && currencies.size > 1
 
         etPhone.isEnabled = !loading
-        btnNext.isEnabled = !loading
+        btnNext.isEnabled = !loading && productPolicyReady && !etPhone.text.isNullOrBlank()
         btnUid.isEnabled = !loading
         btnPhone.isEnabled = !loading
         ivBack.isEnabled = !loading
@@ -559,6 +702,11 @@ class SendMoneyActivity : BaseFintechActivity() {
         val currency = lastConfirmedCurrency ?: return
         val amount = lastConfirmedAmount ?: return
         val description = lastConfirmedDescription
+
+        if (!isTransferCurrencyAllowed(currency)) {
+            showError("Transfers in this currency are not available right now")
+            return
+        }
 
         vm.sendMoney(
             toPhone = receiverIdentifier,
@@ -814,6 +962,11 @@ class SendMoneyActivity : BaseFintechActivity() {
     }
 
     private fun resolveReceiverAndContinue(receiverIdentifier: String) {
+        if (!productPolicyReady) {
+            showError("Transfers are not available right now")
+            return
+        }
+
         setSendLoading(true)
 
         lifecycleScope.launch {
