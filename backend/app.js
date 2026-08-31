@@ -14,6 +14,7 @@ const servicesRoutes = require("./src/routes/services.routes");
 const merchantRoutes = require("./src/routes/merchant.routes");
 const accountLinkRoutes = require("./src/routes/accountLink.routes");
 const merchantAccountLinkRoutes = require("./src/routes/merchantAccountLink.routes");
+const productRoutes = require("./src/routes/product.routes");
 
 const app = express();
 
@@ -55,6 +56,11 @@ app.options(/.*/, cors(corsOptions));
 
 
 app.use(express.json());
+
+// Public product configuration. This is safe to expose because it contains
+// launch availability and capability flags only; financial authorization is
+// still enforced by authenticated routes.
+app.use("/products", productRoutes);
 
 app.use("/auth/signup/request-otp", otpLimiter);
 app.use("/auth/forgot-password/request-otp", otpLimiter);
