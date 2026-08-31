@@ -1,9 +1,10 @@
 BEGIN;
 
 -- Phase 1 auth hardening.
--- This migration is backward-compatible with the currently deployed backend:
--- legacy code can keep using otp_codes.code while the hardened backend writes
--- a one-way HMAC into both code and code_hash during the transition.
+-- Apply this additive migration before deploying the hardened backend.
+-- Existing plaintext OTP rows remain readable by the hardened verifier for their
+-- short lifetime; once the hardened backend is running, new OTPs are stored only
+-- as one-way HMAC values in both code and code_hash during this transition.
 
 ALTER TABLE public.otp_codes
   ADD COLUMN IF NOT EXISTS code_hash text;
