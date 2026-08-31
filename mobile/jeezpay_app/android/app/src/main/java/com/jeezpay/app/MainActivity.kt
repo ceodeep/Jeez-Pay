@@ -1,4 +1,4 @@
-﻿package com.jeezpay.app
+package com.jeezpay.app
 
 import android.content.Intent
 import android.os.Bundle
@@ -7,15 +7,23 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import com.jeezpay.app.base.BaseFintechActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
 import com.jeezpay.app.adapters.TransactionsAdapter
 import com.jeezpay.app.adapters.WalletPickerAdapter
 import com.jeezpay.app.adapters.WalletStripAdapter
+import com.jeezpay.app.base.BaseFintechActivity
+import com.jeezpay.app.network.ApiResult
+import com.jeezpay.app.network.AppError
+import com.jeezpay.app.network.dto.ProductCapabilitiesResponse
+import com.jeezpay.app.network.dto.ProductCapability
+import com.jeezpay.app.repository.ProductPolicyStore
+import com.jeezpay.app.repository.ProductRepository
 import com.jeezpay.app.repository.WalletRepository
 import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.Dispatchers
@@ -23,32 +31,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Locale
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import androidx.appcompat.app.AlertDialog
-import com.jeezpay.app.network.ApiResult
-import com.jeezpay.app.network.AppError
-import com.jeezpay.app.common.LoaderOverlayController
-import com.google.android.material.button.MaterialButton
-
-
-
-
 
 class MainActivity : BaseFintechActivity() {
+
     private lateinit var imgProfile: View
-
-
     private lateinit var swipeRefreshLayout: SwipeRefreshLayout
 
     private val walletRepo = WalletRepository()
+    private val productRepo = ProductRepository()
     private val billsServicesEnabled = false
 
     private val prefs by lazy { getSharedPreferences("jeezpay_prefs", MODE_PRIVATE) }
 
     private lateinit var screenFlipper: android.widget.ViewFlipper
-    private lateinit var loaderOverlay: LoaderOverlayController
     private var isPagingTransactions = false
     private var handledPendingMerchantPayment = false
+    private var productPolicyLoaded = false
+    private var productPolicyLoading = false
 
     // top/balance UI
     private lateinit var tvBalance: TextView
@@ -61,150 +60,6 @@ class MainActivity : BaseFintechActivity() {
 
     // action status
     private lateinit var actionText: TextView
-    private fun showStatus(msg: String) {
-        actionText.text = msg
-        actionText.visibility = android.view.View.VISIBLE
-    }
-
-    private fun hideStatus() {
-        actionText.text = ""
-        actionText.visibility = android.view.View.GONE
-    }
-
-    private fun showInfoState(message: String) {
-        actionText.text = message
-        actionText.visibility = View.VISIBLE
-        actionText.alpha = 1f
-    }
-
-    private fun showErrorState(message: String) {
-        actionText.text = message
-        actionText.visibility = View.VISIBLE
-        actionText.alpha = 1f
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun fadeBalanceText(newText: String) {
-        tvBalance.animate()
-            .alpha(0f)
-            .setDuration(120)
-            .withEndAction {
-                tvBalance.text = newText
-                tvBalance.animate()
-                    .alpha(1f)
-                    .setDuration(120)
-                    .start()
-            }
-            .start()
-    }
-
-    private fun setRefreshing(refreshing: Boolean) {
-        if (::swipeRefreshLayout.isInitialized) {
-            swipeRefreshLayout.isRefreshing = refreshing
-        }
-    }
-
-    private fun setBalanceLoading() {
-        if (isBalanceHidden) {
-            fadeBalanceText("â€¢â€¢â€¢â€¢â€¢â€¢")
-        } else {
-            fadeBalanceText("Loading...")
-        }
-    }
-
-    private fun formatAmount(amount: Double, code: String): String {
-        // You already have nf in your file, so use it
-        return "${nf.format(amount)} $code"
-    }
-    private fun normalizePhoneSudan(raw: String): String {
-        val p = raw.trim()
-        val digits = p.replace(Regex("\\D"), "")
-
-        return when {
-            digits.startsWith("0") && digits.length >= 10 -> "+249" + digits.substring(1)
-            digits.startsWith("249") -> "+249" + digits.substring(3)
-            p.startsWith("+") && digits.length >= 8 -> "+" + digits
-            digits.length == 9 -> "+249$digits"
-            else -> p
-        }
-    }
-
-
-    private fun getMyPhoneFromJwt(): String? {
-        val token = SessionManager(this).getToken() ?: return null
-
-        return try {
-            val parts = token.split(".")
-            if (parts.size < 2) return null
-
-            val payload = String(
-                android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE)
-            )
-
-            org.json.JSONObject(payload).optString("phone", null)
-
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-
-    private fun fetchBalance(currency: String) {
-        setBalanceLoading()
-
-        lifecycleScope.launch {
-            when (val result = withContext(Dispatchers.IO) {
-                walletRepo.fetchBalanceSafe(currency)
-            }) {
-                is ApiResult.Success -> {
-                    val res = result.data
-                    val bal = res.balances.firstOrNull { it.currency == currency }?.balance ?: 0.0
-
-                    val w = wallets.firstOrNull { it.code == currency }
-                    if (w != null) {
-                        w.amount = bal
-                    }
-                    applyBalanceVisibility()
-                }
-
-                is ApiResult.Error -> {
-                    handleMainError(result.error) {
-                        fetchBalance(currency)
-                    }
-                }
-            }
-        }
-    }
-
-
-
-    private fun fetchHistory(currency: String) {
-        showInfoState("Loading transactions...")
-
-        lifecycleScope.launch {
-            when (val result = withContext(Dispatchers.IO) {
-                walletRepo.fetchHistorySafe(currency)
-            }) {
-                is ApiResult.Success -> {
-                    val list = result.data.transactions ?: emptyList()
-
-                    txAdapter.submit(list)
-
-                    if (list.isEmpty()) {
-                        showInfoState("No transactions yet")
-                    } else {
-                        hideStatus()
-                    }
-                }
-
-                is ApiResult.Error -> {
-                    handleMainError(result.error) {
-                        fetchHistory(currency)
-                    }
-                }
-            }
-        }
-    }
 
     // custom bottom nav items
     private lateinit var navHome: LinearLayout
@@ -231,17 +86,12 @@ class MainActivity : BaseFintechActivity() {
     private lateinit var txAdapter: TransactionsAdapter
 
     private lateinit var wallets: MutableList<WalletBalance>
-    private var selectedCode: String = "USDT"
+    private var selectedCode: String = ""
     private var isBalanceHidden: Boolean = false
 
     private val nf = NumberFormat.getNumberInstance(Locale.US).apply {
         minimumFractionDigits = 2
         maximumFractionDigits = 2
-    }
-    private fun refreshSelectedCurrency() {
-        hideStatus()
-        fetchBalance(selectedCode)
-        fetchHistory(selectedCode)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -249,100 +99,20 @@ class MainActivity : BaseFintechActivity() {
         setContentView(R.layout.activity_main)
         initBlockingLoader()
 
-        val imgProfile = findViewById<View>(R.id.imgProfile)
-
-        imgProfile.setOnClickListener {
-            startActivity(Intent(this, ProfileActivity::class.java))
-        }
-
-
-
         bindViews()
-        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
-        swipeRefreshLayout.setColorSchemeResources(R.color.paypal_blue)
-        swipeRefreshLayout.setOnRefreshListener {
-            fetchBalanceAndHistory()
-        }
-        applyHeaderAvatar()
-        findViewById<TextView>(R.id.tvSeeAll).setOnClickListener {
-            startActivity(
-                Intent(this, TransactionsActivity::class.java).apply {
-                    putExtra("currency", selectedCode)
-                }
-            )
-        }
-
-        val profileCard = findViewById<View>(R.id.profileCard)
-        profileCard.setOnClickListener {
-            startActivity(Intent(this, ProfileActivity::class.java))
-        }
-        imgProfile.setOnClickListener {
-            startActivity(Intent(this, ProfileActivity::class.java))
-        }
-
-
-
-        // Transactions recycler
-        rvTransactions.layoutManager = LinearLayoutManager(this)
-        txAdapter = TransactionsAdapter(selectedCode) { tx ->
-            TransactionDetailsBottomSheet(
-                tx = tx,
-                displayCurrency = selectedCode
-            ).show(supportFragmentManager, "TransactionDetailsBottomSheet")
-        }
-        rvTransactions.adapter = txAdapter
-
-        rvTransactions.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                super.onScrolled(recyclerView, dx, dy)
-
-                if (dy <= 0) return
-                if (isPagingTransactions) return
-                if (!txAdapter.canLoadMore()) return
-
-                val layoutManager = recyclerView.layoutManager as? LinearLayoutManager ?: return
-                val lastVisible = layoutManager.findLastVisibleItemPosition()
-                val total = txAdapter.itemCount
-
-                if (lastVisible >= total - 3) {
-                    isPagingTransactions = true
-                    recyclerView.post {
-                        txAdapter.loadNextPage()
-                        isPagingTransactions = false
-                    }
-                }
-            }
-        })
-
-        // logout
-//        val tvLogout = findViewById<TextView>(R.id.tvLogout)
-//        tvLogout.setOnClickListener { doLogout() }
-
+        setupRefresh()
+        setupProfileNavigation()
+        setupTransactions()
         setupWallets()
         setupCurrencyPill()
         setupBalanceToggle()
         setupActionButtons()
         setupCustomBottomNav()
-        openPendingMerchantPaymentIfAny()
+        applyHeaderAvatar()
+
+        loadProductPolicyAndWallet()
     }
 
-    private fun openPendingMerchantPaymentIfAny() {
-        if (handledPendingMerchantPayment) return
-
-        val id = prefs.getString("pending_merchant_payment_id", null)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: return
-
-        handledPendingMerchantPayment = true
-        prefs.edit().remove("pending_merchant_payment_id").apply()
-
-        startActivity(
-            Intent(this, MerchantPaymentActivity::class.java).apply {
-                putExtra(MerchantPaymentActivity.EXTRA_PAYMENT_ID, id)
-            }
-        )
-    }
     private fun bindViews() {
         screenFlipper = findViewById(R.id.screenFlipper)
 
@@ -352,10 +122,7 @@ class MainActivity : BaseFintechActivity() {
         btnCurrency = findViewById(R.id.btnCurrency)
         imgCurrency = findViewById(R.id.imgCurrency)
         tvCurrency = findViewById(R.id.tvCurrency)
-
         actionText = findViewById(R.id.actionText)
-
-
 
         imgProfile = findViewById(R.id.imgProfile)
 
@@ -376,41 +143,88 @@ class MainActivity : BaseFintechActivity() {
 
         rvWalletStrip = findViewById(R.id.rvWalletStrip)
         rvTransactions = findViewById(R.id.rvTransactions)
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
+    }
+
+    private fun setupRefresh() {
+        swipeRefreshLayout.setColorSchemeResources(R.color.paypal_blue)
+        swipeRefreshLayout.setOnRefreshListener {
+            loadProductPolicyAndWallet(forcePolicyRefresh = true)
+        }
+    }
+
+    private fun setupProfileNavigation() {
+        imgProfile.setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
+
+        findViewById<View>(R.id.profileCard).setOnClickListener {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
+
+        findViewById<TextView>(R.id.tvSeeAll).setOnClickListener {
+            if (!requireEnabledCurrency()) return@setOnClickListener
+
+            startActivity(
+                Intent(this, TransactionsActivity::class.java).apply {
+                    putExtra("currency", selectedCode)
+                }
+            )
+        }
+    }
+
+    private fun setupTransactions() {
+        rvTransactions.layoutManager = LinearLayoutManager(this)
+        txAdapter = TransactionsAdapter(selectedCode) { tx ->
+            TransactionDetailsBottomSheet(
+                tx = tx,
+                displayCurrency = selectedCode
+            ).show(supportFragmentManager, "TransactionDetailsBottomSheet")
+        }
+        rvTransactions.adapter = txAdapter
+
+        rvTransactions.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+
+                if (dy <= 0 || isPagingTransactions || !txAdapter.canLoadMore()) return
+
+                val layoutManager = recyclerView.layoutManager as? LinearLayoutManager ?: return
+                val lastVisible = layoutManager.findLastVisibleItemPosition()
+                val total = txAdapter.itemCount
+
+                if (lastVisible >= total - 3) {
+                    isPagingTransactions = true
+                    recyclerView.post {
+                        txAdapter.loadNextPage()
+                        isPagingTransactions = false
+                    }
+                }
+            }
+        })
     }
 
     private fun setupWallets() {
-        selectedCode = prefs.getString("selected_wallet", "USDT") ?: "USDT"
         isBalanceHidden = prefs.getBoolean("hide_balance", false)
+        wallets = mutableListOf()
 
-        // Local UI list (will be updated by fetchBalanceAndHistory())
-        wallets = mutableListOf(
-            WalletBalance("USDT", "Tether", R.drawable.logo_usdt, 0.0),
-            WalletBalance("SSP", "South Sudan Pound", R.drawable.flag_ssp, 0.0),
-            WalletBalance("SDG", "Sudanese Pound", R.drawable.flag_sdg, 0.0),
-            WalletBalance("EGP", "Egyptian Pound", R.drawable.flag_egp, 0.0),
-            WalletBalance("UGX", "Ugandan Shilling", R.drawable.flag_ugx, 0.0)
-        )
-        txAdapter.setCurrency(selectedCode)
+        tvCurrency.text = "--"
+        tvBalance.text = if (isBalanceHidden) "••••••" else "Loading..."
 
-
-        applySelectedWallet(selectedCode)
-        applyBalanceVisibility()
-        setupWalletStrip()
-        walletStripAdapter?.setHideBalances(isBalanceHidden)
-        setMainBlockingLoading(true)
-    }
-
-    private fun setupWalletStrip() {
         rvWalletStrip.layoutManager =
             LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
 
-        walletStripAdapter = WalletStripAdapter(wallets, selectedCode, isBalanceHidden) { picked ->
-            selectedCode = picked.code
-            prefs.edit().putString("selected_wallet", selectedCode).apply()
-            applySelectedWallet(selectedCode)
-            walletStripAdapter?.setSelected(selectedCode)
+        walletStripAdapter = WalletStripAdapter(
+            wallets,
+            selectedCode,
+            isBalanceHidden
+        ) { picked ->
+            if (!ProductPolicyStore.isCurrencyEnabled(picked.code)) {
+                showErrorState("This wallet is not available right now")
+                return@WalletStripAdapter
+            }
 
-            // âœ… Important: reload balance + transactions for the newly selected currency
+            selectWallet(picked.code)
             setMainBlockingLoading(true)
             fetchBalanceAndHistory()
         }
@@ -420,13 +234,15 @@ class MainActivity : BaseFintechActivity() {
 
     private fun setupCurrencyPill() {
         btnCurrency.setOnClickListener {
-            showWalletPicker { picked ->
-                selectedCode = picked.code
-                prefs.edit().putString("selected_wallet", selectedCode).apply()
-                applySelectedWallet(selectedCode)
-                walletStripAdapter?.setSelected(selectedCode)
+            if (!productPolicyLoaded) {
+                showErrorState("Wallet products are still loading")
+                return@setOnClickListener
+            }
 
-                // âœ… reload for chosen currency
+            if (wallets.size <= 1) return@setOnClickListener
+
+            showWalletPicker { picked ->
+                selectWallet(picked.code)
                 setMainBlockingLoading(true)
                 fetchBalanceAndHistory()
             }
@@ -458,29 +274,48 @@ class MainActivity : BaseFintechActivity() {
         val btnWithdraw = findViewById<View>(R.id.btnWithdraw)
 
         btnDeposit.setOnClickListener {
-            startActivity(Intent(this, DepositActivity::class.java))
+            runCapabilityAction(ProductCapability.CASH_IN) {
+                startActivity(
+                    Intent(this, DepositActivity::class.java)
+                        .putExtra("currency", selectedCode)
+                )
+            }
         }
 
         btnSend.setOnClickListener {
-            startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))
+            runCapabilityAction(ProductCapability.P2P_TRANSFER) {
+                startActivity(
+                    Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java)
+                        .putExtra("currency", selectedCode)
+                )
+            }
         }
-
 
         btnReferral.setOnClickListener {
             startActivity(Intent(this, ReferralActivity::class.java))
         }
+
         btnSwap.setOnClickListener {
-            startActivity(Intent(this, SwapActivity::class.java))
+            runCapabilityAction(ProductCapability.FX_CONVERT) {
+                startActivity(Intent(this, SwapActivity::class.java))
+            }
         }
+
         btnReceive.setOnClickListener {
-            startActivity(Intent(this, ReceiveQrActivity::class.java))
+            runCapabilityAction(ProductCapability.P2P_TRANSFER) {
+                startActivity(
+                    Intent(this, ReceiveQrActivity::class.java)
+                        .putExtra("currency", selectedCode)
+                )
+            }
         }
+
         btnBill.setOnClickListener {
             if (!billsServicesEnabled) {
                 showComingSoon(
                     title = "Bills & Services",
-                    message = "Bill payments and service requests are currently in development. Soon youâ€™ll be able to pay bills, request services, and manage payments directly from JeezPay.",
-                    icon = "ðŸ§¾"
+                    message = "Bill payments and service requests are currently in development. Soon you’ll be able to pay bills, request services, and manage payments directly from JeezPay.",
+                    icon = "🧾"
                 )
                 return@setOnClickListener
             }
@@ -489,21 +324,32 @@ class MainActivity : BaseFintechActivity() {
         }
 
         btnWithdraw.setOnClickListener {
+            runCapabilityAction(ProductCapability.CASH_OUT) {
+                if (selectedCode == "USDT") {
+                    // Crypto withdrawal is a separate product and is not part of
+                    // the SSP launch. This branch remains for future enablement.
+                    if (!ProductPolicyStore.isCapabilityEnabled(
+                            "USDT",
+                            ProductCapability.USDT_SEND
+                        )
+                    ) {
+                        showErrorState("USDT withdrawals are not available right now")
+                        return@runCapabilityAction
+                    }
 
-            if (selectedCode == "USDT") {
-                startActivity(
-                    Intent(this, WithdrawActivity::class.java)
-                        .putExtra("currency", "USDT")
-                )
-            } else {
-                showComingSoon(
-                    title = "Withdrawals Coming Soon",
-                    message = "Withdrawals for $selectedCode will be available in a future JeezPay update."
-                )
+                    startActivity(
+                        Intent(this, WithdrawActivity::class.java)
+                            .putExtra("currency", "USDT")
+                    )
+                } else {
+                    showComingSoon(
+                        title = "Cash Out",
+                        message = "Cash-out for $selectedCode is enabled for the launch product, but the mobile cash-out flow is not available in this build yet."
+                    )
+                }
             }
         }
     }
-
 
     private fun setupCustomBottomNav() {
         selectTab(0)
@@ -515,13 +361,18 @@ class MainActivity : BaseFintechActivity() {
         navCard.setOnClickListener {
             showComingSoon(
                 title = "JeezPay Cards",
-                message = "Virtual and physical cards are currently in development. Soon youâ€™ll be able to pay online, withdraw from ATMs, and manage your cards directly from JeezPay.",
-                icon = "ðŸ’³"
+                message = "Virtual and physical cards are currently in development. Soon you’ll be able to pay online, withdraw from ATMs, and manage your cards directly from JeezPay.",
+                icon = "💳"
             )
         }
 
         navSend.setOnClickListener {
-            startActivity(Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java))
+            runCapabilityAction(ProductCapability.P2P_TRANSFER) {
+                startActivity(
+                    Intent(this, com.jeezpay.app.send.SendMoneyActivity::class.java)
+                        .putExtra("currency", selectedCode)
+                )
+            }
         }
 
         navHub.setOnClickListener {
@@ -530,6 +381,303 @@ class MainActivity : BaseFintechActivity() {
                 message = "The Hub will bring shortcuts, rewards, offers, and account tools into one place."
             )
         }
+    }
+
+    private fun loadProductPolicyAndWallet(forcePolicyRefresh: Boolean = false) {
+        if (productPolicyLoading) return
+
+        val cached = ProductPolicyStore.current()
+        if (!forcePolicyRefresh && cached != null) {
+            applyProductConfiguration(cached)
+            fetchBalanceAndHistory()
+            return
+        }
+
+        productPolicyLoading = true
+        productPolicyLoaded = false
+        setMainBlockingLoading(true)
+        setRefreshing(true)
+        showInfoState("Loading available wallet products...")
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                productRepo.fetchCapabilitiesSafe(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
+            }) {
+                is ApiResult.Success -> {
+                    val config = result.data
+                    val defaultCurrency = config.defaultCurrency
+                        ?.trim()
+                        ?.uppercase()
+                        ?.takeIf { it.isNotBlank() }
+
+                    if (defaultCurrency == null || config.products.isEmpty()) {
+                        failProductPolicy("No wallet product is currently available")
+                        return@launch
+                    }
+
+                    ProductPolicyStore.replace(config)
+                    applyProductConfiguration(config)
+                    productPolicyLoading = false
+                    fetchBalanceAndHistory()
+                    openPendingMerchantPaymentIfAny()
+                }
+
+                is ApiResult.Error -> {
+                    ProductPolicyStore.clear()
+                    failProductPolicy("Couldn’t load available wallet products")
+                    handleMainError(result.error) {
+                        loadProductPolicyAndWallet(forcePolicyRefresh = true)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun applyProductConfiguration(config: ProductCapabilitiesResponse) {
+        val previousAmounts = wallets.associate { it.code to it.amount }
+
+        val enabledWallets = config.products.mapNotNull { product ->
+            val code = product.currency.trim().uppercase()
+            if (code.isBlank()) return@mapNotNull null
+
+            WalletBalance(
+                code = code,
+                name = product.displayName.ifBlank { code },
+                iconRes = walletIconFor(code),
+                amount = previousAmounts[code] ?: 0.0
+            )
+        }
+
+        if (enabledWallets.isEmpty()) {
+            failProductPolicy("No wallet product is currently available")
+            return
+        }
+
+        wallets.clear()
+        wallets.addAll(enabledWallets)
+
+        val savedSelection = prefs.getString("selected_wallet", null)
+            ?.trim()
+            ?.uppercase()
+
+        val defaultCurrency = config.defaultCurrency
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { ProductPolicyStore.isCurrencyEnabled(it) }
+            ?: enabledWallets.first().code
+
+        selectedCode = savedSelection
+            ?.takeIf { ProductPolicyStore.isCurrencyEnabled(it) }
+            ?: defaultCurrency
+
+        prefs.edit().putString("selected_wallet", selectedCode).apply()
+
+        productPolicyLoaded = true
+        txAdapter.setCurrency(selectedCode)
+        walletStripAdapter?.setSelected(selectedCode)
+        walletStripAdapter?.notifyDataSetChanged()
+        walletStripAdapter?.setHideBalances(isBalanceHidden)
+
+        applySelectedWallet(selectedCode)
+        applyActionVisibility(config)
+    }
+
+    private fun applyActionVisibility(config: ProductCapabilitiesResponse) {
+        val hasFx = config.products.any {
+            it.isCapabilityEnabled(ProductCapability.FX_CONVERT)
+        }
+
+        // FX is fully hidden when the server says it is unavailable. Other
+        // launch actions stay visible and are capability-checked on tap.
+        findViewById<View>(R.id.btnSwap).visibility = if (hasFx) View.VISIBLE else View.GONE
+    }
+
+    private fun walletIconFor(currency: String): Int {
+        return when (currency) {
+            "USDT" -> R.drawable.logo_usdt
+            "SSP" -> R.drawable.flag_ssp
+            "SDG" -> R.drawable.flag_sdg
+            "EGP" -> R.drawable.flag_egp
+            "UGX" -> R.drawable.flag_ugx
+            else -> android.R.drawable.ic_menu_info_details
+        }
+    }
+
+    private fun selectWallet(code: String) {
+        val normalized = code.trim().uppercase()
+        if (!ProductPolicyStore.isCurrencyEnabled(normalized)) return
+
+        selectedCode = normalized
+        prefs.edit().putString("selected_wallet", selectedCode).apply()
+        txAdapter.setCurrency(selectedCode)
+        walletStripAdapter?.setSelected(selectedCode)
+        applySelectedWallet(selectedCode)
+    }
+
+    private fun fetchBalanceAndHistory() {
+        if (!productPolicyLoaded || !requireEnabledCurrency(showMessage = false)) {
+            setRefreshing(false)
+            setMainBlockingLoading(false)
+            return
+        }
+
+        txAdapter.setCurrency(selectedCode)
+        isPagingTransactions = false
+        setRefreshing(true)
+        showInfoState("Refreshing wallet...")
+        txAdapter.showSkeleton()
+
+        lifecycleScope.launch {
+            try {
+                when (val balancesResult = withContext(Dispatchers.IO) {
+                    walletRepo.fetchBalancesSafe()
+                }) {
+                    is ApiResult.Success -> {
+                        val balancesByCurrency = balancesResult.data.balances.associate {
+                            it.currency.trim().uppercase() to it.balance
+                        }
+
+                        for (wallet in wallets) {
+                            wallet.amount = balancesByCurrency[wallet.code] ?: 0.0
+                        }
+                    }
+
+                    is ApiResult.Error -> {
+                        handleMainError(balancesResult.error) {
+                            fetchBalanceAndHistory()
+                        }
+                        return@launch
+                    }
+                }
+
+                when (val histResult = withContext(Dispatchers.IO) {
+                    walletRepo.fetchHistorySafe(selectedCode)
+                }) {
+                    is ApiResult.Success -> {
+                        applySelectedWallet(selectedCode)
+                        walletStripAdapter?.notifyDataSetChanged()
+
+                        val list = histResult.data.transactions ?: emptyList()
+                        txAdapter.submit(list)
+                        isPagingTransactions = false
+
+                        if (list.isEmpty()) {
+                            showInfoState("No transactions yet")
+                        } else {
+                            hideStatus()
+                        }
+                    }
+
+                    is ApiResult.Error -> {
+                        handleMainError(histResult.error) {
+                            fetchBalanceAndHistory()
+                        }
+                    }
+                }
+            } finally {
+                setRefreshing(false)
+                setMainBlockingLoading(false)
+            }
+        }
+    }
+
+    private fun runCapabilityAction(capability: String, action: () -> Unit) {
+        if (!requireEnabledCurrency()) return
+
+        if (!ProductPolicyStore.isCapabilityEnabled(selectedCode, capability)) {
+            showErrorState("This action is not available for $selectedCode right now")
+            return
+        }
+
+        action()
+    }
+
+    private fun requireEnabledCurrency(showMessage: Boolean = true): Boolean {
+        val enabled = productPolicyLoaded &&
+            selectedCode.isNotBlank() &&
+            ProductPolicyStore.isCurrencyEnabled(selectedCode)
+
+        if (!enabled && showMessage) {
+            showErrorState("Wallet products are unavailable. Pull down to retry.")
+        }
+
+        return enabled
+    }
+
+    private fun failProductPolicy(message: String) {
+        productPolicyLoading = false
+        productPolicyLoaded = false
+        ProductPolicyStore.clear()
+
+        wallets.clear()
+        walletStripAdapter?.notifyDataSetChanged()
+        selectedCode = ""
+        tvCurrency.text = "--"
+        tvBalance.text = "Unavailable"
+        txAdapter.submit(emptyList())
+
+        setRefreshing(false)
+        setMainBlockingLoading(false)
+        showInfoState(message)
+    }
+
+    private fun applySelectedWallet(code: String) {
+        val wallet = wallets.firstOrNull { it.code == code } ?: return
+        imgCurrency.setImageResource(wallet.iconRes)
+        tvCurrency.text = wallet.code
+        applyBalanceVisibility()
+    }
+
+    private fun applyBalanceVisibility() {
+        val wallet = wallets.firstOrNull { it.code == selectedCode }
+
+        if (wallet == null) {
+            tvBalance.text = if (isBalanceHidden) "••••••" else "Unavailable"
+            return
+        }
+
+        if (isBalanceHidden) {
+            fadeBalanceText("••••••")
+            btnToggleBalance.setImageResource(R.drawable.ic_eye_off)
+        } else {
+            fadeBalanceText("${nf.format(wallet.amount)} ${wallet.code}")
+            btnToggleBalance.setImageResource(R.drawable.ic_eye)
+        }
+    }
+
+    private fun showWalletPicker(onPicked: (WalletBalance) -> Unit) {
+        if (wallets.isEmpty()) return
+
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.bottom_sheet_wallets, null)
+
+        val rv = view.findViewById<RecyclerView>(R.id.rvWallets)
+        rv.layoutManager = LinearLayoutManager(this)
+        rv.adapter = WalletPickerAdapter(wallets) { picked ->
+            dialog.dismiss()
+            onPicked(picked)
+        }
+
+        dialog.setContentView(view)
+        dialog.show()
+    }
+
+    private fun openPendingMerchantPaymentIfAny() {
+        if (handledPendingMerchantPayment || !productPolicyLoaded) return
+
+        val id = prefs.getString("pending_merchant_payment_id", null)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+
+        handledPendingMerchantPayment = true
+        prefs.edit().remove("pending_merchant_payment_id").apply()
+
+        startActivity(
+            Intent(this, MerchantPaymentActivity::class.java).apply {
+                putExtra(MerchantPaymentActivity.EXTRA_PAYMENT_ID, id)
+            }
+        )
     }
 
     private fun selectTab(index: Int) {
@@ -558,41 +706,70 @@ class MainActivity : BaseFintechActivity() {
         }
     }
 
-    private fun applySelectedWallet(code: String) {
-        val w = wallets.firstOrNull { it.code == code } ?: wallets.first()
-        imgCurrency.setImageResource(w.iconRes)
-        tvCurrency.text = w.code
-        applyBalanceVisibility()
-    }
-
-    private fun applyBalanceVisibility() {
-        val w = wallets.firstOrNull { it.code == selectedCode } ?: wallets.first()
-
-        if (isBalanceHidden) {
-            fadeBalanceText("â€¢â€¢â€¢â€¢â€¢â€¢")
-            btnToggleBalance.setImageResource(R.drawable.ic_eye_off)
-        } else {
-            fadeBalanceText("${nf.format(w.amount)} ${w.code}")
-            btnToggleBalance.setImageResource(R.drawable.ic_eye)
+    private fun setRefreshing(refreshing: Boolean) {
+        if (::swipeRefreshLayout.isInitialized) {
+            swipeRefreshLayout.isRefreshing = refreshing
         }
     }
 
-    private fun showWalletPicker(onPicked: (WalletBalance) -> Unit) {
-        val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.bottom_sheet_wallets, null)
+    private fun setMainBlockingLoading(loading: Boolean) {
+        if (loading) showBlockingLoader() else hideBlockingLoader()
 
-        val rv = view.findViewById<RecyclerView>(R.id.rvWallets)
-        rv.layoutManager = LinearLayoutManager(this)
-        rv.adapter = WalletPickerAdapter(wallets) { picked ->
-            dialog.dismiss()
-            onPicked(picked)
-        }
+        navHome.isEnabled = !loading
+        navCard.isEnabled = !loading
+        navSend.isEnabled = !loading && productPolicyLoaded
+        navHub.isEnabled = !loading
 
-        dialog.setContentView(view as android.view.View)
-        dialog.show()
+        btnCurrency.isEnabled = !loading && productPolicyLoaded && wallets.size > 1
+        btnToggleBalance.isEnabled = !loading && productPolicyLoaded
+    }
+
+    private fun fadeBalanceText(newText: String) {
+        tvBalance.animate()
+            .alpha(0f)
+            .setDuration(120)
+            .withEndAction {
+                tvBalance.text = newText
+                tvBalance.animate()
+                    .alpha(1f)
+                    .setDuration(120)
+                    .start()
+            }
+            .start()
+    }
+
+    private fun hideStatus() {
+        actionText.text = ""
+        actionText.visibility = View.GONE
+    }
+
+    private fun showInfoState(message: String) {
+        actionText.text = message
+        actionText.visibility = View.VISIBLE
+        actionText.alpha = 1f
+    }
+
+    private fun showErrorState(message: String) {
+        actionText.text = message
+        actionText.visibility = View.VISIBLE
+        actionText.alpha = 1f
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun handleMainError(
+        error: AppError,
+        retryAction: () -> Unit = {}
+    ) {
+        handleCommonError(
+            error = error,
+            retryAction = retryAction,
+            onValidation = { showErrorState(it) },
+            onUnauthorized = { doLogout() }
+        )
     }
 
     private fun doLogout() {
+        ProductPolicyStore.clear()
         SessionManager(this).clearAll()
         prefs.edit().clear().commit()
 
@@ -606,136 +783,12 @@ class MainActivity : BaseFintechActivity() {
 
     override fun onResume() {
         super.onResume()
-        applyHeaderAvatar() // âœ… refresh avatar
-        fetchBalanceAndHistory()
-    }
+        applyHeaderAvatar()
 
-
-
-    private fun fetchBalanceAndHistory() {
-        txAdapter.setCurrency(selectedCode)
-        isPagingTransactions = false
-        setRefreshing(true)
-        showInfoState("Refreshing wallet...")
-        txAdapter.showSkeleton()
-
-        lifecycleScope.launch {
-            try {
-                val balancesMap = mutableMapOf<String, Double>()
-
-                for (w in wallets) {
-                    when (val result = withContext(Dispatchers.IO) {
-                        walletRepo.fetchBalanceSafe(w.code)
-                    }) {
-                        is ApiResult.Success -> {
-                            balancesMap[w.code] =
-                                result.data.balances.firstOrNull { it.currency == w.code }?.balance ?: 0.0
-                        }
-
-                        is ApiResult.Error -> {
-                            setRefreshing(false)
-                            handleMainError(result.error) {
-                                fetchBalanceAndHistory()
-                            }
-                            return@launch
-                        }
-                    }
-                }
-
-                for (i in wallets.indices) {
-                    val code = wallets[i].code
-                    balancesMap[code]?.let { wallets[i].amount = it }
-                }
-
-                when (val histResult = withContext(Dispatchers.IO) {
-                    walletRepo.fetchHistorySafe(selectedCode)
-                }) {
-                    is ApiResult.Success -> {
-                        applySelectedWallet(selectedCode)
-                        walletStripAdapter?.notifyDataSetChanged()
-
-                        val list = histResult.data.transactions ?: emptyList()
-
-                        txAdapter.submit(list)
-                        isPagingTransactions = false
-
-
-
-                        if (list.isEmpty()) {
-                            showInfoState("No transactions yet")
-                        } else {
-                            hideStatus()
-                        }
-                    }
-
-                    is ApiResult.Error -> {
-                        handleMainError(histResult.error) {
-                            fetchBalanceAndHistory()
-                        }
-                    }
-                }
-            } finally {
-                setRefreshing(false)
-                setMainBlockingLoading(false)
-            }
+        if (productPolicyLoaded && !productPolicyLoading) {
+            fetchBalanceAndHistory()
+            openPendingMerchantPaymentIfAny()
         }
-    }
-
-
-
-
-
-
-    private fun handleMainError(
-        error: AppError,
-        retryAction: () -> Unit = {}
-    ) {
-        handleCommonError(
-            error = error,
-            retryAction = retryAction,
-            onValidation = { showErrorState(it) },
-            onUnauthorized = {
-                doLogout()
-            }
-        )
-    }
-
-    private fun showKycRequiredDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("KYC Required")
-            .setMessage("You must complete KYC to unlock transfers & higher limits.")
-            .setPositiveButton("Start KYC") { _, _ ->
-                startActivity(Intent(this, KycActivity::class.java))
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun showKycPendingDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("KYC Pending")
-            .setMessage("Your KYC is under review. Transfers are disabled until approval.")
-            .setPositiveButton("View KYC") { _, _ ->
-                startActivity(Intent(this, KycActivity::class.java))
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-
-
-    private fun setMainBlockingLoading(loading: Boolean) {
-
-        if (loading) showBlockingLoader()
-        else hideBlockingLoader()
-
-        navHome.isEnabled = !loading
-        navCard.isEnabled = !loading
-        navSend.isEnabled = !loading
-        navHub.isEnabled = !loading
-
-        btnCurrency.isEnabled = !loading
-        btnToggleBalance.isEnabled = !loading
     }
 
     private val avatarOptions = listOf(
@@ -758,15 +811,14 @@ class MainActivity : BaseFintechActivity() {
 
     private fun applyHeaderAvatar() {
         val key = getSelectedAvatarKey()
-        val resId = getAvatarResIdFromKey(key)
-
         val imageView = findViewById<ImageView>(R.id.imgProfile)
-        imageView.setImageResource(resId)
+        imageView.setImageResource(getAvatarResIdFromKey(key))
     }
+
     private fun showComingSoon(
         title: String,
         message: String,
-        icon: String = "âœ¨"
+        icon: String = "✨"
     ) {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.bottom_sheet_coming_soon, null)
@@ -783,6 +835,3 @@ class MainActivity : BaseFintechActivity() {
         dialog.show()
     }
 }
-
-
-
