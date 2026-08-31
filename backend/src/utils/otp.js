@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { jwtSecret } = require("../config/env");
+const { otpHashSecret } = require("../config/env");
 
 const OTP_HASH_PATTERN = /^[a-f0-9]{64}$/i;
 
@@ -13,7 +13,7 @@ function hashOTP({ email, purpose, code }) {
   const normalizedCode = String(code || "").trim();
 
   return crypto
-    .createHmac("sha256", jwtSecret)
+    .createHmac("sha256", otpHashSecret)
     .update(`${normalizedEmail}:${normalizedPurpose}:${normalizedCode}`)
     .digest("hex");
 }
