@@ -1,76 +1,70 @@
 const express = require("express");
-const router = express.Router();
-router.get("/ping", (req, res) => {
-  res.status(200).json({ ok: true, service: "kyc", ts: new Date().toISOString() });
-});
 
+const router = express.Router();
 
 const supabase = require("../config/supabase");
 const supabaseAdmin = require("../config/supabaseAdmin");
 const authMiddleware = require("../middlewares/auth.middleware");
 
-// ---- helper: check admin ----
-async function isAdmin(userId) {
-  const { data, error } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error || !data) return false;
-  return data.role === "admin";
-}
-
-
-// Keep bucket private in Supabase dashboard
 const KYC_BUCKET = "kyc-documents";
+const ALLOWED_CONTENT_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "application/pdf",
+]);
 
-// small helpers
-function safeType(t) {
-  const x = String(t || "").toLowerCase();
-  if (x !== "id" && x !== "selfie") return null;
-  return x;
+function normalizeFileType(value) {
+  const fileType = String(value || "").trim().toLowerCase();
+  return fileType === "id" || fileType === "selfie" ? fileType : null;
 }
 
-function safeContentType(ct) {
-  const x = String(ct || "").toLowerCase();
-  const allowed = ["image/jpeg", "image/jpg", "image/png", "application/pdf"];
-  return allowed.includes(x) ? x : null;
+function normalizeContentType(value) {
+  const contentType = String(value || "").trim().toLowerCase();
+  return ALLOWED_CONTENT_TYPES.has(contentType) ? contentType : null;
 }
 
-function extFromContentType(ct) {
-  if (ct === "image/png") return "png";
-  if (ct === "application/pdf") return "pdf";
+function extensionForContentType(contentType) {
+  if (contentType === "image/png") return "png";
+  if (contentType === "application/pdf") return "pdf";
   return "jpg";
 }
 
-/**
- * POST /kyc/upload-url
- * body: { fileType: "id"|"selfie", contentType: "image/jpeg"|"image/png"|"application/pdf" }
- * returns: { path, signedUrl }
- */
+router.get("/ping", (req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "kyc",
+    ts: new Date().toISOString(),
+  });
+});
+
+// Keep the kyc-documents bucket private in Supabase.
+// The client receives a short-lived signed upload URL and the database stores
+// only the private object path.
 router.post("/upload-url", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-
-    const fileType = safeType(req.body.fileType);
-    const contentType = safeContentType(req.body.contentType);
+    const fileType = normalizeFileType(req.body.fileType);
+    const contentType = normalizeContentType(req.body.contentType);
 
     if (!fileType || !contentType) {
-      return res.status(400).json({ message: "Invalid fileType or contentType" });
+      return res.status(400).json({
+        message: "Invalid fileType or contentType",
+      });
     }
 
-    const ext = extFromContentType(contentType);
-    const path = `${userId}/${fileType}_${Date.now()}.${ext}`;
+    const extension = extensionForContentType(contentType);
+    const path = `${userId}/${fileType}_${Date.now()}.${extension}`;
 
-    // signed upload url (valid for 2 minutes)
     const { data, error } = await supabaseAdmin.storage
       .from(KYC_BUCKET)
       .createSignedUploadUrl(path);
 
     if (error || !data?.signedUrl) {
       console.error("createSignedUploadUrl error:", error);
-      return res.status(500).json({ message: "Failed to create upload URL" });
+      return res.status(500).json({
+        message: "Failed to create upload URL",
+      });
     }
 
     return res.json({
@@ -83,25 +77,21 @@ router.post("/upload-url", authMiddleware, async (req, res) => {
   }
 });
 
-/**
- * POST /kyc/submit
- * body: { fullName, dob, address, idPath, selfiePath }
- */
 router.post("/submit", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
-
     const fullName = String(req.body.fullName || "").trim();
-    const dob = String(req.body.dob || "").trim(); // "YYYY-MM-DD"
+    const dob = String(req.body.dob || "").trim();
     const address = String(req.body.address || "").trim();
     const idPath = String(req.body.idPath || "").trim();
     const selfiePath = String(req.body.selfiePath || "").trim();
 
     if (!fullName || !dob || !address || !idPath || !selfiePath) {
-      return res.status(400).json({ message: "fullName, dob, address, idPath, selfiePath required" });
+      return res.status(400).json({
+        message: "fullName, dob, address, idPath, selfiePath required",
+      });
     }
 
-    // Save only paths, not public URLs
     const payload = {
       user_id: userId,
       fullName,
@@ -124,24 +114,25 @@ router.post("/submit", authMiddleware, async (req, res) => {
       return res.status(500).json({ message: "Failed to save KYC" });
     }
 
-    return res.json({ message: "KYC submitted", kyc: data });
+    return res.json({
+      message: "KYC submitted",
+      kyc: data,
+    });
   } catch (err) {
     console.error("kyc submit crash:", err);
     return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-/**
- * GET /kyc/me
- * returns user kyc status + fields
- */
 router.get("/me", authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
 
     const { data, error } = await supabase
       .from("kyc_profiles")
-      .select("fullName, dob, address, id_path, selfie_path, status, created_at, updated_at")
+      .select(
+        "fullName, dob, address, id_path, selfie_path, status, created_at, updated_at"
+      )
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -156,67 +147,5 @@ router.get("/me", authMiddleware, async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
-
-/**
- * POST /kyc/approve  (ADMIN ONLY)
- * Body: { userId }
- * Sets kyc_profiles.status = 'approved'
- */
-router.post("/approve", authMiddleware, async (req, res) => {
-  try {
-    const adminId = req.user.userId;
-    const ok = await isAdmin(adminId);
-
-    if (!ok) {
-      return res.status(403).json({ message: "Only admin can approve KYC" });
-    }
-
-    const targetUserId = String(req.body.userId || "").trim();
-    if (!targetUserId) {
-      return res.status(400).json({ message: "userId is required" });
-    }
-
-    // Make sure the user has a KYC row
-    const { data: existing, error: findErr } = await supabase
-      .from("kyc_profiles")
-      .select("id, status")
-      .eq("user_id", targetUserId)
-      .maybeSingle();
-
-    if (findErr) {
-      console.error("KYC find error:", findErr);
-      return res.status(500).json({ message: "Failed to find KYC profile" });
-    }
-
-    if (!existing) {
-      return res.status(404).json({ message: "KYC profile not found for this user" });
-    }
-
-    const { data: updated, error: upErr } = await supabase
-      .from("kyc_profiles")
-      .update({
-        status: "approved",
-        reviewed_at: new Date().toISOString(),
-        reviewed_by: adminId,
-      })
-      .eq("user_id", targetUserId)
-      .select("user_id, status, reviewed_at, reviewed_by")
-      .single();
-
-    if (upErr) {
-      console.error("KYC approve error:", upErr);
-      return res.status(500).json({ message: "Failed to approve KYC" });
-    }
-
-    return res.json({
-      message: "KYC approved",
-      kyc: updated,
-    });
-  } catch (err) {
-    console.error("KYC approve crash:", err);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-});
-
 
 module.exports = router;
