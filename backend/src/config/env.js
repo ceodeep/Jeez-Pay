@@ -1,6 +1,7 @@
 const path = require("path");
 require("dotenv").config({
   path: path.resolve(__dirname, "../../.env"),
+  quiet: true,
 });
 
 function requireEnv(name) {
@@ -22,4 +23,5 @@ if (!Number.isInteger(port) || port <= 0 || port > 65535) {
 module.exports = {
   port,
   jwtSecret: requireEnv("JWT_SECRET"),
+  otpHashSecret: requireEnv("OTP_HASH_SECRET"),
 };
