@@ -2,7 +2,6 @@ package com.jeezpay.app.storage
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.SecureRandom
@@ -12,32 +11,26 @@ import javax.crypto.spec.PBEKeySpec
 @Suppress("DEPRECATION")
 class SessionManager(context: Context) {
 
-    private val appContext = context.applicationContext
+    private val prefs: SharedPreferences = createEncryptedPrefs(context.applicationContext)
 
-    private val prefs: SharedPreferences = createSafePrefs(appContext)
-
-    private fun createSafePrefs(context: Context): SharedPreferences {
-        return try {
+    private fun createEncryptedPrefs(context: Context): SharedPreferences {
+        try {
             val masterKey = MasterKey.Builder(context)
                 .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                 .build()
 
-            EncryptedSharedPreferences.create(
+            return EncryptedSharedPreferences.create(
                 context,
                 PREF_NAME,
                 masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
-        } catch (e: Exception) {
-            Log.e("SessionManager", "Encrypted prefs failed. Using fallback prefs.", e)
-
-            try {
-                context.getSharedPreferences(FALLBACK_PREF_NAME, Context.MODE_PRIVATE)
-            } catch (fallbackError: Exception) {
-                Log.e("SessionManager", "Fallback prefs failed. Using default prefs.", fallbackError)
-                context.getSharedPreferences("jeezpay_default_session", Context.MODE_PRIVATE)
-            }
+        } catch (error: Exception) {
+            throw IllegalStateException(
+                "Secure session storage is unavailable. Refusing to use unencrypted storage.",
+                error
+            )
         }
     }
 
@@ -169,7 +162,6 @@ class SessionManager(context: Context) {
 
     companion object {
         private const val PREF_NAME = "jeezpay_secure_session"
-        private const val FALLBACK_PREF_NAME = "jeezpay_session_fallback"
 
         private const val KEY_TOKEN = "token"
         private const val KEY_PHONE = "phone"
