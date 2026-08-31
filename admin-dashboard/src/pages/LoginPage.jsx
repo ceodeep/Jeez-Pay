@@ -2,7 +2,7 @@ import { useState } from "react";
 import api from "../lib/api";
 
 export default function LoginPage({ onLogin }) {
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -13,16 +13,18 @@ export default function LoginPage({ onLogin }) {
     setError("");
 
     try {
-      const res = await api.post("/auth/login", { phone, password });
+      const res = await api.post("/auth/login", {
+        identifier: identifier.trim(),
+        password,
+      });
+
       localStorage.setItem("admin_token", res.data.token);
       onLogin(res.data.token);
-        } catch (err) {
-      console.log("LOGIN ERROR:", err);
-      console.log("LOGIN ERROR RESPONSE:", err?.response?.data);
+    } catch (err) {
       setError(
         err?.response?.data?.message ||
-        err?.message ||
-        "Login failed"
+          err?.message ||
+          "Login failed"
       );
     } finally {
       setLoading(false);
@@ -103,12 +105,13 @@ export default function LoginPage({ onLogin }) {
                 color: "#334155",
               }}
             >
-              Phone number
+              Email or phone
             </label>
             <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+249xxxxxxxxx"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="admin@example.com or +249xxxxxxxxx"
+              autoComplete="username"
               style={{
                 width: "100%",
                 height: 48,
@@ -140,6 +143,7 @@ export default function LoginPage({ onLogin }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
+              autoComplete="current-password"
               style={{
                 width: "100%",
                 height: 48,
