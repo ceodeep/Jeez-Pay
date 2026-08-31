@@ -28,6 +28,21 @@ object ProductPolicyStore {
     fun defaultCurrency(): String? =
         snapshot?.defaultCurrency?.trim()?.uppercase()?.takeIf { it.isNotBlank() }
 
+    fun enabledCurrencies(): List<String> =
+        snapshot?.products
+            ?.map { it.currency.trim().uppercase() }
+            ?.filter { it.isNotBlank() }
+            ?.distinct()
+            ?: emptyList()
+
+    fun currenciesWithCapability(capability: String): List<String> =
+        snapshot?.products
+            ?.filter { it.isCapabilityEnabled(capability) }
+            ?.map { it.currency.trim().uppercase() }
+            ?.filter { it.isNotBlank() }
+            ?.distinct()
+            ?: emptyList()
+
     fun isCurrencyEnabled(currency: String): Boolean =
         snapshot?.enabledCurrencies()?.contains(currency.trim().uppercase()) == true
 
