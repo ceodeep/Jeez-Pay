@@ -8,6 +8,35 @@ BEGIN;
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS phone_verified_at timestamptz;
 
+-- Fail closed if applying this migration would remove the only usable login
+-- identity from an active administrative account. Enroll and verify admin email
+-- addresses first with backend/scripts/enroll-admin-email.js.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public.users
+    WHERE role IN (
+      'admin',
+      'super_admin',
+      'finance_admin',
+      'kyc_officer',
+      'support_agent',
+      'auditor'
+    )
+      AND is_active IS DISTINCT FROM false
+      AND (
+        email IS NULL
+        OR btrim(email) = ''
+        OR email_verified IS NOT TRUE
+      )
+  ) THEN
+    RAISE EXCEPTION
+      'Phone verification migration blocked: active admin account(s) lack a verified email';
+  END IF;
+END
+$$;
+
 -- Correct the legacy placeholder state. The repository contains no genuine
 -- phone-verification flow that could have populated phone_verified_at, so any
 -- true flag without provenance must not be treated as proof of ownership.
