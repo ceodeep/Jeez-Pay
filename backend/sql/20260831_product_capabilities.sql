@@ -135,10 +135,149 @@ SET
   enabled = EXCLUDED.enabled,
   updated_at = now();
 
+-- Storage-layer defense in depth. Existing historical wallets are preserved,
+-- but a disabled currency cannot gain a new wallet row. Returning NULL from a
+-- BEFORE INSERT trigger skips only the disabled row, which also keeps legacy
+-- multi-row signup seeding compatible while SSP is the sole enabled product.
+CREATE OR REPLACE FUNCTION public.guard_enabled_wallet_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  normalized_currency text;
+BEGIN
+  normalized_currency := upper(trim(coalesce(NEW.currency, '')));
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.country_products AS product
+    WHERE product.currency = normalized_currency
+      AND product.enabled IS TRUE
+  ) THEN
+    NEW.currency := normalized_currency;
+    RETURN NEW;
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS wallets_enabled_product_insert_guard
+  ON public.wallets;
+
+CREATE TRIGGER wallets_enabled_product_insert_guard
+BEFORE INSERT ON public.wallets
+FOR EACH ROW
+EXECUTE FUNCTION public.guard_enabled_wallet_insert();
+
+-- Disabled historical wallets stay readable for reconciliation, but their
+-- balance/currency cannot be mutated while the product is unavailable.
+CREATE OR REPLACE FUNCTION public.guard_enabled_wallet_balance_update()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  normalized_currency text;
+BEGIN
+  normalized_currency := upper(trim(coalesce(NEW.currency, OLD.currency, '')));
+
+  IF NEW.balance IS NOT DISTINCT FROM OLD.balance
+    AND normalized_currency = upper(trim(coalesce(OLD.currency, '')))
+  THEN
+    RETURN NEW;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.country_products AS product
+    WHERE product.currency = normalized_currency
+      AND product.enabled IS TRUE
+  ) THEN
+    NEW.currency := normalized_currency;
+    RETURN NEW;
+  END IF;
+
+  RAISE EXCEPTION 'PRODUCT_DISABLED: % is not enabled', normalized_currency
+    USING ERRCODE = 'P0001';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS wallets_enabled_product_balance_guard
+  ON public.wallets;
+
+CREATE TRIGGER wallets_enabled_product_balance_guard
+BEFORE UPDATE OF balance, currency ON public.wallets
+FOR EACH ROW
+EXECUTE FUNCTION public.guard_enabled_wallet_balance_update();
+
+-- Referral settings are another path capable of crediting wallets outside the
+-- /wallet router. Disable any active non-launch reward configuration now and
+-- prevent it from being re-enabled while its product is disabled.
+DO $$
+BEGIN
+  IF to_regclass('public.referral_reward_settings') IS NOT NULL THEN
+    EXECUTE $sql$
+      UPDATE public.referral_reward_settings AS settings
+      SET enabled = false
+      WHERE settings.enabled IS TRUE
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.country_products AS product
+          WHERE product.currency = upper(trim(coalesce(settings.currency, '')))
+            AND product.enabled IS TRUE
+        )
+    $sql$;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.guard_referral_reward_product()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  normalized_currency text;
+BEGIN
+  IF NEW.enabled IS NOT TRUE THEN
+    RETURN NEW;
+  END IF;
+
+  normalized_currency := upper(trim(coalesce(NEW.currency, '')));
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.country_products AS product
+    WHERE product.currency = normalized_currency
+      AND product.enabled IS TRUE
+  ) THEN
+    NEW.currency := normalized_currency;
+    RETURN NEW;
+  END IF;
+
+  RAISE EXCEPTION 'PRODUCT_DISABLED: referral rewards cannot use %', normalized_currency
+    USING ERRCODE = 'P0001';
+END;
+$$;
+
+DO $$
+BEGIN
+  IF to_regclass('public.referral_reward_settings') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS referral_reward_product_guard ON public.referral_reward_settings';
+    EXECUTE 'CREATE TRIGGER referral_reward_product_guard BEFORE INSERT OR UPDATE OF currency, enabled ON public.referral_reward_settings FOR EACH ROW EXECUTE FUNCTION public.guard_referral_reward_product()';
+  END IF;
+END;
+$$;
+
 COMMENT ON TABLE public.country_products IS
   'Country/currency products exposed by JeezPay. Disabled rows remain available for future launches.';
 
 COMMENT ON TABLE public.product_capabilities IS
   'Server-side feature entitlements for each country/currency product.';
+
+COMMENT ON FUNCTION public.guard_enabled_wallet_insert() IS
+  'Prevents creation of wallet rows for disabled products while preserving existing historical rows.';
+
+COMMENT ON FUNCTION public.guard_enabled_wallet_balance_update() IS
+  'Prevents balance/currency mutation on disabled wallet products.';
 
 COMMIT;
