@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-
-    <style name="JeezPayTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+    <style name="JeezPayThemeBase" parent="Theme.MaterialComponents.Light.NoActionBar">
 
         <!-- Real primary (used by Material internally) -->
         <item name="colorPrimary">@color/paypal_blue</item>
@@ -15,16 +14,18 @@
         <item name="android:windowBackground">@color/bg_main</item>
         <item name="colorOnSurface">@color/text_primary</item>
 
-        <!-- Status / Nav bars -->
+        <!-- Status / Nav bars available on the app minSdk -->
         <item name="android:statusBarColor">@color/bg_main</item>
         <item name="android:navigationBarColor">@color/bg_main</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
 
         <!-- Disable ugly default ripples -->
         <item name="colorControlHighlight">@color/ripple_soft</item>
 
     </style>
+
+    <!-- API 24-26 theme. API 27+ adds light navigation icons in values-v27. -->
+    <style name="JeezPayTheme" parent="JeezPayThemeBase" />
 
     <style name="JeezPayBottomSheet" parent="ThemeOverlay.MaterialComponents.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/JeezPayBottomSheetStyle</item>
@@ -113,17 +114,12 @@
         <item name="android:paddingBottom">6dp</item>
     </style>
 
-
-
     <style name="BottomNavStyle" parent="Widget.MaterialComponents.BottomNavigationView">
         <item name="itemIconTint">@color/nav_selector</item>
         <item name="itemTextColor">@color/nav_selector</item>
         <item name="labelVisibilityMode">labeled</item>
         <item name="android:background">@android:color/transparent</item>
     </style>
-
-    <!-- Rounded active indicator like the screenshot -->
-
 
     <style name="ShapeAppearance.JeezPay.Circle" parent="">
         <item name="cornerFamily">rounded</item>
