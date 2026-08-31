@@ -12,7 +12,7 @@
         android:layout_height="24dp"
         android:layout_gravity="end"
         android:src="@android:drawable/ic_menu_close_clear_cancel"
-        android:tint="#6B7280" />
+        app:tint="#6B7280" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -69,7 +69,7 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@android:drawable/ic_menu_myplaces"
-                android:tint="#3B82F6" />
+                app:tint="#3B82F6" />
 
             <TextView
                 android:id="@+id/tvReviewRecipient"
