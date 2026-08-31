@@ -9,6 +9,10 @@ const authRoutes = require("./src/routes/auth.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
 const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
+const {
+  merchantProductPolicy,
+  serviceProductPolicy,
+} = require("./src/middlewares/nonWalletProductPolicy.middleware");
 const kycRoutes = require("./src/routes/kyc.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const servicesRoutes = require("./src/routes/services.routes");
@@ -83,7 +87,10 @@ app.use(
 // route code so disabled currencies cannot reach money-moving handlers.
 app.use("/wallet", authMiddleware, walletProductPolicy, walletRoutes);
 app.use("/admin", adminRoutes);
-app.use("/services", servicesRoutes);
+
+// Service payments sit outside /wallet, so enforce the same launch product
+// policy before their legacy route code executes.
+app.use("/services", serviceProductPolicy, servicesRoutes);
 
 // Merchant account-link endpoints are isolated from the existing
 // merchant payment/payout router.
@@ -92,7 +99,9 @@ app.use(
   merchantAccountLinkRoutes,
 );
 
-app.use("/merchant", merchantRoutes);
+// Merchant payment creation and payouts are also money-moving entry points and
+// must honor the server-side launch capability configuration.
+app.use("/merchant", merchantProductPolicy, merchantRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({ ok: true, service: "JeezPay API" });
