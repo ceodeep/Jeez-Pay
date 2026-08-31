@@ -13,18 +13,25 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jeezpay.app.base.BaseFintechActivity
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
+import com.jeezpay.app.network.dto.ProductCapability
+import com.jeezpay.app.network.dto.ProductCapabilitiesResponse
+import com.jeezpay.app.repository.ProductPolicyStore
+import com.jeezpay.app.repository.ProductRepository
 import com.jeezpay.app.repository.WalletRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.DecimalFormat
 
-
 class SwapActivity : BaseFintechActivity() {
 
     private val repo = WalletRepository()
+    private val productRepo = ProductRepository()
     private val df = DecimalFormat("#,##0.##")
-    private val currencies = arrayOf("USDT", "SDG", "SSP", "EGP", "UGX")
+
+    private var currencies: Array<String> = emptyArray()
+    private var swapPolicyReady = false
+    private var swapPolicyLoading = false
 
     private lateinit var btnBack: View
     private lateinit var fromCurrencyBox: LinearLayout
@@ -42,8 +49,8 @@ class SwapActivity : BaseFintechActivity() {
     private lateinit var btnPreview: TextView
     private lateinit var btnReview: TextView
 
-    private var fromCurrency = "USDT"
-    private var toCurrency = "SSP"
+    private var fromCurrency = ""
+    private var toCurrency = ""
 
     private var previewAmount = 0.0
     private var previewRate = 0.0
@@ -72,8 +79,10 @@ class SwapActivity : BaseFintechActivity() {
 
         bindViews()
         bindClicks()
-        loadBalances()
         resetPreview()
+        applyUnavailableCurrencyUi()
+        setLoading(false)
+        loadSwapPolicy()
     }
 
     private fun bindViews() {
@@ -98,10 +107,12 @@ class SwapActivity : BaseFintechActivity() {
         btnBack.setOnClickListener { finish() }
 
         fromCurrencyBox.setOnClickListener {
+            if (!requireSwapPolicy()) return@setOnClickListener
+
             chooseCurrency("From currency", fromCurrency) {
                 fromCurrency = it
                 if (fromCurrency == toCurrency) {
-                    toCurrency = currencies.first { c -> c != fromCurrency }
+                    toCurrency = currencies.first { currency -> currency != fromCurrency }
                 }
                 applyCurrencies()
                 resetPreview()
@@ -109,12 +120,15 @@ class SwapActivity : BaseFintechActivity() {
         }
 
         toCurrencyBox.setOnClickListener {
+            if (!requireSwapPolicy()) return@setOnClickListener
+
             chooseCurrency("To currency", toCurrency) {
-                toCurrency = it
-                if (fromCurrency == toCurrency) {
+                if (fromCurrency == it) {
                     showError("Choose two different currencies")
                     return@chooseCurrency
                 }
+
+                toCurrency = it
                 applyCurrencies()
                 resetPreview()
             }
@@ -129,7 +143,115 @@ class SwapActivity : BaseFintechActivity() {
         }
     }
 
+    private fun loadSwapPolicy(forceRefresh: Boolean = false) {
+        if (swapPolicyLoading) return
+
+        val cached = ProductPolicyStore.current()
+        if (!forceRefresh && cached != null) {
+            applySwapPolicy(cached)
+            return
+        }
+
+        swapPolicyLoading = true
+        swapPolicyReady = false
+        setLoading(false)
+        showBlockingLoader()
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                productRepo.fetchCapabilitiesSafe(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
+            }) {
+                is ApiResult.Success -> {
+                    swapPolicyLoading = false
+                    ProductPolicyStore.replace(result.data)
+                    applySwapPolicy(result.data)
+                }
+
+                is ApiResult.Error -> {
+                    swapPolicyLoading = false
+                    swapPolicyReady = false
+                    ProductPolicyStore.clear(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
+                    hideBlockingLoader()
+                    failSwapPolicy("Currency exchange is not available right now")
+                    handleSwapError(result.error)
+                }
+            }
+        }
+    }
+
+    private fun applySwapPolicy(config: ProductCapabilitiesResponse) {
+        ProductPolicyStore.replace(config)
+
+        val allowedCurrencies = ProductPolicyStore
+            .currenciesWithCapability(ProductCapability.FX_CONVERT)
+
+        if (allowedCurrencies.size < 2) {
+            hideBlockingLoader()
+            failSwapPolicy("Currency exchange is not available right now")
+            return
+        }
+
+        currencies = allowedCurrencies.toTypedArray()
+
+        val requestedFrom = intent.getStringExtra("fromCurrency")
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it in currencies }
+
+        val requestedTo = intent.getStringExtra("toCurrency")
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it in currencies && it != requestedFrom }
+
+        fromCurrency = requestedFrom ?: currencies[0]
+        toCurrency = requestedTo
+            ?: currencies.first { it != fromCurrency }
+
+        swapPolicyReady = true
+        hideBlockingLoader()
+        applyCurrencies()
+        resetPreview()
+        setLoading(false)
+        loadBalances()
+    }
+
+    private fun failSwapPolicy(message: String) {
+        swapPolicyLoading = false
+        swapPolicyReady = false
+        currencies = emptyArray()
+        fromCurrency = ""
+        toCurrency = ""
+        balances.clear()
+        applyUnavailableCurrencyUi()
+        resetPreview()
+        setLoading(false)
+        showError(message)
+    }
+
+    private fun requireSwapPolicy(): Boolean {
+        val allowed = swapPolicyReady &&
+            fromCurrency.isNotBlank() &&
+            toCurrency.isNotBlank() &&
+            fromCurrency != toCurrency &&
+            ProductPolicyStore.isCapabilityEnabled(
+                fromCurrency,
+                ProductCapability.FX_CONVERT
+            ) &&
+            ProductPolicyStore.isCapabilityEnabled(
+                toCurrency,
+                ProductCapability.FX_CONVERT
+            )
+
+        if (!allowed) {
+            showError("Currency exchange is not available right now")
+        }
+
+        return allowed
+    }
+
     private fun chooseCurrency(title: String, current: String, onPicked: (String) -> Unit) {
+        if (!swapPolicyReady || currencies.isEmpty()) return
+
         val checked = currencies.indexOf(current).coerceAtLeast(0)
 
         MaterialAlertDialogBuilder(this)
@@ -149,7 +271,16 @@ class SwapActivity : BaseFintechActivity() {
         tvToBalance.text = "Balance: ${df.format(balances[toCurrency] ?: 0.0)}"
     }
 
+    private fun applyUnavailableCurrencyUi() {
+        tvFromCurrency.text = "--"
+        tvToCurrency.text = "--"
+        tvFromBalance.text = "Balance: --"
+        tvToBalance.text = "Balance: --"
+    }
+
     private fun loadBalances() {
+        if (!requireSwapPolicy()) return
+
         setLoading(true)
 
         lifecycleScope.launch {
@@ -159,7 +290,7 @@ class SwapActivity : BaseFintechActivity() {
                 is ApiResult.Success -> {
                     balances.clear()
                     result.data.balances.forEach {
-                        balances[it.currency] = it.balance
+                        balances[it.currency.trim().uppercase()] = it.balance
                     }
 
                     setLoading(false)
@@ -175,18 +306,14 @@ class SwapActivity : BaseFintechActivity() {
     }
 
     private fun previewSwap() {
+        if (!requireSwapPolicy()) return
+
         val amount = etAmount.text.toString().trim().toDoubleOrNull()
 
         if (amount == null || amount <= 0) {
             showError("Enter a valid amount")
             return
         }
-
-        if (fromCurrency == toCurrency) {
-            showError("Choose two different currencies")
-            return
-        }
-
 
         val balance = balances[fromCurrency] ?: 0.0
         if (amount > balance) {
@@ -206,6 +333,11 @@ class SwapActivity : BaseFintechActivity() {
                 )
             }) {
                 is ApiResult.Success -> {
+                    if (!requireSwapPolicy()) {
+                        setLoading(false)
+                        return@launch
+                    }
+
                     setLoading(false)
 
                     val res = result.data
@@ -237,6 +369,8 @@ class SwapActivity : BaseFintechActivity() {
     }
 
     private fun showReviewSheet() {
+        if (!requireSwapPolicy()) return
+
         if (previewAmount <= 0 || previewRate <= 0) {
             showError("Preview swap first")
             return
@@ -258,6 +392,8 @@ class SwapActivity : BaseFintechActivity() {
     }
 
     private fun openPinThenConfirm(onConfirmAfterPin: (String) -> Unit) {
+        if (!requireSwapPolicy()) return
+
         pendingPinAction = onConfirmAfterPin
 
         val i = Intent(this, PinVerifyActivity::class.java).apply {
@@ -269,6 +405,8 @@ class SwapActivity : BaseFintechActivity() {
     }
 
     private fun confirmSwap(pin: String) {
+        if (!requireSwapPolicy()) return
+
         setLoading(true)
 
         lifecycleScope.launch {
@@ -322,21 +460,24 @@ class SwapActivity : BaseFintechActivity() {
     }
 
     private fun setReviewEnabled(enabled: Boolean) {
-        btnReview.isEnabled = enabled
-        btnReview.alpha = if (enabled) 1f else 0.55f
+        val canReview = enabled && swapPolicyReady
+        btnReview.isEnabled = canReview
+        btnReview.alpha = if (canReview) 1f else 0.55f
     }
 
     private fun setLoading(loading: Boolean) {
-        btnPreview.isEnabled = !loading
-        btnPreview.alpha = if (loading) 0.7f else 1f
+        val canInteract = !loading && swapPolicyReady
+
+        btnPreview.isEnabled = canInteract
+        btnPreview.alpha = if (canInteract) 1f else 0.7f
         btnPreview.text = if (loading) "Please wait..." else "Preview Swap"
 
-        btnReview.isEnabled = !loading && previewAmount > 0
+        btnReview.isEnabled = canInteract && previewAmount > 0
         btnReview.alpha = if (btnReview.isEnabled) 1f else 0.55f
 
-        etAmount.isEnabled = !loading
-        fromCurrencyBox.isEnabled = !loading
-        toCurrencyBox.isEnabled = !loading
+        etAmount.isEnabled = canInteract
+        fromCurrencyBox.isEnabled = canInteract
+        toCurrencyBox.isEnabled = canInteract
     }
 
     private fun handleSwapError(error: AppError) {
