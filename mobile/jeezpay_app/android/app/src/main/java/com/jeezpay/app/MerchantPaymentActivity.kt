@@ -25,6 +25,10 @@ import com.jeezpay.app.network.safeApiCall
 import com.jeezpay.app.network.dto.ConfirmMerchantPaymentRequest
 import com.jeezpay.app.network.dto.ConfirmMerchantPaymentResponse
 import com.jeezpay.app.network.dto.MerchantPaymentDto
+import com.jeezpay.app.network.dto.ProductCapability
+import com.jeezpay.app.network.dto.ProductCapabilitiesResponse
+import com.jeezpay.app.repository.ProductPolicyStore
+import com.jeezpay.app.repository.ProductRepository
 import com.jeezpay.app.storage.SessionManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,8 +48,12 @@ class MerchantPaymentActivity : BaseFintechActivity() {
     private lateinit var btnPay: MaterialButton
     private lateinit var btnCancel: MaterialButton
 
+    private val productRepo = ProductRepository()
+
     private var paymentId: String = ""
     private var currentPayment: MerchantPaymentDto? = null
+    private var paymentPolicyReady = false
+    private var paymentPolicyLoading = false
 
     private val blue = Color.rgb(0, 112, 224)
     private val bg = Color.rgb(245, 247, 251)
@@ -284,23 +292,27 @@ class MerchantPaymentActivity : BaseFintechActivity() {
         if (loading) {
             btnPay.isEnabled = false
             btnPay.text = "Loading..."
-        } else {
-            val payment = currentPayment
-            val status = payment?.status ?: ""
-            val canPay = status.equals("pending", ignoreCase = true)
-            val amount = payment?.amount ?: "-"
-            val currency = payment?.currency ?: ""
+            return
+        }
 
-            btnPay.isEnabled = canPay
-            btnPay.text = when {
-                status.equals("paid", ignoreCase = true) -> "Already paid"
-                canPay -> "Confirm and Pay $currency $amount"
-                else -> "Payment $status"
-            }
+        val payment = currentPayment
+        val status = payment?.status ?: ""
+        val amount = payment?.amount ?: "-"
+        val currency = payment?.currency ?: ""
+        val isPending = status.equals("pending", ignoreCase = true)
+        val canPay = isPending && paymentPolicyReady
+
+        btnPay.isEnabled = canPay
+        btnPay.text = when {
+            status.equals("paid", ignoreCase = true) -> "Already paid"
+            isPending && !paymentPolicyReady -> "Payment unavailable"
+            canPay -> "Confirm and Pay $currency $amount"
+            else -> "Payment $status"
         }
     }
 
     private fun loadPayment() {
+        paymentPolicyReady = false
         setPageLoading(true)
 
         lifecycleScope.launch {
@@ -313,16 +325,95 @@ class MerchantPaymentActivity : BaseFintechActivity() {
 
                 if (payment == null) {
                     showError("Payment not found")
+                    setPageLoading(false)
                     return@launch
                 }
 
                 currentPayment = payment
                 renderPayment(payment)
+                loadPaymentPolicy(payment)
             } catch (error: Exception) {
+                paymentPolicyReady = false
                 showError(error.message ?: "Could not load payment")
-            } finally {
                 setPageLoading(false)
             }
+        }
+    }
+
+    private fun policyCountryForCurrency(currency: String): String {
+        return if (currency.trim().uppercase() == "USDT") {
+            ProductPolicyStore.GLOBAL_COUNTRY_CODE
+        } else {
+            ProductPolicyStore.LAUNCH_COUNTRY_CODE
+        }
+    }
+
+    private fun loadPaymentPolicy(payment: MerchantPaymentDto) {
+        if (paymentPolicyLoading) return
+
+        val currency = payment.currency
+            ?.trim()
+            ?.uppercase()
+            .orEmpty()
+
+        if (currency.isBlank()) {
+            paymentPolicyReady = false
+            setPageLoading(false)
+            showError("Payment currency is unavailable")
+            return
+        }
+
+        val countryCode = policyCountryForCurrency(currency)
+        val cached = ProductPolicyStore.current(countryCode)
+
+        if (cached != null) {
+            applyPaymentPolicy(currency, countryCode, cached)
+            return
+        }
+
+        paymentPolicyLoading = true
+        setPageLoading(true)
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                productRepo.fetchCapabilitiesSafe(countryCode)
+            }) {
+                is ApiResult.Success -> {
+                    paymentPolicyLoading = false
+                    ProductPolicyStore.replace(result.data)
+                    applyPaymentPolicy(currency, countryCode, result.data)
+                }
+
+                is ApiResult.Error -> {
+                    paymentPolicyLoading = false
+                    paymentPolicyReady = false
+                    ProductPolicyStore.clear(countryCode)
+                    setPageLoading(false)
+                    showError(appErrorMessage(result.error))
+                }
+            }
+        }
+    }
+
+    private fun applyPaymentPolicy(
+        currency: String,
+        countryCode: String,
+        config: ProductCapabilitiesResponse
+    ) {
+        ProductPolicyStore.replace(config)
+
+        paymentPolicyReady = ProductPolicyStore.isCapabilityEnabled(
+            currency,
+            ProductCapability.MERCHANT_PAYMENT,
+            countryCode
+        )
+
+        setPageLoading(false)
+
+        if (!paymentPolicyReady &&
+            currentPayment?.status.equals("pending", ignoreCase = true)
+        ) {
+            showError("Merchant payments in $currency are not available right now")
         }
     }
 
@@ -346,15 +437,25 @@ class MerchantPaymentActivity : BaseFintechActivity() {
             tvStatus.setTextColor(Color.rgb(126, 87, 0))
             tvStatus.background = rounded(Color.rgb(255, 244, 214), dp(18))
         }
-
-        setPageLoading(false)
     }
 
     private fun requestPin() {
         val payment = currentPayment ?: return
+        val currency = payment.currency?.trim()?.uppercase().orEmpty()
+        val countryCode = policyCountryForCurrency(currency)
+
+        if (!paymentPolicyReady ||
+            !ProductPolicyStore.isCapabilityEnabled(
+                currency,
+                ProductCapability.MERCHANT_PAYMENT,
+                countryCode
+            )
+        ) {
+            showError("This merchant payment is not available right now")
+            return
+        }
 
         val amount = payment.amount ?: "-"
-        val currency = payment.currency ?: ""
         val merchantName = payment.merchants?.name ?: "merchant"
 
         val i = Intent(this, PinVerifyActivity::class.java).apply {
@@ -369,6 +470,22 @@ class MerchantPaymentActivity : BaseFintechActivity() {
     }
 
     private fun confirmPayment(pin: String) {
+        val payment = currentPayment ?: return
+        val currency = payment.currency?.trim()?.uppercase().orEmpty()
+        val countryCode = policyCountryForCurrency(currency)
+
+        if (!paymentPolicyReady ||
+            !ProductPolicyStore.isCapabilityEnabled(
+                currency,
+                ProductCapability.MERCHANT_PAYMENT,
+                countryCode
+            )
+        ) {
+            showError("This merchant payment is no longer available")
+            setPageLoading(false)
+            return
+        }
+
         setPageLoading(true)
 
         lifecycleScope.launch {
@@ -437,13 +554,13 @@ class MerchantPaymentActivity : BaseFintechActivity() {
                 }
             }
             .setNegativeButton("Done") { _, _ ->
-    startActivity(
-        Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-    )
-    finish()
-}
+                startActivity(
+                    Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                )
+                finish()
+            }
             .show()
     }
 
@@ -451,4 +568,3 @@ class MerchantPaymentActivity : BaseFintechActivity() {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 }
-
