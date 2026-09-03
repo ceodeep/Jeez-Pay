@@ -13,6 +13,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jeezpay.app.base.BaseFintechActivity
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
+import com.jeezpay.app.network.dto.ProductCapability
 import com.jeezpay.app.network.dto.ProductCapabilitiesResponse
 import com.jeezpay.app.repository.ProductPolicyStore
 import com.jeezpay.app.repository.ProductRepository
@@ -131,13 +132,16 @@ class ServiceRequestActivity : BaseFintechActivity() {
     private fun applyProductPolicy(config: ProductCapabilitiesResponse) {
         ProductPolicyStore.replace(config)
 
-        currencies = ProductPolicyStore.enabledCurrencies().toTypedArray()
+        currencies = ProductPolicyStore
+            .currenciesWithCapability(ProductCapability.SERVICE_PAYMENT)
+            .toTypedArray()
+
         if (currencies.isEmpty()) {
             productPolicyReady = false
             selectedCurrency = ""
             tvCurrency.text = "--"
             setLoading(false)
-            showError("No payment product is currently available")
+            showError("Bills and services are not available right now")
             return
         }
 
@@ -160,7 +164,7 @@ class ServiceRequestActivity : BaseFintechActivity() {
 
     private fun showCurrencyPicker() {
         if (!productPolicyReady) {
-            showError("Payment products are unavailable")
+            showError("Bills and services are unavailable")
             return
         }
 
@@ -179,11 +183,8 @@ class ServiceRequestActivity : BaseFintechActivity() {
     }
 
     private fun validateThenPin() {
-        if (!productPolicyReady ||
-            selectedCurrency.isBlank() ||
-            !ProductPolicyStore.isCurrencyEnabled(selectedCurrency)
-        ) {
-            showError("This payment currency is not available right now")
+        if (!isServiceCurrencyAllowed(selectedCurrency)) {
+            showError("Bills and services are not available right now")
             return
         }
 
@@ -250,8 +251,8 @@ class ServiceRequestActivity : BaseFintechActivity() {
         note: String?,
         pin: String
     ) {
-        if (!productPolicyReady || !ProductPolicyStore.isCurrencyEnabled(currency)) {
-            showError("This payment currency is no longer available")
+        if (!isServiceCurrencyAllowed(currency)) {
+            showError("Bills and services are no longer available")
             return
         }
 
@@ -285,6 +286,18 @@ class ServiceRequestActivity : BaseFintechActivity() {
                 }
             }
         }
+    }
+
+    private fun isServiceCurrencyAllowed(currency: String): Boolean {
+        val normalized = currency.trim().uppercase()
+        if (!productPolicyReady || normalized.isBlank() || normalized !in currencies) {
+            return false
+        }
+
+        return ProductPolicyStore.isCapabilityEnabled(
+            normalized,
+            ProductCapability.SERVICE_PAYMENT
+        )
     }
 
     private fun setLoading(loading: Boolean) {
