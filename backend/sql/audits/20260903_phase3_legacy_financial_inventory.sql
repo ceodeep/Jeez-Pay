@@ -85,6 +85,56 @@ LEFT JOIN public.wallets AS w
   ON w.id = t.wallet_id;
 
 \echo ''
+\echo '=== MERCHANT BALANCE SUMMARY BY CURRENCY ==='
+SELECT
+  currency,
+  count(*) AS merchant_balance_rows,
+  count(*) FILTER (WHERE balance <> 0) AS nonzero_balance_rows,
+  count(*) FILTER (WHERE balance < 0) AS negative_balance_rows,
+  COALESCE(sum(balance), 0) AS total_balance,
+  COALESCE(min(balance), 0) AS min_balance,
+  COALESCE(max(balance), 0) AS max_balance
+FROM public.merchant_balances
+GROUP BY currency
+ORDER BY currency;
+
+\echo ''
+\echo '=== MERCHANT BALANCE INTEGRITY ==='
+SELECT
+  count(*) AS rows,
+  count(DISTINCT id) AS distinct_ids,
+  count(*) FILTER (WHERE merchant_id IS NULL) AS missing_merchant_id,
+  count(*) FILTER (WHERE currency IS NULL OR btrim(currency) = '') AS missing_currency,
+  count(*) - count(DISTINCT (merchant_id, currency)) AS duplicate_merchant_currency_rows
+FROM public.merchant_balances;
+
+\echo ''
+\echo '=== MERCHANT PAYMENT SUMMARY ==='
+SELECT
+  currency,
+  status,
+  count(*) AS payment_count,
+  COALESCE(sum(amount), 0) AS total_amount,
+  min(created_at) AS first_created_at,
+  max(created_at) AS last_created_at
+FROM public.merchant_payments
+GROUP BY currency, status
+ORDER BY currency, status;
+
+\echo ''
+\echo '=== MERCHANT PAYOUT SUMMARY ==='
+SELECT
+  currency,
+  status,
+  count(*) AS payout_count,
+  COALESCE(sum(amount), 0) AS total_amount,
+  min(created_at) AS first_created_at,
+  max(created_at) AS last_created_at
+FROM public.merchant_payouts
+GROUP BY currency, status
+ORDER BY currency, status;
+
+\echo ''
 \echo '=== PUBLIC FINANCIAL-LIKE TABLE INVENTORY ==='
 SELECT
   c.relname AS table_name,
@@ -96,6 +146,19 @@ WHERE n.nspname = 'public'
   AND c.relkind = 'r'
   AND c.relname ~* '(wallet|transaction|merchant|payment|payout|withdraw|deposit|service|agent|referral|crypto|sweep|treasury|fee|balance|settlement)'
 ORDER BY c.relname;
+
+\echo ''
+\echo '=== BALANCE-BEARING BASE TABLES ==='
+SELECT
+  table_name,
+  column_name,
+  data_type,
+  is_nullable,
+  column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND column_name ~* '(^|_)(balance|available_balance|reserved_balance|ledger_balance)($|_)'
+ORDER BY table_name, ordinal_position;
 
 \echo ''
 \echo '=== BALANCE / MONEY-LIKE COLUMNS ==='
@@ -123,19 +186,20 @@ FROM pg_constraint
 WHERE connamespace = 'public'::regnamespace
   AND conrelid IN (
     'public.wallets'::regclass,
-    'public.transactions'::regclass
+    'public.transactions'::regclass,
+    'public.merchant_balances'::regclass
   )
 ORDER BY conrelid::regclass::text, conname;
 
 \echo ''
-\echo '=== WALLET / TRANSACTION INDEXES ==='
+\echo '=== WALLET / TRANSACTION / MERCHANT BALANCE INDEXES ==='
 SELECT
   tablename,
   indexname,
   indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND tablename IN ('wallets', 'transactions')
+  AND tablename IN ('wallets', 'transactions', 'merchant_balances')
 ORDER BY tablename, indexname;
 
 \echo ''
@@ -157,27 +221,36 @@ ORDER BY c.relname, t.tgname;
 
 \echo ''
 \echo '=== FINANCIAL DATABASE FUNCTIONS / RPC DEFINITIONS ==='
+WITH financial_functions AS MATERIALIZED (
+  SELECT
+    p.oid,
+    p.proname,
+    p.oid::regprocedure::text AS function_signature,
+    l.lanname AS language,
+    p.prosecdef AS security_definer,
+    pg_get_functiondef(p.oid) AS function_definition
+  FROM pg_proc AS p
+  JOIN pg_namespace AS n ON n.oid = p.pronamespace
+  JOIN pg_language AS l ON l.oid = p.prolang
+  WHERE n.nspname = 'public'
+    AND p.prokind IN ('f', 'p')
+    AND l.lanname IN ('sql', 'plpgsql')
+)
 SELECT
-  p.oid::regprocedure::text AS function_signature,
-  l.lanname AS language,
-  p.prosecdef AS security_definer,
-  pg_get_functiondef(p.oid) AS function_definition
-FROM pg_proc AS p
-JOIN pg_namespace AS n ON n.oid = p.pronamespace
-JOIN pg_language AS l ON l.oid = p.prolang
-WHERE n.nspname = 'public'
-  AND l.lanname IN ('sql', 'plpgsql')
-  AND (
-    p.proname IN (
-      'wallet_transfer',
-      'confirm_merchant_payment',
-      'execute_merchant_payout',
-      'credit_usdt_trc20_deposit',
-      'credit_usdt_bep20_deposit'
-    )
-    OR pg_get_functiondef(p.oid) ~* '(wallets|transactions|merchant_payments|merchant_payout|withdraw|deposit|service_request|agent_operations|referral)'
+  function_signature,
+  language,
+  security_definer,
+  function_definition
+FROM financial_functions
+WHERE proname IN (
+    'wallet_transfer',
+    'confirm_merchant_payment',
+    'execute_merchant_payout',
+    'credit_usdt_trc20_deposit',
+    'credit_usdt_bep20_deposit'
   )
-ORDER BY p.proname, p.oid::regprocedure::text;
+  OR function_definition ~* '(wallets|transactions|merchant_balances|merchant_payments|merchant_payout|withdraw|deposit|service_request|agent_operations|referral)'
+ORDER BY proname, function_signature;
 
 \echo ''
 \echo '=== RLS POLICIES ON FINANCIAL-LIKE TABLES ==='
@@ -213,6 +286,17 @@ SELECT
   count(*) FILTER (WHERE balance <> 0) AS wallets_requiring_opening_balance,
   COALESCE(sum(balance), 0) AS legacy_total_balance
 FROM public.wallets
+GROUP BY currency
+ORDER BY currency;
+
+\echo ''
+\echo '=== MERCHANT BALANCE -> LEDGER CANDIDATE COUNTS ==='
+SELECT
+  currency,
+  count(*) AS merchant_balances,
+  count(*) FILTER (WHERE balance <> 0) AS balances_requiring_opening_balance,
+  COALESCE(sum(balance), 0) AS legacy_total_balance
+FROM public.merchant_balances
 GROUP BY currency
 ORDER BY currency;
 
