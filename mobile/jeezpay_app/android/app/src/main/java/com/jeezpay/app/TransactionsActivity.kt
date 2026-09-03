@@ -51,12 +51,12 @@ class TransactionsActivity : BaseFintechActivity() {
         tvError = findViewById(R.id.tvError)
 
         adapter = TransactionsAdapter("") { tx ->
-            if (selectedCurrency.isBlank()) return@TransactionsAdapter
-
-            TransactionDetailsBottomSheet(
-                tx = tx,
-                displayCurrency = selectedCurrency
-            ).show(supportFragmentManager, "TransactionDetailsBottomSheet")
+            if (selectedCurrency.isNotBlank()) {
+                TransactionDetailsBottomSheet(
+                    tx = tx,
+                    displayCurrency = selectedCurrency
+                ).show(supportFragmentManager, "TransactionDetailsBottomSheet")
+            }
         }
 
         rvTransactions.layoutManager = LinearLayoutManager(this)
