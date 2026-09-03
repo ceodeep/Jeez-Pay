@@ -8,6 +8,7 @@ const rateLimit = require("express-rate-limit");
 const authRoutes = require("./src/routes/auth.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
 const walletTransferV2Routes = require("./src/routes/walletTransferV2.routes");
+const walletMerchantV2Routes = require("./src/routes/walletMerchantV2.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
 const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
 const {
@@ -19,6 +20,7 @@ const kycRoutes = require("./src/routes/kyc.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const servicesRoutes = require("./src/routes/services.routes");
 const merchantRoutes = require("./src/routes/merchant.routes");
+const merchantMoneyV2Routes = require("./src/routes/merchantMoneyV2.routes");
 const accountLinkRoutes = require("./src/routes/accountLink.routes");
 const merchantAccountLinkRoutes = require("./src/routes/merchantAccountLink.routes");
 const productRoutes = require("./src/routes/product.routes");
@@ -86,13 +88,14 @@ app.use(
 );
 
 // Product policy is evaluated after authentication and before wallet route
-// code. Phase 4.2B intercepts only POST /wallet/transfer with the native Ledger
-// v2 handler; every other wallet route falls through to the existing router.
+// code. Phase 4 transition routers intercept only the money flows already
+// proven against Ledger v2; all remaining wallet routes fall through unchanged.
 app.use(
   "/wallet",
   authMiddleware,
   walletProductPolicy,
   walletTransferV2Routes,
+  walletMerchantV2Routes,
   walletRoutes,
 );
 
@@ -111,9 +114,14 @@ app.use(
   merchantAccountLinkRoutes,
 );
 
-// Merchant payment creation and payouts are also money-moving entry points and
-// must honor the server-side launch capability configuration.
-app.use("/merchant", merchantProductPolicy, merchantRoutes);
+// Phase 4.3C intercepts merchant payouts with the native Ledger v2 wrapper;
+// other merchant endpoints continue through the existing router unchanged.
+app.use(
+  "/merchant",
+  merchantProductPolicy,
+  merchantMoneyV2Routes,
+  merchantRoutes,
+);
 
 app.get("/", (req, res) => {
   res.status(200).json({ ok: true, service: "JeezPay API" });
