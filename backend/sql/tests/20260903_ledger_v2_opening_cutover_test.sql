@@ -117,7 +117,10 @@ BEGIN
       v_expected_nonzero_currencies, v_cutover.journal_count;
   END IF;
 
-  IF jsonb_object_length(v_cutover.journal_ids) <> v_expected_nonzero_currencies THEN
+  SELECT count(*) INTO v_bad_count
+  FROM jsonb_object_keys(v_cutover.journal_ids);
+
+  IF v_bad_count <> v_expected_nonzero_currencies THEN
     RAISE EXCEPTION 'TEST_CUTOVER_JOURNAL_MAP_COUNT_MISMATCH';
   END IF;
 
