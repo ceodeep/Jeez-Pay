@@ -18,7 +18,9 @@ const {
   merchantProductPolicy,
   serviceProductPolicy,
 } = require("./src/middlewares/nonWalletProductPolicy.middleware");
+const kycLifecycleV2Routes = require("./src/routes/kycLifecycleV2.routes");
 const kycRoutes = require("./src/routes/kyc.routes");
+const adminKycV2Routes = require("./src/routes/adminKycV2.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const adminLaunchMoneyV2Routes = require("./src/routes/adminLaunchMoneyV2.routes");
 const servicesRoutes = require("./src/routes/services.routes");
@@ -64,9 +66,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
-
-
-
 app.use(express.json());
 
 // Public product configuration. This is safe to expose because it contains
@@ -80,7 +79,9 @@ app.use("/auth/forgot-pin/request-otp", otpLimiter);
 app.use("/auth/change-email/request-otp", otpLimiter);
 app.use("/auth", authLimiter, authRoutes);
 
-app.use("/kyc", kycRoutes);
+// Phase 5.1 intercepts KYC submissions with the controlled lifecycle RPC.
+// Existing read/upload endpoints continue through the legacy KYC router.
+app.use("/kyc", kycLifecycleV2Routes, kycRoutes);
 
 // Secure external-account authorization.
 // Keep this before the generic /wallet router.
@@ -106,11 +107,12 @@ app.use(
 
 // Admin reporting stays available, but manual balance/crypto configuration and
 // money actions must obey the same launch product policy as customer routes.
-// Native launch-money routes intercept reachable SSP writers before legacy
-// admin handlers. Unrelated admin routes continue to fall through unchanged.
+// Phase 5.1 KYC review routes intercept approve/reject before legacy handlers.
+// Native launch-money routes intercept reachable SSP writers after that.
 app.use(
   "/admin",
   adminProductPolicy,
+  adminKycV2Routes,
   adminLaunchMoneyV2Routes,
   adminRoutes,
 );
