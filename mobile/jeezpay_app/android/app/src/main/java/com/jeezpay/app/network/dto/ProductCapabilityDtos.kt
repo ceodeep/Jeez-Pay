@@ -39,6 +39,7 @@ object ProductCapability {
     const val CASH_IN = "CASH_IN"
     const val CASH_OUT = "CASH_OUT"
     const val MERCHANT_PAYMENT = "MERCHANT_PAYMENT"
+    const val SERVICE_PAYMENT = "SERVICE_PAYMENT"
     const val CROSS_BORDER_SEND = "CROSS_BORDER_SEND"
     const val CROSS_BORDER_RECEIVE = "CROSS_BORDER_RECEIVE"
     const val FX_CONVERT = "FX_CONVERT"
