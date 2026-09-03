@@ -9,6 +9,7 @@ const authRoutes = require("./src/routes/auth.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
 const walletTransferV2Routes = require("./src/routes/walletTransferV2.routes");
 const walletMerchantV2Routes = require("./src/routes/walletMerchantV2.routes");
+const walletAgentV2Routes = require("./src/routes/walletAgentV2.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
 const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
 const {
@@ -96,6 +97,7 @@ app.use(
   walletProductPolicy,
   walletTransferV2Routes,
   walletMerchantV2Routes,
+  walletAgentV2Routes,
   walletRoutes,
 );
 
