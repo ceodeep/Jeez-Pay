@@ -16,10 +16,16 @@ CREATE TABLE IF NOT EXISTS public.ledger_accounts_v2 (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT ledger_accounts_v2_account_key_not_blank
     CHECK (btrim(account_key) <> ''),
+  CONSTRAINT ledger_accounts_v2_account_key_length
+    CHECK (length(account_key) <= 200),
   CONSTRAINT ledger_accounts_v2_account_type_not_blank
     CHECK (btrim(account_type) <> ''),
+  CONSTRAINT ledger_accounts_v2_account_type_length
+    CHECK (length(account_type) <= 80),
   CONSTRAINT ledger_accounts_v2_owner_type_not_blank
     CHECK (btrim(owner_type) <> ''),
+  CONSTRAINT ledger_accounts_v2_owner_type_length
+    CHECK (length(owner_type) <= 80),
   CONSTRAINT ledger_accounts_v2_currency_format
     CHECK (currency ~ '^[A-Z0-9]{3,10}$'),
   CONSTRAINT ledger_accounts_v2_status_check
@@ -57,8 +63,12 @@ CREATE TABLE IF NOT EXISTS public.ledger_journals_v2 (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT ledger_journals_v2_source_type_not_blank
     CHECK (btrim(source_type) <> ''),
+  CONSTRAINT ledger_journals_v2_source_type_length
+    CHECK (length(source_type) <= 80),
   CONSTRAINT ledger_journals_v2_idempotency_key_not_blank
     CHECK (btrim(idempotency_key) <> ''),
+  CONSTRAINT ledger_journals_v2_idempotency_key_length
+    CHECK (length(idempotency_key) <= 200),
   CONSTRAINT ledger_journals_v2_request_hash_format
     CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT ledger_journals_v2_metadata_object
@@ -218,7 +228,7 @@ CREATE OR REPLACE FUNCTION public.ensure_ledger_account_v2(
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, extensions
 AS $$
 DECLARE
   v_account_id uuid;
@@ -287,9 +297,32 @@ BEGIN
     COALESCE(p_allow_negative, false),
     v_metadata
   )
+  ON CONFLICT (account_key) DO NOTHING
   RETURNING id INTO v_account_id;
 
-  RETURN v_account_id;
+  IF v_account_id IS NOT NULL THEN
+    RETURN v_account_id;
+  END IF;
+
+  -- A concurrent creator won the unique-key race. Verify that it created the
+  -- exact same account identity before treating this call as an idempotent hit.
+  SELECT *
+  INTO v_existing
+  FROM public.ledger_accounts_v2
+  WHERE account_key = v_account_key;
+
+  IF v_existing.id IS NULL
+    OR v_existing.account_type <> v_account_type
+    OR v_existing.owner_type <> v_owner_type
+    OR v_existing.owner_ref IS DISTINCT FROM v_owner_ref
+    OR v_existing.currency <> v_currency
+    OR v_existing.allow_negative <> COALESCE(p_allow_negative, false)
+  THEN
+    RAISE EXCEPTION 'LEDGER_ACCOUNT_KEY_CONFLICT'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  RETURN v_existing.id;
 END;
 $$;
 
@@ -304,7 +337,7 @@ CREATE OR REPLACE FUNCTION public.post_ledger_journal_v2(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, extensions
 AS $$
 DECLARE
   v_source_type text := upper(btrim(COALESCE(p_source_type, '')));
@@ -366,8 +399,8 @@ BEGIN
   END;
 
   IF cardinality(v_account_ids) <> (
-    SELECT count(DISTINCT account_id)
-    FROM unnest(v_account_ids) AS account_id
+    SELECT count(DISTINCT requested.account_id)
+    FROM unnest(v_account_ids) AS requested(account_id)
   ) THEN
     RAISE EXCEPTION 'LEDGER_DUPLICATE_ACCOUNT_ENTRY' USING ERRCODE = 'P0001';
   END IF;
@@ -431,6 +464,9 @@ BEGIN
     );
   END IF;
 
+  -- Serialize all affected accounts in deterministic UUID order. This makes
+  -- balance validation and posting atomic and avoids deadlocks between flows
+  -- that touch the same accounts in opposite directions.
   PERFORM id
   FROM public.ledger_accounts_v2
   WHERE id = ANY(v_account_ids)
@@ -439,12 +475,33 @@ BEGIN
 
   SELECT count(*)
   INTO v_bad_count
-  FROM unnest(v_account_ids) AS requested(id)
-  LEFT JOIN public.ledger_accounts_v2 AS a ON a.id = requested.id
+  FROM unnest(v_account_ids) AS requested(account_id)
+  LEFT JOIN public.ledger_accounts_v2 AS a ON a.id = requested.account_id
   WHERE a.id IS NULL;
 
   IF v_bad_count > 0 THEN
     RAISE EXCEPTION 'LEDGER_ACCOUNT_NOT_FOUND' USING ERRCODE = 'P0001';
+  END IF;
+
+  -- A duplicate request may have completed while this call was waiting for an
+  -- account lock. Recognize it before status/balance checks so retries cannot
+  -- turn into false insufficient-balance errors after the first post succeeds.
+  SELECT id, request_hash
+  INTO v_existing_id, v_existing_hash
+  FROM public.ledger_journals_v2
+  WHERE source_type = v_source_type
+    AND idempotency_key = v_idempotency_key;
+
+  IF FOUND THEN
+    IF v_existing_hash <> v_request_hash THEN
+      RAISE EXCEPTION 'LEDGER_IDEMPOTENCY_CONFLICT' USING ERRCODE = 'P0001';
+    END IF;
+
+    RETURN jsonb_build_object(
+      'ok', true,
+      'journalId', v_existing_id,
+      'idempotentReplay', true
+    );
   END IF;
 
   SELECT count(*)
@@ -470,6 +527,17 @@ BEGIN
 
   SELECT count(*)
   INTO v_bad_count
+  FROM unnest(v_account_ids) AS requested(account_id)
+  LEFT JOIN public.ledger_account_balances_v2 AS b
+    ON b.account_id = requested.account_id
+  WHERE b.account_id IS NULL;
+
+  IF v_bad_count > 0 THEN
+    RAISE EXCEPTION 'LEDGER_BALANCE_STATE_MISSING' USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT count(*)
+  INTO v_bad_count
   FROM jsonb_array_elements(p_entries) AS e
   JOIN public.ledger_accounts_v2 AS a
     ON a.id = (e->>'accountId')::uuid
@@ -480,26 +548,6 @@ BEGIN
 
   IF v_bad_count > 0 THEN
     RAISE EXCEPTION 'LEDGER_INSUFFICIENT_BALANCE' USING ERRCODE = 'P0001';
-  END IF;
-
-  -- Recheck after deterministic account locks so concurrent duplicate requests
-  -- cannot post twice while waiting on the same account set.
-  SELECT id, request_hash
-  INTO v_existing_id, v_existing_hash
-  FROM public.ledger_journals_v2
-  WHERE source_type = v_source_type
-    AND idempotency_key = v_idempotency_key;
-
-  IF FOUND THEN
-    IF v_existing_hash <> v_request_hash THEN
-      RAISE EXCEPTION 'LEDGER_IDEMPOTENCY_CONFLICT' USING ERRCODE = 'P0001';
-    END IF;
-
-    RETURN jsonb_build_object(
-      'ok', true,
-      'journalId', v_existing_id,
-      'idempotentReplay', true
-    );
   END IF;
 
   BEGIN
@@ -635,20 +683,10 @@ REVOKE ALL ON FUNCTION public.post_ledger_journal_v2(
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-    GRANT EXECUTE ON FUNCTION public.ensure_ledger_account_v2(
-      text, text, text, text, text, boolean, jsonb
-    ) TO service_role;
-
-    GRANT EXECUTE ON FUNCTION public.post_ledger_journal_v2(
-      text, text, text, text, jsonb, jsonb
-    ) TO service_role;
-
-    GRANT SELECT ON
-      public.ledger_accounts_v2,
-      public.ledger_account_balances_v2,
-      public.ledger_journals_v2,
-      public.ledger_entries_v2
-    TO service_role;
+    EXECUTE 'REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.ledger_accounts_v2, public.ledger_account_balances_v2, public.ledger_journals_v2, public.ledger_entries_v2 FROM service_role';
+    EXECUTE 'GRANT SELECT ON public.ledger_accounts_v2, public.ledger_account_balances_v2, public.ledger_journals_v2, public.ledger_entries_v2, public.ledger_v2_unbalanced_journals, public.ledger_v2_balance_reconciliation TO service_role';
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.ensure_ledger_account_v2(text, text, text, text, text, boolean, jsonb) TO service_role';
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.post_ledger_journal_v2(text, text, text, text, jsonb, jsonb) TO service_role';
   END IF;
 END;
 $$;
