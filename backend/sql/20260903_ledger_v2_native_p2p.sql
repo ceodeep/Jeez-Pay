@@ -1,5 +1,24 @@
 BEGIN;
 
+DO $$
+BEGIN
+  IF to_regprocedure('public.wallet_transfer(uuid,text,text,numeric,text)') IS NULL THEN
+    RAISE EXCEPTION 'LEDGER_P2P_LEGACY_WALLET_TRANSFER_MISSING'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF to_regprocedure('public.post_ledger_journal_v2(text,text,text,text,jsonb,jsonb)') IS NULL THEN
+    RAISE EXCEPTION 'LEDGER_P2P_LEDGER_POSTING_PRIMITIVE_MISSING'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF to_regprocedure('public.materialize_legacy_account_mappings_v2()') IS NULL THEN
+    RAISE EXCEPTION 'LEDGER_P2P_MAPPING_PRIMITIVE_MISSING'
+      USING ERRCODE = 'P0001';
+  END IF;
+END;
+$$;
+
 -- Phase 4.2 database primitive:
 -- 1) Add a transaction-local bypass understood only by the generic legacy mirror.
 -- 2) Add a service-role-only P2P wrapper that runs the proven legacy wallet_transfer
