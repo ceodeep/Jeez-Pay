@@ -53,11 +53,43 @@ SELECT
   w.id AS source_id,
   w.user_id::text AS source_owner_ref,
   upper(w.currency) AS currency,
-  ('USER_WALLET:' || w.user_id::text || ':' || upper(w.currency))::text AS account_key,
-  'USER_WALLET'::text AS account_type,
-  'USER'::text AS owner_type,
+  (
+    CASE
+      WHEN coalesce(u.is_system, false)
+        OR EXISTS (
+          SELECT 1
+          FROM public.system_accounts AS sa
+          WHERE sa.user_id = w.user_id
+        )
+      THEN 'SYSTEM_WALLET:'
+      ELSE 'USER_WALLET:'
+    END
+    || w.user_id::text || ':' || upper(w.currency)
+  )::text AS account_key,
+  CASE
+    WHEN coalesce(u.is_system, false)
+      OR EXISTS (
+        SELECT 1
+        FROM public.system_accounts AS sa
+        WHERE sa.user_id = w.user_id
+      )
+    THEN 'SYSTEM_WALLET'::text
+    ELSE 'USER_WALLET'::text
+  END AS account_type,
+  CASE
+    WHEN coalesce(u.is_system, false)
+      OR EXISTS (
+        SELECT 1
+        FROM public.system_accounts AS sa
+        WHERE sa.user_id = w.user_id
+      )
+    THEN 'SYSTEM'::text
+    ELSE 'USER'::text
+  END AS owner_type,
   w.balance::numeric(38, 12) AS legacy_balance
 FROM public.wallets AS w
+JOIN public.users AS u
+  ON u.id = w.user_id
 WHERE w.user_id IS NOT NULL
   AND w.currency IS NOT NULL
   AND btrim(w.currency) <> ''
@@ -93,13 +125,15 @@ DECLARE
 BEGIN
   IF EXISTS (
     SELECT 1
-    FROM public.wallets
-    WHERE user_id IS NULL
-       OR currency IS NULL
-       OR btrim(currency) = ''
-       OR currency <> upper(currency)
-       OR balance IS NULL
-       OR balance < 0
+    FROM public.wallets AS w
+    LEFT JOIN public.users AS u ON u.id = w.user_id
+    WHERE w.user_id IS NULL
+       OR u.id IS NULL
+       OR w.currency IS NULL
+       OR btrim(w.currency) = ''
+       OR w.currency <> upper(w.currency)
+       OR w.balance IS NULL
+       OR w.balance < 0
   ) THEN
     RAISE EXCEPTION 'LEDGER_LEGACY_USER_WALLET_SOURCE_INVALID'
       USING ERRCODE = 'P0001';
@@ -221,6 +255,8 @@ SELECT
   c.source_owner_ref,
   c.currency,
   c.account_key,
+  c.account_type AS expected_account_type,
+  c.owner_type AS expected_owner_type,
   c.legacy_balance,
   m.ledger_account_id,
   a.account_type,
@@ -232,6 +268,8 @@ SELECT
     WHEN a.id IS NULL THEN 'ACCOUNT_MISSING'
     WHEN b.account_id IS NULL THEN 'BALANCE_STATE_MISSING'
     WHEN a.account_key <> c.account_key
+      OR a.account_type <> c.account_type
+      OR a.owner_type <> c.owner_type
       OR a.currency <> c.currency
       OR a.owner_ref IS DISTINCT FROM c.source_owner_ref
     THEN 'IDENTITY_MISMATCH'
@@ -333,9 +371,9 @@ END;
 $$;
 
 COMMENT ON TABLE public.ledger_legacy_account_map_v2 IS
-  'Immutable identity mapping from legacy user-wallet and merchant-balance rows to Ledger v2 accounts. No balances are copied by this table.';
+  'Immutable identity mapping from legacy wallet and merchant-balance rows to Ledger v2 accounts. System-owned legacy wallets are classified as SYSTEM_WALLET. No balances are copied by this table.';
 
 COMMENT ON VIEW public.ledger_v2_legacy_opening_entries_plan IS
-  'Read-only Phase 3 opening-balance plan. Positive legacy liabilities are offset per currency by LEGACY_OPENING_OFFSET accounts; this view never posts journals.';
+  'Read-only Phase 3 opening-balance plan. Positive legacy balances are offset per currency by LEGACY_OPENING_OFFSET accounts; this view never posts journals.';
 
 COMMIT;
