@@ -118,8 +118,6 @@ BEGIN
         USING ERRCODE = 'P0001';
     END IF;
 
-    -- Ensure every currently existing legacy source has its deterministic
-    -- Ledger account before we check exact live reconciliation.
     v_mapping := public.materialize_legacy_account_mappings_v2();
 
     FOR v_currency IN
@@ -225,8 +223,6 @@ BEGIN
       USING ERRCODE = 'P0001';
   END IF;
 
-  -- New zero-balance rows still need a deterministic account mapping so the
-  -- next balance mutation cannot create an unmapped liability.
   IF TG_OP = 'INSERT' THEN
     PERFORM public.materialize_legacy_account_mappings_v2();
   END IF;
@@ -389,7 +385,10 @@ DECLARE
   v_source_kind text := TG_ARGV[0];
 BEGIN
   IF public.ledger_v2_legacy_balance_mirror_enabled() IS NOT TRUE THEN
-    RETURN COALESCE(NEW, OLD);
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
+    RETURN NEW;
   END IF;
 
   IF TG_OP = 'DELETE' THEN
