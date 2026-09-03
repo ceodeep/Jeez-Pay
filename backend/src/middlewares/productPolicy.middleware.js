@@ -95,6 +95,20 @@ async function rejectDisabledCurrency(res, currency) {
   return true;
 }
 
+async function getMerchantPaymentCurrency(paymentId) {
+  const normalizedPaymentId = String(paymentId || "").trim();
+  if (!normalizedPaymentId) return null;
+
+  const { data, error } = await supabase
+    .from("merchant_payments")
+    .select("currency")
+    .eq("id", normalizedPaymentId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return normalizeCurrency(data?.currency);
+}
+
 function addDefaultQueryCurrency(req, currency) {
   if (req.query?.currency) return;
 
@@ -163,6 +177,38 @@ async function walletProductPolicy(req, res, next) {
 
     if (req.method === "GET" && path === "/history") {
       addDefaultQueryCurrency(req, defaultCurrency);
+    }
+
+    // Merchant payment confirmation only carries a PIN in the request body, so
+    // the currency must be resolved from the stored payment before the legacy
+    // confirmation route/RPC is allowed to run.
+    const merchantPaymentConfirmMatch = path.match(
+      /^\/merchant-payments\/([^/]+)\/confirm$/
+    );
+
+    if (req.method === "POST" && merchantPaymentConfirmMatch) {
+      const paymentCurrency = await getMerchantPaymentCurrency(
+        merchantPaymentConfirmMatch[1]
+      );
+
+      if (!paymentCurrency) {
+        return policyError(res, {
+          status: 404,
+          code: "PAYMENT_NOT_FOUND",
+          message: "Payment not found",
+        });
+      }
+
+      if (await rejectDisabledCurrency(res, paymentCurrency)) return;
+
+      const allowed = await requireCapability(
+        res,
+        paymentCurrency,
+        CAPABILITIES.MERCHANT_PAYMENT
+      );
+      if (!allowed) return;
+
+      return next();
     }
 
     // Crypto is a separate GLOBAL product. It remains in the architecture but
