@@ -21,6 +21,7 @@ const {
 const kycLifecycleV2Routes = require("./src/routes/kycLifecycleV2.routes");
 const kycRoutes = require("./src/routes/kyc.routes");
 const adminKycV2Routes = require("./src/routes/adminKycV2.routes");
+const adminComplianceV1Routes = require("./src/routes/adminComplianceV1.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const adminLaunchMoneyV2Routes = require("./src/routes/adminLaunchMoneyV2.routes");
 const servicesRoutes = require("./src/routes/services.routes");
@@ -108,11 +109,14 @@ app.use(
 // Admin reporting stays available, but manual balance/crypto configuration and
 // money actions must obey the same launch product policy as customer routes.
 // Phase 5.1 KYC review routes intercept approve/reject before legacy handlers.
-// Native launch-money routes intercept reachable SSP writers after that.
+// Phase 5.2 compliance review/control endpoints are isolated here; Ledger-bound
+// transaction monitoring itself is enforced in PostgreSQL for every native
+// launch money journal.
 app.use(
   "/admin",
   adminProductPolicy,
   adminKycV2Routes,
+  adminComplianceV1Routes,
   adminLaunchMoneyV2Routes,
   adminRoutes,
 );
