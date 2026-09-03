@@ -184,13 +184,7 @@ function mapNativeTransferError(error) {
     };
   }
 
-  if (
-    message.includes("LEDGER_P2P_PRE_RECONCILIATION_FAILED") ||
-    message.includes("LEDGER_P2P_POST_RECONCILIATION_FAILED") ||
-    message.includes("LEDGER_P2P_PRE_BALANCE_MISMATCH") ||
-    message.includes("LEDGER_P2P_POST_BALANCE_MISMATCH") ||
-    message.includes("LEDGER_P2P_LEGACY_MIRROR_NOT_ENABLED")
-  ) {
+  if (message.includes("LEDGER_P2P_")) {
     return {
       status: 503,
       body: {
