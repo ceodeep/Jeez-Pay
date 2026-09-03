@@ -10,6 +10,7 @@ const walletRoutes = require("./src/routes/wallet.routes");
 const walletTransferV2Routes = require("./src/routes/walletTransferV2.routes");
 const walletMerchantV2Routes = require("./src/routes/walletMerchantV2.routes");
 const walletAgentV2Routes = require("./src/routes/walletAgentV2.routes");
+const walletAdminCreditV2Routes = require("./src/routes/walletAdminCreditV2.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
 const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
 const {
@@ -19,6 +20,7 @@ const {
 } = require("./src/middlewares/nonWalletProductPolicy.middleware");
 const kycRoutes = require("./src/routes/kyc.routes");
 const adminRoutes = require("./src/routes/admin.routes");
+const adminLaunchMoneyV2Routes = require("./src/routes/adminLaunchMoneyV2.routes");
 const servicesRoutes = require("./src/routes/services.routes");
 const merchantRoutes = require("./src/routes/merchant.routes");
 const merchantMoneyV2Routes = require("./src/routes/merchantMoneyV2.routes");
@@ -95,6 +97,7 @@ app.use(
   "/wallet",
   authMiddleware,
   walletProductPolicy,
+  walletAdminCreditV2Routes,
   walletTransferV2Routes,
   walletMerchantV2Routes,
   walletAgentV2Routes,
@@ -103,7 +106,14 @@ app.use(
 
 // Admin reporting stays available, but manual balance/crypto configuration and
 // money actions must obey the same launch product policy as customer routes.
-app.use("/admin", adminProductPolicy, adminRoutes);
+// Native launch-money routes intercept reachable SSP writers before legacy
+// admin handlers. Unrelated admin routes continue to fall through unchanged.
+app.use(
+  "/admin",
+  adminProductPolicy,
+  adminLaunchMoneyV2Routes,
+  adminRoutes,
+);
 
 // Service payments sit outside /wallet, so enforce the same launch product
 // policy before their legacy route code executes.
