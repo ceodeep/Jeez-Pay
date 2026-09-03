@@ -7,6 +7,7 @@ const rateLimit = require("express-rate-limit");
 
 const authRoutes = require("./src/routes/auth.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
+const walletTransferV2Routes = require("./src/routes/walletTransferV2.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
 const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
 const {
@@ -38,7 +39,7 @@ const authLimiter = rateLimit({
 const otpLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
   max: 5,
-  message: { message: "Too many OTP requests. Please wait and try again." },
+  message: { message: "Too many OTP requests. Please wait and try again later." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -52,7 +53,7 @@ const corsOptions = {
   ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Idempotency-Key"],
 };
 
 app.use(cors(corsOptions));
@@ -84,9 +85,16 @@ app.use(
   accountLinkRoutes,
 );
 
-// Product policy is evaluated after authentication and before legacy wallet
-// route code so disabled currencies cannot reach money-moving handlers.
-app.use("/wallet", authMiddleware, walletProductPolicy, walletRoutes);
+// Product policy is evaluated after authentication and before wallet route
+// code. Phase 4.2B intercepts only POST /wallet/transfer with the native Ledger
+// v2 handler; every other wallet route falls through to the existing router.
+app.use(
+  "/wallet",
+  authMiddleware,
+  walletProductPolicy,
+  walletTransferV2Routes,
+  walletRoutes,
+);
 
 // Admin reporting stays available, but manual balance/crypto configuration and
 // money actions must obey the same launch product policy as customer routes.
