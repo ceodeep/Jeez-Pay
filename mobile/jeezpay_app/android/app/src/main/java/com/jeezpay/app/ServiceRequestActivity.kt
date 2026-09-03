@@ -8,18 +8,23 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.jeezpay.app.base.BaseFintechActivity
 import com.jeezpay.app.network.ApiResult
 import com.jeezpay.app.network.AppError
+import com.jeezpay.app.network.dto.ProductCapabilitiesResponse
+import com.jeezpay.app.repository.ProductPolicyStore
+import com.jeezpay.app.repository.ProductRepository
 import com.jeezpay.app.repository.ServicesRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ServiceRequestActivity : BaseFintechActivity() {
 
     private val repo = ServicesRepository()
-    private val currencies = arrayOf("USDT", "SSP", "SDG", "EGP", "UGX")
+    private val productRepo = ProductRepository()
 
     private lateinit var tvTitle: TextView
     private lateinit var etProvider: EditText
@@ -30,8 +35,11 @@ class ServiceRequestActivity : BaseFintechActivity() {
     private lateinit var tvError: TextView
     private lateinit var btnSubmit: MaterialButton
 
+    private var currencies: Array<String> = emptyArray()
     private var serviceType: String = "other"
-    private var selectedCurrency: String = "USDT"
+    private var selectedCurrency: String = ""
+    private var productPolicyLoading = false
+    private var productPolicyReady = false
     private var pendingPinAction: ((String) -> Unit)? = null
 
     private val pinLauncher =
@@ -69,7 +77,7 @@ class ServiceRequestActivity : BaseFintechActivity() {
         etProvider.hint = providerHint
         etProvider.setText(providerHint.takeIf { it != "Provider" } ?: "")
         etCustomerReference.hint = referenceHint
-        tvCurrency.text = selectedCurrency
+        tvCurrency.text = "--"
 
         tvCurrency.setOnClickListener {
             showCurrencyPicker()
@@ -78,9 +86,86 @@ class ServiceRequestActivity : BaseFintechActivity() {
         btnSubmit.setOnClickListener {
             validateThenPin()
         }
+
+        setLoading(false)
+        loadProductPolicy()
+    }
+
+    private fun loadProductPolicy(forceRefresh: Boolean = false) {
+        if (productPolicyLoading) return
+
+        val cached = ProductPolicyStore.current()
+        if (!forceRefresh && cached != null) {
+            applyProductPolicy(cached)
+            return
+        }
+
+        productPolicyLoading = true
+        productPolicyReady = false
+        setLoading(false)
+
+        lifecycleScope.launch {
+            when (val result = withContext(Dispatchers.IO) {
+                productRepo.fetchCapabilitiesSafe(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
+            }) {
+                is ApiResult.Success -> {
+                    productPolicyLoading = false
+                    ProductPolicyStore.replace(result.data)
+                    applyProductPolicy(result.data)
+                }
+
+                is ApiResult.Error -> {
+                    productPolicyLoading = false
+                    productPolicyReady = false
+                    currencies = emptyArray()
+                    selectedCurrency = ""
+                    ProductPolicyStore.clear(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
+                    tvCurrency.text = "--"
+                    setLoading(false)
+                    showError(errorMessage(result.error))
+                }
+            }
+        }
+    }
+
+    private fun applyProductPolicy(config: ProductCapabilitiesResponse) {
+        ProductPolicyStore.replace(config)
+
+        currencies = ProductPolicyStore.enabledCurrencies().toTypedArray()
+        if (currencies.isEmpty()) {
+            productPolicyReady = false
+            selectedCurrency = ""
+            tvCurrency.text = "--"
+            setLoading(false)
+            showError("No payment product is currently available")
+            return
+        }
+
+        val requestedCurrency = intent.getStringExtra("currency")
+            ?.trim()
+            ?.uppercase()
+            ?.takeIf { it in currencies }
+
+        val defaultCurrency = ProductPolicyStore.defaultCurrency()
+            ?.takeIf { it in currencies }
+
+        selectedCurrency = requestedCurrency
+            ?: defaultCurrency
+            ?: currencies.first()
+
+        productPolicyReady = true
+        tvCurrency.text = selectedCurrency
+        setLoading(false)
     }
 
     private fun showCurrencyPicker() {
+        if (!productPolicyReady) {
+            showError("Payment products are unavailable")
+            return
+        }
+
+        if (currencies.size <= 1) return
+
         val checked = currencies.indexOf(selectedCurrency).coerceAtLeast(0)
 
         MaterialAlertDialogBuilder(this)
@@ -94,6 +179,14 @@ class ServiceRequestActivity : BaseFintechActivity() {
     }
 
     private fun validateThenPin() {
+        if (!productPolicyReady ||
+            selectedCurrency.isBlank() ||
+            !ProductPolicyStore.isCurrencyEnabled(selectedCurrency)
+        ) {
+            showError("This payment currency is not available right now")
+            return
+        }
+
         val provider = etProvider.text.toString().trim()
         val customerReference = etCustomerReference.text.toString().trim()
         val amount = etAmount.text.toString().trim().toDoubleOrNull()
@@ -157,6 +250,11 @@ class ServiceRequestActivity : BaseFintechActivity() {
         note: String?,
         pin: String
     ) {
+        if (!productPolicyReady || !ProductPolicyStore.isCurrencyEnabled(currency)) {
+            showError("This payment currency is no longer available")
+            return
+        }
+
         setLoading(true)
 
         lifecycleScope.launch {
@@ -190,15 +288,15 @@ class ServiceRequestActivity : BaseFintechActivity() {
     }
 
     private fun setLoading(loading: Boolean) {
-        btnSubmit.isEnabled = !loading
-        btnSubmit.alpha = if (loading) 0.7f else 1f
+        btnSubmit.isEnabled = !loading && productPolicyReady
+        btnSubmit.alpha = if (btnSubmit.isEnabled) 1f else 0.7f
         btnSubmit.text = if (loading) "Submitting..." else "Submit Request"
 
         etProvider.isEnabled = !loading
         etCustomerReference.isEnabled = !loading
-        tvCurrency.isEnabled = !loading
-        etAmount.isEnabled = !loading
-        etNote.isEnabled = !loading
+        tvCurrency.isEnabled = !loading && productPolicyReady && currencies.size > 1
+        etAmount.isEnabled = !loading && productPolicyReady
+        etNote.isEnabled = !loading && productPolicyReady
     }
 
     private fun showError(message: String) {
