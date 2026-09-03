@@ -29,6 +29,50 @@ BEGIN
     RAISE EXCEPTION 'TEST_EXPECTED_LEGACY_SOURCES';
   END IF;
 
+  -- Wallets owned by a system user or referenced by system_accounts must be
+  -- represented as SYSTEM_WALLET/SYSTEM, never as an ordinary customer wallet.
+  SELECT count(*) INTO v_bad_count
+  FROM public.ledger_v2_legacy_source_candidates AS c
+  JOIN public.wallets AS w
+    ON c.source_kind = 'USER_WALLET'
+   AND c.source_id = w.id
+  JOIN public.users AS u
+    ON u.id = w.user_id
+  WHERE (
+      coalesce(u.is_system, false)
+      OR EXISTS (
+        SELECT 1
+        FROM public.system_accounts AS sa
+        WHERE sa.user_id = w.user_id
+      )
+    )
+    AND (c.account_type <> 'SYSTEM_WALLET' OR c.owner_type <> 'SYSTEM');
+
+  IF v_bad_count <> 0 THEN
+    RAISE EXCEPTION 'TEST_SYSTEM_WALLET_MISCLASSIFIED: % rows', v_bad_count;
+  END IF;
+
+  SELECT count(*) INTO v_bad_count
+  FROM public.ledger_v2_legacy_source_candidates AS c
+  JOIN public.wallets AS w
+    ON c.source_kind = 'USER_WALLET'
+   AND c.source_id = w.id
+  JOIN public.users AS u
+    ON u.id = w.user_id
+  WHERE NOT (
+      coalesce(u.is_system, false)
+      OR EXISTS (
+        SELECT 1
+        FROM public.system_accounts AS sa
+        WHERE sa.user_id = w.user_id
+      )
+    )
+    AND (c.account_type <> 'USER_WALLET' OR c.owner_type <> 'USER');
+
+  IF v_bad_count <> 0 THEN
+    RAISE EXCEPTION 'TEST_CUSTOMER_WALLET_MISCLASSIFIED: % rows', v_bad_count;
+  END IF;
+
   SELECT count(*) INTO v_before_accounts FROM public.ledger_accounts_v2;
   SELECT count(*) INTO v_before_journals FROM public.ledger_journals_v2;
   SELECT count(*) INTO v_before_entries FROM public.ledger_entries_v2;
@@ -155,12 +199,12 @@ $$;
 \echo ''
 \echo '=== TEMPORARY MAPPING SUMMARY ==='
 SELECT
-  source_kind,
+  expected_account_type AS account_type,
   currency,
   count(*) AS mapped_sources
-FROM public.ledger_legacy_account_map_v2
-GROUP BY source_kind, currency
-ORDER BY source_kind, currency;
+FROM public.ledger_v2_legacy_mapping_status
+GROUP BY expected_account_type, currency
+ORDER BY expected_account_type, currency;
 
 \echo ''
 \echo '=== TEMPORARY OPENING PLAN SUMMARY ==='
