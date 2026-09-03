@@ -87,8 +87,12 @@ async function serviceProductPolicy(req, res, next) {
     setDefaultBodyCurrency(req);
     const currency = normalizeCurrency(req.body?.currency);
 
-    const enabled = await requireEnabledProduct(res, currency);
-    if (!enabled) return;
+    const allowed = await requireCapability(
+      res,
+      currency,
+      CAPABILITIES.SERVICE_PAYMENT
+    );
+    if (!allowed) return;
 
     return next();
   } catch (error) {
