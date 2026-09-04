@@ -233,7 +233,10 @@ BEGIN
   SELECT count(*) INTO v_missing
   FROM (VALUES('OFAC_SDN'),('OFAC_NON_SDN'),('UN_SC'),('UK')) req(source_code)
   LEFT JOIN public.sanctions_sources_v1 s ON s.source_code=req.source_code
-  WHERE s.source_code IS NULL OR s.status<>'fresh' OR s.last_success_at<now()-interval '36 hours';
+  WHERE s.source_code IS NULL
+     OR s.status<>'fresh'
+     OR s.last_success_at IS NULL
+     OR s.last_success_at<now()-interval '36 hours';
 
   IF v_missing>0 THEN
     RETURN jsonb_build_object('ok',false,'code','SANCTIONS_DATASET_STALE','missingOrStaleSources',v_missing);
@@ -242,7 +245,7 @@ BEGIN
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
       'sourceCode',c.source_code,'sourceRef',c.source_ref,'primaryName',c.primary_name,
       'matchedName',c.matched_name,'entityType',c.entity_type,'nameSimilarity',c.name_similarity,
-      'dobYearMatch',c.dob_year_match,'score',c.score
+      'dobYearMatch',c.dob_year_match,'nationalityMatch',c.nationality_match,'score',c.score
     ) ORDER BY c.score DESC,c.name_similarity DESC),'[]'::jsonb),
     COALESCE(max(c.score),0),COALESCE(max(c.name_similarity),0)
   INTO v_candidates,v_top_score,v_top_similarity
