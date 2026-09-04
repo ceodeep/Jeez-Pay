@@ -23,6 +23,7 @@ const kycLifecycleV2Routes = require("./src/routes/kycLifecycleV2.routes");
 const kycRoutes = require("./src/routes/kyc.routes");
 const adminKycV3Routes = require("./src/routes/adminKycV3.routes");
 const adminSanctionsV1Routes = require("./src/routes/adminSanctionsV1.routes");
+const adminAgentsV1Routes = require("./src/routes/adminAgentsV1.routes");
 const adminKycV2Routes = require("./src/routes/adminKycV2.routes");
 const adminComplianceV1Routes = require("./src/routes/adminComplianceV1.routes");
 const adminRoutes = require("./src/routes/admin.routes");
@@ -110,11 +111,13 @@ app.use(
 // KYC v3 reviewer APIs use deterministic keyset pagination, atomic claiming,
 // fresh public sanctions screening, signed evidence only on detail view,
 // controlled checks and senior approval. Existing V2 admin routes remain as
-// fallback for legacy records.
+// fallback for legacy records. Agent desks are managed through a dedicated
+// lifecycle API; generic role editing does not create operational agents.
 app.use(
   "/admin",
   adminProductPolicy,
   adminSanctionsV1Routes,
+  adminAgentsV1Routes,
   adminKycV3Routes,
   adminKycV2Routes,
   adminComplianceV1Routes,
