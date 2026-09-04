@@ -208,13 +208,14 @@ router.post("/agent-cash-in", async (req, res) => {
     }
 
     const idempotencyKey = resolveIdempotencyKey(req);
+    const customerIdentifier = String(customer.phone || phoneNorm).trim();
 
     const { data, error } = await supabase.rpc("agent_cash_in_ledger_v2", {
       p_agent_user_id: agentId,
-      p_customer_identifier: phoneRaw,
+      p_customer_identifier: customerIdentifier,
       p_currency: currency,
       p_amount: amount,
-      p_description: description || `Agent cash-in to ${phoneNorm}`,
+      p_description: description || `Agent cash-in to ${customerIdentifier}`,
       p_idempotency_key: idempotencyKey,
     });
 
@@ -237,7 +238,7 @@ router.post("/agent-cash-in", async (req, res) => {
       fee: Number.isFinite(actualFee) ? actualFee : 0,
       agentUserId: agentId,
       customerUserId: result.customerUserId || customer.id,
-      phone: phoneNorm,
+      phone: customerIdentifier,
       senderBalance: result.sender_balance ?? result.senderBalance ?? null,
       receiverBalance: result.receiver_balance ?? result.receiverBalance ?? null,
     });
@@ -288,13 +289,14 @@ router.post("/agent-cash-out", async (req, res) => {
     }
 
     const idempotencyKey = resolveIdempotencyKey(req);
+    const agentIdentifier = String(agent.phone || phoneNorm).trim();
 
     const { data, error } = await supabase.rpc("agent_cash_out_ledger_v2", {
       p_customer_user_id: userId,
-      p_agent_identifier: phoneRaw,
+      p_agent_identifier: agentIdentifier,
       p_currency: currency,
       p_amount: amount,
-      p_description: description || `Agent cash-out to ${phoneNorm}`,
+      p_description: description || `Agent cash-out to ${agentIdentifier}`,
       p_idempotency_key: idempotencyKey,
     });
 
@@ -317,7 +319,7 @@ router.post("/agent-cash-out", async (req, res) => {
       fee: Number.isFinite(actualFee) ? actualFee : 0,
       agentUserId: result.agentUserId || agent.id,
       customerUserId: userId,
-      phone: phoneNorm,
+      phone: agentIdentifier,
       senderBalance: result.sender_balance ?? result.senderBalance ?? null,
       receiverBalance: result.receiver_balance ?? result.receiverBalance ?? null,
     });
