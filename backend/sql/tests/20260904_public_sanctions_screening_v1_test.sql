@@ -1,6 +1,6 @@
 \pset pager off
 \echo '=== PUBLIC SANCTIONS SCREENING V1 TEST ==='
-\echo 'ROLLBACK-ONLY: fresh-source gate, exact-hit potential match, no-hit clear, no auto-confirm.'
+\echo 'ROLLBACK-ONLY: null/stale-source gate, exact-hit potential match, no-hit clear, no auto-confirm.'
 
 BEGIN;
 SET LOCAL statement_timeout='30s';
@@ -53,6 +53,20 @@ BEGIN
   );
   v_result:=public.submit_kyc_v3(v_hit_user,v_payload,'127.0.0.1','SANCTIONS-ROLLBACK-TEST');
   IF COALESCE((v_result->>'ok')::boolean,false) IS NOT TRUE THEN RAISE EXCEPTION 'HIT_USER_SUBMIT_FAILED: %',v_result; END IF;
+
+  UPDATE public.sanctions_sources_v1 SET last_success_at=NULL WHERE source_code='UK';
+  v_result:=public.screen_kyc_sanctions_public_v1(v_admin,v_hit_user);
+  IF COALESCE(v_result->>'code','')<>'SANCTIONS_DATASET_STALE' THEN
+    RAISE EXCEPTION 'NULL_SOURCE_FRESHNESS_DID_NOT_FAIL_CLOSED: %',v_result;
+  END IF;
+  UPDATE public.sanctions_sources_v1 SET last_success_at=now() WHERE source_code='UK';
+
+  UPDATE public.sanctions_sources_v1 SET last_success_at=now()-interval '37 hours' WHERE source_code='UN_SC';
+  v_result:=public.screen_kyc_sanctions_public_v1(v_admin,v_hit_user);
+  IF COALESCE(v_result->>'code','')<>'SANCTIONS_DATASET_STALE' THEN
+    RAISE EXCEPTION 'STALE_SOURCE_DID_NOT_FAIL_CLOSED: %',v_result;
+  END IF;
+  UPDATE public.sanctions_sources_v1 SET last_success_at=now() WHERE source_code='UN_SC';
 
   v_result:=public.screen_kyc_sanctions_public_v1(v_admin,v_hit_user);
   IF COALESCE((v_result->>'ok')::boolean,false) IS NOT TRUE OR v_result->>'status'<>'potential_match' THEN
