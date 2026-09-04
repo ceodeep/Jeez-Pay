@@ -200,6 +200,34 @@ BEGIN
     RAISE EXCEPTION 'TEST_ADMIN_NET_BALANCE_NOT_RESTORED: before %, after %', v_before, v_after;
   END IF;
 
+  SELECT u.id, w.id
+  INTO v_target_user_id, v_target_wallet_id
+  FROM public.users u
+  JOIN public.wallets w
+    ON w.user_id=u.id
+   AND upper(w.currency)='SSP'
+  JOIN public.kyc_profiles kp
+    ON kp.user_id=u.id
+   AND kp.status='approved'
+  WHERE u.role='user'
+    AND COALESCE(u.is_system,false)=false
+    AND COALESCE(u.is_active,true)=true
+    AND w.balance >= 1
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.compliance_entity_controls c
+      WHERE c.entity_type='USER'
+        AND c.entity_ref=u.id::text
+        AND c.status='frozen'
+        AND (c.expires_at IS NULL OR c.expires_at > now())
+    )
+  ORDER BY w.balance DESC, u.id
+  LIMIT 1;
+
+  IF v_target_user_id IS NULL THEN
+    RAISE EXCEPTION 'TEST_APPROVED_KYC_SSP_USER_WITH_BALANCE_MISSING';
+  END IF;
+
   INSERT INTO public.withdraw_requests(
     user_id,wallet_id,amount,currency,method,destination,status
   ) VALUES (
