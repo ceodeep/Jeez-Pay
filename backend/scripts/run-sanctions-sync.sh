@@ -28,9 +28,9 @@ BACKEND_DIR="$(
   '
 )"
 
-if [ -z "$BACKEND_DIR" ] || [ ! -f "$BACKEND_DIR/scripts/sync-sanctions.py" ] || [ ! -f "$BACKEND_DIR/.env" ]; then
+if [ -z "$BACKEND_DIR" ] || [ ! -f "$BACKEND_DIR/scripts/sync-sanctions-runner.py" ] || [ ! -f "$BACKEND_DIR/.env" ]; then
   echo "Sanctions sync: active backend release not found" >&2
   exit 2
 fi
 
-exec /usr/bin/python3 "$BACKEND_DIR/scripts/sync-sanctions.py" --env "$BACKEND_DIR/.env"
+exec /usr/bin/python3 "$BACKEND_DIR/scripts/sync-sanctions-runner.py" --env "$BACKEND_DIR/.env"
