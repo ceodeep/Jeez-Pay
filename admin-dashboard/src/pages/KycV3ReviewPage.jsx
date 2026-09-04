@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../lib/api";
 
 const CHECKS = [
@@ -45,9 +45,7 @@ export default function KycV3ReviewPage() {
   const [workflow, setWorkflow] = useState("submitted");
   const [risk, setRisk] = useState("");
   const [assignment, setAssignment] = useState("");
-  const [cursorSeq, setCursorSeq] = useState(null);
   const [nextCursorSeq, setNextCursorSeq] = useState(null);
-  const [history, setHistory] = useState([]);
   const [reviewReason, setReviewReason] = useState("");
   const [requiredAction, setRequiredAction] = useState("");
   const [checkDrafts, setCheckDrafts] = useState({});
@@ -58,7 +56,7 @@ export default function KycV3ReviewPage() {
     return map;
   }, [detail]);
 
-  async function loadQueue(cursor = null, append = false) {
+  const loadQueue = useCallback(async (cursor = null, append = false) => {
     setLoading(true);
     setMessage("");
     try {
@@ -71,14 +69,13 @@ export default function KycV3ReviewPage() {
       const rows = res.data?.items || [];
       setItems((prev) => append ? [...prev, ...rows] : rows);
       setNextCursorSeq(res.data?.pagination?.nextCursorSeq ?? null);
-      if (!append) setCursorSeq(null);
     } catch (err) {
       if (err?.response?.status === 401) window.location.href = "/";
       setMessage(err?.response?.data?.message || "Failed to load KYC review queue");
     } finally {
       setLoading(false);
     }
-  }
+  }, [workflow, risk, assignment]);
 
   async function openApplication(item) {
     setSelected(item);
@@ -150,7 +147,9 @@ export default function KycV3ReviewPage() {
     }
   }
 
-  useEffect(() => { loadQueue(); }, [workflow, risk, assignment]);
+  useEffect(() => {
+    loadQueue();
+  }, [loadQueue]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -190,7 +189,7 @@ export default function KycV3ReviewPage() {
               {item.assigned_to && <div style={{ color: "#64748b", fontSize: 11, marginTop: 4 }}>Assigned</div>}
             </button>
           ))}
-          {nextCursorSeq && <button onClick={() => { setCursorSeq(nextCursorSeq); loadQueue(nextCursorSeq, true); }} disabled={loading} style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}>{loading ? "Loading…" : "Load more"}</button>}
+          {nextCursorSeq && <button onClick={() => loadQueue(nextCursorSeq, true)} disabled={loading} style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}>{loading ? "Loading…" : "Load more"}</button>}
         </aside>
 
         <main>
