@@ -1,32 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_app">
 
-    <!-- Top App Bar -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbarKyc"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@android:color/transparent"
-        app:title="KYC Verification"
+        app:title="Identity verification"
         app:titleTextAppearance="@style/TextAppearance.MaterialComponents.Headline6"
         app:navigationIcon="@drawable/ic_back"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Scroll Content -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollKyc"
-        android:scrollbars="none"
-        android:fadeScrollbars="false"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:fillViewport="true"
+        android:scrollbars="none"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:paddingTop="8dp"
@@ -41,223 +37,277 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Hint Card -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardKycStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
                 app:cardCornerRadius="18dp"
                 app:cardElevation="0dp"
                 app:strokeWidth="1dp"
-                app:strokeColor="@color/card_stroke"
-                android:layout_marginBottom="14dp">
-
+                app:strokeColor="@color/card_stroke">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:padding="16dp">
-
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:id="@+id/tvKycStatusTitle"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Complete KYC to unlock transfers &amp; higher limits"
+                        android:text="Verify your identity"
                         android:textColor="@color/text_primary"
-                        android:textSize="16sp"
-                        android:textStyle="bold"/>
-
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
                     <TextView
+                        android:id="@+id/tvKycStatusMessage"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="Your documents are stored securely."
+                        android:text="Complete the steps below. Your information is used for identity verification and financial crime prevention."
                         android:textColor="@color/text_tertiary"
-                        android:textSize="13sp"/>
+                        android:textSize="13sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Full name -->
-            <com.google.android.material.textfield.TextInputLayout
+            <LinearLayout
+                android:id="@+id/layoutKycProgress"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Full name"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etFullName"
-                    android:layout_width="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingVertical="6dp">
+                <TextView
+                    android:id="@+id/tvKycStep"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:inputType="textPersonName"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_weight="1"
+                    android:text="Step 1 of 4"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/tvKycStepName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Personal details"
+                    android:textColor="@color/text_tertiary"
+                    android:textSize="13sp" />
+            </LinearLayout>
 
-            <!-- DOB -->
-            <com.google.android.material.textfield.TextInputLayout
+            <LinearLayout
+                android:id="@+id/sectionPersonal"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:hint="Date of birth"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
-                app:endIconMode="custom"
-                app:endIconDrawable="@drawable/ic_calendar">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etDob"
+                android:orientation="vertical">
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:focusable="false"
-                    android:clickable="true"
-                    android:inputType="none"/>
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="10dp"
+                    android:text="Personal identity"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:hint="Full legal name"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etFullName" android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:inputType="textPersonName" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    android:hint="Date of birth" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    app:endIconMode="custom" app:endIconDrawable="@drawable/ic_calendar">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etDob" android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:focusable="false" android:clickable="true" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    android:hint="Nationality" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/acNationality" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    android:hint="Country of birth" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/acCountryOfBirth" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    android:hint="Country of residence" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                        android:id="@+id/acResidenceCountry" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    android:hint="Residential address" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etAddress" android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:inputType="textPostalAddress" android:minLines="2" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    android:hint="Address line 2 (optional)" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etAddressLine2" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textPostalAddress" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    android:hint="City / town" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etCity" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapWords" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="horizontal">
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginEnd="6dp"
+                        android:hint="State / region" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/etRegion" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="6dp"
+                        android:hint="Postal code" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/etPostalCode" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+            </LinearLayout>
 
-            <!-- Address -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:hint="Address"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+            <LinearLayout
+                android:id="@+id/sectionDocument" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="vertical" android:visibility="gone">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginBottom="10dp"
+                    android:text="Government identity document" android:textColor="@color/text_primary" android:textSize="20sp" android:textStyle="bold" />
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Document type"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/acDocumentType" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Issuing country"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/acIssuingCountry" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Document number"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/etDocumentNumber" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapCharacters" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:orientation="horizontal">
+                    <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginEnd="6dp"
+                        android:hint="Issue date (optional)" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/etDocumentIssueDate" android:layout_width="match_parent" android:layout_height="wrap_content" android:focusable="false" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.textfield.TextInputLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="6dp"
+                        android:hint="Expiry date" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                        <com.google.android.material.textfield.TextInputEditText android:id="@+id/etDocumentExpiryDate" android:layout_width="match_parent" android:layout_height="wrap_content" android:focusable="false" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+                <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/cbDocumentNoExpiry" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="This document has no expiry date" />
 
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etAddress"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textPostalAddress"
-                    android:minLines="2"/>
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- ID Upload Card -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardIdUpload"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="0dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="@color/card_stroke">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:padding="14dp">
-
-                    <ImageView
-                        android:id="@+id/imgIdPreview"
-                        android:layout_width="64dp"
-                        android:layout_height="64dp"
-                        android:scaleType="centerCrop"
-                        android:visibility="gone"
-                        android:background="@drawable/kyc_preview_bg"
-                        android:contentDescription="ID preview" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="ID Photo"
-                            android:textColor="@color/text_primary"
-                            android:textStyle="bold"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="Upload a clear photo of your ID front."
-                            android:textColor="@color/text_tertiary"
-                            android:textSize="13sp" />
+                <com.google.android.material.card.MaterialCardView android:id="@+id/cardIdUpload" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/card_stroke">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="14dp">
+                        <ImageView android:id="@+id/imgIdPreview" android:layout_width="64dp" android:layout_height="64dp" android:background="@drawable/kyc_preview_bg" android:contentDescription="ID front preview" android:scaleType="centerCrop" android:visibility="gone" />
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Document front" android:textColor="@color/text_primary" android:textSize="15sp" android:textStyle="bold" />
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Use the camera. Keep all corners visible and text readable." android:textColor="@color/text_tertiary" android:textSize="13sp" />
+                        </LinearLayout>
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btnPickId" android:layout_width="wrap_content" android:layout_height="44dp" android:text="Camera" app:cornerRadius="14dp" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                     </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnPickId"
-                        android:layout_width="wrap_content"
-                        android:layout_height="44dp"
-                        android:text="Choose"
-                        app:cornerRadius="14dp"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardSelfieUpload"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:cardCornerRadius="18dp"
-                app:cardElevation="0dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="@color/card_stroke">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:padding="14dp">
-
-                    <ImageView
-                        android:id="@+id/imgSelfiePreview"
-                        android:layout_width="64dp"
-                        android:layout_height="64dp"
-                        android:scaleType="centerCrop"
-                        android:visibility="gone"
-                        android:background="@drawable/kyc_preview_bg"
-                        android:contentDescription="Selfie preview" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="12dp"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Live Selfie"
-                            android:textColor="@color/text_primary"
-                            android:textStyle="bold"
-                            android:textSize="15sp" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="3dp"
-                            android:text="Take a live camera selfie. Gallery is not allowed."
-                            android:textColor="@color/text_tertiary"
-                            android:textSize="13sp" />
+                <com.google.android.material.card.MaterialCardView android:id="@+id/cardIdBackUpload" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                    app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/card_stroke">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="14dp">
+                        <ImageView android:id="@+id/imgIdBackPreview" android:layout_width="64dp" android:layout_height="64dp" android:background="@drawable/kyc_preview_bg" android:contentDescription="ID back preview" android:scaleType="centerCrop" android:visibility="gone" />
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Document back" android:textColor="@color/text_primary" android:textSize="15sp" android:textStyle="bold" />
+                            <TextView android:id="@+id/tvIdBackHint" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Required for two-sided identity cards." android:textColor="@color/text_tertiary" android:textSize="13sp" />
+                        </LinearLayout>
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btnPickIdBack" android:layout_width="wrap_content" android:layout_height="44dp" android:text="Camera" app:cornerRadius="14dp" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
                     </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnPickSelfie"
-                        android:layout_width="wrap_content"
-                        android:layout_height="44dp"
-                        android:text="Camera"
-                        app:cornerRadius="14dp"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+            <LinearLayout android:id="@+id/sectionRisk" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginBottom="10dp" android:text="Financial profile" android:textColor="@color/text_primary" android:textSize="20sp" android:textStyle="bold" />
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Employment status" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/acEmploymentStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Occupation" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/etOccupation" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Employer / business (optional)" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/etEmployerName" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp" android:text="Source of funds" android:textColor="@color/text_primary" android:textStyle="bold" />
+                <com.google.android.material.chip.ChipGroup android:id="@+id/chipSourceOfFunds" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" app:singleSelection="false">
+                    <com.google.android.material.chip.Chip android:id="@+id/chipSalary" style="@style/Widget.MaterialComponents.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Salary" android:checkable="true" />
+                    <com.google.android.material.chip.Chip android:id="@+id/chipBusiness" style="@style/Widget.MaterialComponents.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Business" android:checkable="true" />
+                    <com.google.android.material.chip.Chip android:id="@+id/chipSavings" style="@style/Widget.MaterialComponents.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Savings" android:checkable="true" />
+                    <com.google.android.material.chip.Chip android:id="@+id/chipInvestments" style="@style/Widget.MaterialComponents.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Investments" android:checkable="true" />
+                    <com.google.android.material.chip.Chip android:id="@+id/chipFamily" style="@style/Widget.MaterialComponents.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Family support" android:checkable="true" />
+                    <com.google.android.material.chip.Chip android:id="@+id/chipOtherFunds" style="@style/Widget.MaterialComponents.Chip.Filter" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Other" android:checkable="true" />
+                </com.google.android.material.chip.ChipGroup>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Source of wealth (optional)" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/etSourceOfWealth" android:layout_width="match_parent" android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Main reason for using JeezPay" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/acAccountPurpose" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Expected monthly transaction value" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/acExpectedVolume" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Expected monthly transaction count" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView android:id="@+id/acExpectedTxCount" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Tax residence countries (ISO codes, optional)" app:helperText="Example: SS, KE" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/etTaxResidencies" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapCharacters" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/cbPepSelf" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="I am, or have been, a politically exposed person (PEP)" />
+                <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/cbPepRelated" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="I am a close family member or known close associate of a PEP" />
+            </LinearLayout>
 
+            <LinearLayout android:id="@+id/sectionVerification" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:layout_marginBottom="10dp" android:text="Verification &amp; consent" android:textColor="@color/text_primary" android:textSize="20sp" android:textStyle="bold" />
+                <com.google.android.material.card.MaterialCardView android:id="@+id/cardSelfieUpload" android:layout_width="match_parent" android:layout_height="wrap_content" app:cardCornerRadius="18dp" app:cardElevation="0dp" app:strokeWidth="1dp" app:strokeColor="@color/card_stroke">
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="14dp">
+                        <ImageView android:id="@+id/imgSelfiePreview" android:layout_width="64dp" android:layout_height="64dp" android:background="@drawable/kyc_preview_bg" android:contentDescription="Selfie preview" android:scaleType="centerCrop" android:visibility="gone" />
+                        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:layout_weight="1" android:orientation="vertical">
+                            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Selfie capture" android:textColor="@color/text_primary" android:textSize="15sp" android:textStyle="bold" />
+                            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="Use the camera in good lighting. This photo supports identity comparison; additional liveness checks may be required." android:textColor="@color/text_tertiary" android:textSize="13sp" />
+                        </LinearLayout>
+                        <com.google.android.material.button.MaterialButton android:id="@+id/btnPickSelfie" android:layout_width="wrap_content" android:layout_height="44dp" android:text="Camera" app:cornerRadius="14dp" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+                <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/cbPrivacyConsent" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:text="I have read and accept the privacy notice." />
+                <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/cbIdentityConsent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="I consent to identity-document verification for KYC purposes." />
+                <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/cbBiometricConsent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="I consent to processing my selfie/biometric comparison data for identity verification." />
+                <com.google.android.material.checkbox.MaterialCheckBox android:id="@+id/cbScreeningConsent" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="I acknowledge ongoing sanctions, PEP and financial-crime screening where required by law/policy." />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:text="By submitting, you confirm the information is true and belongs to you. False information may result in rejection or account restrictions." android:textColor="@color/text_tertiary" android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout android:id="@+id/layoutStepNavigation" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton android:id="@+id/btnKycBackStep" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:layout_marginEnd="6dp" android:text="Back" android:visibility="gone" style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btnKycNextStep" android:layout_width="0dp" android:layout_height="50dp" android:layout_weight="1" android:layout_marginStart="6dp" android:text="Continue" />
+            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Sticky Submit Button -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnSubmitKyc"
         android:layout_width="0dp"
         android:layout_height="54dp"
         android:layout_margin="16dp"
-        android:text="Submit KYC"
+        android:text="Submit verification"
+        android:visibility="gone"
         app:cornerRadius="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
