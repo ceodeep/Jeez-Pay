@@ -2,7 +2,7 @@
 \pset pager off
 
 \echo '=== MERCHANT API V1 MONEY TEST ==='
-\echo 'ROLLBACK-ONLY: one tiny SSP payment + payout through launch wrappers, replay proof, balanced Ledger, no generic mirror double-post.'
+\echo 'ROLLBACK-ONLY: one tiny SSP payment + payout through launch wrappers, replay/webhook proof, balanced Ledger, no generic mirror double-post.'
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -119,6 +119,15 @@ BEGIN
   IF COALESCE((v_payment_replay->>'idempotentReplay')::boolean, false) IS NOT TRUE
      OR NULLIF(v_payment_replay->>'ledgerJournalId','')::uuid IS DISTINCT FROM v_payment_journal THEN
     RAISE EXCEPTION 'MERCHANT_API_V1_MONEY_TEST_PAYMENT_REPLAY_FAILED: %', v_payment_replay;
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM public.merchant_webhook_events
+  WHERE merchant_payment_id = v_payment_id
+    AND event_type = 'merchant_payment.paid';
+
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'MERCHANT_API_V1_MONEY_TEST_WEBHOOK_EVENT_COUNT: %', v_count;
   END IF;
 
   v_payout_key := 'phase7-money-payout-' || txid_current()::text;
