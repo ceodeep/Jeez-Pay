@@ -1,6 +1,7 @@
 package com.jeezpay.app.network
 
 import com.jeezpay.app.network.dto.KycMeResponse
+import com.jeezpay.app.network.dto.KycPolicyResponse
 import com.jeezpay.app.network.dto.KycSubmitRequest
 import com.jeezpay.app.network.dto.KycSubmitResponse
 import com.jeezpay.app.network.dto.KycUploadUrlRequest
@@ -10,6 +11,9 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 
 interface KycApi {
+
+    @GET("kyc/policy")
+    suspend fun policy(): KycPolicyResponse
 
     @GET("kyc/me")
     suspend fun me(): KycMeResponse
