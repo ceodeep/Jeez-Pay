@@ -119,6 +119,14 @@ BEGIN
     END IF;
   END IF;
 
+  IF NEW.check_type='face_match' AND NEW.status='verified' THEN
+    IF NULLIF(btrim(COALESCE(NEW.provider,'')),'') IS NULL
+       OR lower(btrim(NEW.provider))='manual'
+       OR NULLIF(btrim(COALESCE(NEW.provider_reference,'')),'') IS NULL THEN
+      RAISE EXCEPTION 'KYC_V3_PROVIDER_FACE_MATCH_REFERENCE_REQUIRED' USING ERRCODE='P0001';
+    END IF;
+  END IF;
+
   IF NEW.check_type='liveness' AND NEW.status='manual_verified' THEN
     IF lower(COALESCE(NULLIF(btrim(NEW.provider),''),'manual')) <> 'manual'
        OR NEW.performed_by IS NULL
@@ -128,9 +136,8 @@ BEGIN
     END IF;
   END IF;
 
-  -- Automated/provider liveness may use status=verified, but a reviewer may
-  -- not label a manual check as provider-verified to bypass attended-session
-  -- evidence.
+  -- Automated/provider biometric checks may use status=verified, but a reviewer
+  -- may not label a manual check as provider-verified to bypass evidence.
   IF NEW.check_type='liveness' AND NEW.status='verified' THEN
     IF NULLIF(btrim(COALESCE(NEW.provider,'')),'') IS NULL
        OR lower(btrim(NEW.provider))='manual'
@@ -175,7 +182,12 @@ BEGIN
         WHERE c.application_id=v_app.id
           AND c.check_type='face_match'
           AND (
-            c.status='verified'
+            (
+              c.status='verified'
+              AND NULLIF(btrim(COALESCE(c.provider,'')),'') IS NOT NULL
+              AND lower(btrim(c.provider))<>'manual'
+              AND NULLIF(btrim(COALESCE(c.provider_reference,'')),'') IS NOT NULL
+            )
             OR (
               c.status='manual_verified'
               AND lower(COALESCE(NULLIF(btrim(c.provider),''),'manual'))='manual'
