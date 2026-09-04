@@ -4,58 +4,86 @@ const { merchantAuthMiddleware } = require("../middlewares/merchantAuth.middlewa
 
 const router = express.Router();
 
-function cleanString(value, max = 255) {
-  return String(value || "").trim().slice(0, max);
+function text(value) {
+  return String(value ?? "").trim();
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function metadataSizeOk(value) {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), "utf8") <= 8192;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Phase 4.3C merchant payout cutover.
- *
- * Product policy has already run in app.js. This route preserves the existing
- * merchant authentication, validation, status-code mapping, and response shape;
- * only the money RPC changes to the native Ledger v2 wrapper proven in 4.3B.
+ * Phase 7 merchant payout API.
+ * Merchant auth + product policy have already run in app.js. Launch currency
+ * is SSP only here and again inside PostgreSQL before the proven Ledger v2
+ * payout primitive is reached.
  */
 router.post("/payouts", merchantAuthMiddleware, async (req, res) => {
   try {
     const merchant = req.merchant;
 
-    const idempotencyKey = cleanString(req.body.idempotency_key, 120);
-    const rawAccountNumber = cleanString(req.body.account_number, 40);
-    const amountRaw = cleanString(req.body.amount, 80);
-    const currency = cleanString(req.body.currency, 12).toUpperCase();
-    const description = cleanString(req.body.description, 500);
-    const metadata =
-      req.body.metadata &&
-      typeof req.body.metadata === "object" &&
-      !Array.isArray(req.body.metadata)
-        ? req.body.metadata
-        : {};
+    const idempotencyKey = text(req.body?.idempotency_key);
+    const rawAccountNumber = text(req.body?.account_number);
+    const amountRaw = text(req.body?.amount);
+    const currency = text(req.body?.currency || "SSP").toUpperCase();
+    const description = text(req.body?.description);
+    const metadata = req.body?.metadata == null ? {} : req.body.metadata;
 
-    if (!idempotencyKey) {
+    if (!idempotencyKey || idempotencyKey.length > 120) {
       return res.status(400).json({
         code: "INVALID_IDEMPOTENCY_KEY",
-        message: "idempotency_key is required",
+        message: "idempotency_key must be between 1 and 120 characters",
       });
     }
 
-    if (!rawAccountNumber || !/^\d{1,19}$/.test(rawAccountNumber)) {
+    if (!/^\d{1,19}$/.test(rawAccountNumber)) {
       return res.status(400).json({
         code: "INVALID_ACCOUNT_NUMBER",
         message: "A valid JeezPay account number is required",
       });
     }
 
-    if (!/^\d+(?:\.\d{1,6})?$/.test(amountRaw) || Number(amountRaw) <= 0) {
+    if (!/^\d+(?:\.\d{1,6})?$/.test(amountRaw)) {
       return res.status(400).json({
         code: "INVALID_AMOUNT",
         message: "A valid payout amount is required",
       });
     }
 
-    if (!["SSP", "USDT"].includes(currency)) {
+    const numericAmount = Number(amountRaw);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        code: "INVALID_AMOUNT",
+        message: "A valid payout amount is required",
+      });
+    }
+
+    if (currency !== "SSP") {
       return res.status(400).json({
         code: "UNSUPPORTED_CURRENCY",
-        message: "Only SSP and USDT merchant payouts are supported",
+        message: "Only SSP merchant payouts are enabled for launch",
+      });
+    }
+
+    if (description.length > 500) {
+      return res.status(400).json({
+        code: "INVALID_DESCRIPTION",
+        message: "description must not exceed 500 characters",
+      });
+    }
+
+    if (!isPlainObject(metadata) || !metadataSizeOk(metadata)) {
+      return res.status(400).json({
+        code: "INVALID_METADATA",
+        message: "metadata must be a JSON object no larger than 8KB",
       });
     }
 
@@ -88,9 +116,9 @@ router.post("/payouts", merchantAuthMiddleware, async (req, res) => {
     }
 
     if (data.ok !== true) {
-      const code = cleanString(data.code, 80) || "PAYOUT_FAILED";
+      const code = text(data.code).slice(0, 80) || "PAYOUT_FAILED";
       const message =
-        cleanString(data.message, 500) || "Payout could not be completed";
+        text(data.message).slice(0, 500) || "Payout could not be completed";
 
       const statusByCode = {
         INVALID_IDEMPOTENCY_KEY: 400,
@@ -110,10 +138,7 @@ router.post("/payouts", merchantAuthMiddleware, async (req, res) => {
         IDEMPOTENCY_CONFLICT: 409,
       };
 
-      return res.status(statusByCode[code] || 400).json({
-        code,
-        message,
-      });
+      return res.status(statusByCode[code] || 400).json({ code, message });
     }
 
     return res.status(data.already_processed === true ? 200 : 201).json({
