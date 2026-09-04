@@ -85,6 +85,48 @@ function safeAgentRpcError(error, fallbackMessage) {
     };
   }
 
+  if (message.includes("AGENT_DESK_NOT_ACTIVE")) {
+    return {
+      status: 403,
+      body: { code: "AGENT_NOT_ACTIVE", message: "This agent desk is not active" },
+    };
+  }
+
+  if (
+    message.includes("AGENT_DESK_CAPABILITY_DISABLED") ||
+    message.includes("AGENT_DESK_PRODUCT_DISABLED")
+  ) {
+    return {
+      status: 403,
+      body: { code: "AGENT_CAPABILITY_DISABLED", message: "This cash operation is not enabled for the agent" },
+    };
+  }
+
+  if (message.includes("AGENT_DESK_TX_LIMIT_EXCEEDED")) {
+    return {
+      status: 400,
+      body: { code: "AGENT_TX_LIMIT_EXCEEDED", message: "Amount is outside this agent desk's transaction limits" },
+    };
+  }
+
+  if (message.includes("AGENT_DESK_DAILY_LIMIT_EXCEEDED")) {
+    return {
+      status: 409,
+      body: { code: "AGENT_DAILY_LIMIT_EXCEEDED", message: "This agent desk has reached its daily limit" },
+    };
+  }
+
+  if (
+    message.includes("AGENT_DESK_KYC_REQUIRED") ||
+    message.includes("AGENT_DESK_COMPLIANCE_RESTRICTED") ||
+    message.includes("AGENT_DESK_AGENT_NOT_ELIGIBLE")
+  ) {
+    return {
+      status: 403,
+      body: { code: "AGENT_RESTRICTED", message: "This agent is not eligible for cash operations" },
+    };
+  }
+
   if (
     message.includes("Insufficient balance") ||
     message.includes("Invalid amount") ||
@@ -127,12 +169,11 @@ function safeAgentRpcError(error, fallbackMessage) {
 }
 
 /**
- * Phase 4.4C agent money cutover.
+ * Native Ledger v2 agent money cutover.
  *
  * Authentication + wallet product policy run in app.js before this router.
- * The existing request/response contract is preserved, but the client-supplied
- * fee is no longer used for accounting. The authoritative fee is returned by
- * the atomic Ledger v2 database primitive and stored in agent_operations there.
+ * Phase 6 desk controls execute inside the database before the already-proven
+ * atomic money primitive. The client-supplied fee is never used for accounting.
  */
 router.post("/agent-cash-in", async (req, res) => {
   try {
