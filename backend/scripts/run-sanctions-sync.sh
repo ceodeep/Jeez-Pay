@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/jeezpay-sanctions-sync.lock"
+exec 9>"$LOCK_FILE"
+if ! /usr/bin/flock -n 9; then
+  echo "Sanctions sync: another sync is already running"
+  exit 0
+fi
+
 BACKEND_DIR="$(
   pm2 jlist | node -e '
     let s="";
