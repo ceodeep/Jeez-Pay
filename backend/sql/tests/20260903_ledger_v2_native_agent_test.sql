@@ -107,6 +107,9 @@ BEGIN
   JOIN public.wallets w
     ON w.user_id = u.id
    AND w.currency = 'SSP'
+  JOIN public.kyc_profiles kp
+    ON kp.user_id = u.id
+   AND kp.status = 'approved'
   WHERE u.role = 'user'
     AND u.id <> v_agent_id
     AND COALESCE(u.is_system, false) = false
@@ -114,11 +117,18 @@ BEGIN
     AND COALESCE(u.phone_verified, false) = true
     AND u.phone IS NOT NULL
     AND w.balance >= v_required
+    AND NOT EXISTS (
+      SELECT 1
+      FROM public.compliance_entity_controls c
+      WHERE c.entity_type = 'USER'
+        AND c.entity_ref = u.id::text
+        AND c.status IN ('review','frozen')
+    )
   ORDER BY w.balance DESC, u.id
   LIMIT 1;
 
   IF v_customer_id IS NULL THEN
-    RAISE EXCEPTION 'PHASE44_TEST_NO_CUSTOMER_CANDIDATE';
+    RAISE EXCEPTION 'PHASE44_TEST_NO_ELIGIBLE_CUSTOMER_CANDIDATE';
   END IF;
 
   PERFORM 1 FROM public.users WHERE id IN (v_agent_id, v_customer_id) FOR UPDATE;
