@@ -53,6 +53,8 @@ async function selfTest() {
     "https://10.0.0.1/hook",
     "https://169.254.169.254/latest/meta-data",
     "https://[::1]/hook",
+    "https://[::ffff:127.0.0.1]/hook",
+    "https://[64:ff9b::7f00:1]/hook",
   ]) {
     let blocked = false;
     try {
