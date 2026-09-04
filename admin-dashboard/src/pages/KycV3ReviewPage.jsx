@@ -50,6 +50,7 @@ export default function KycV3ReviewPage() {
   const [reviewReason, setReviewReason] = useState("");
   const [requiredAction, setRequiredAction] = useState("");
   const [checkDrafts, setCheckDrafts] = useState({});
+  const [sanctionsResult, setSanctionsResult] = useState(null);
 
   const checksByType = useMemo(() => {
     const map = {};
@@ -89,6 +90,7 @@ export default function KycV3ReviewPage() {
   async function openApplication(item) {
     setSelected(item);
     setDetail(null);
+    setSanctionsResult(null);
     setDetailLoading(true);
     setMessage("");
     try {
@@ -110,6 +112,28 @@ export default function KycV3ReviewPage() {
       setMessage("Application assigned to you");
     } catch (err) {
       setMessage(err?.response?.data?.message || "Failed to claim application");
+    }
+  }
+
+  async function runSanctionsScreen() {
+    if (!detail?.application?.user_id) return;
+    setMessage("Running authoritative public sanctions screening…");
+    try {
+      const res = await api.post(`/admin/kyc/v3/${detail.application.user_id}/screen-sanctions`, {});
+      setSanctionsResult(res.data || null);
+      const hits = Array.isArray(res.data?.candidates) ? res.data.candidates : [];
+      setMessage(res.data?.status === "clear"
+        ? "Sanctions screening clear against fresh OFAC, UN and UK public lists."
+        : `Potential sanctions match found (${hits.length} candidate${hits.length === 1 ? "" : "s"}). Human compliance review is required.`);
+      await openApplication(selected);
+      setSanctionsResult(res.data || null);
+    } catch (err) {
+      const code = err?.response?.data?.code;
+      if (code === "SANCTIONS_DATASET_STALE") {
+        setMessage("Sanctions datasets are stale or incomplete. Do not approve until the list sync succeeds.");
+      } else {
+        setMessage(err?.response?.data?.message || "Sanctions screening failed");
+      }
     }
   }
 
@@ -275,6 +299,26 @@ export default function KycV3ReviewPage() {
                       : label;
                     return <div key={type} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}><strong>{displayLabel}</strong>{badge(current?.status || "pending")}</div>
+                      {type === "sanctions" && (
+                        <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+                          <button onClick={runSanctionsScreen} style={{ border: 0, background: "#0f172a", color: "#fff", padding: "9px 12px", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>
+                            Run free authoritative screening
+                          </button>
+                          <div style={{ marginTop: 7, color: "#64748b", fontSize: 12 }}>
+                            Screens fresh OFAC SDN/non-SDN, UN Security Council and UK sanctions datasets. Any fuzzy hit is a potential match only and requires human confirmation.
+                          </div>
+                          {sanctionsResult && (
+                            <div style={{ marginTop: 10 }}>
+                              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>{badge(sanctionsResult.status)} <span style={{ fontSize: 12 }}>Top score: {sanctionsResult.topScore ?? 0}</span></div>
+                              {(sanctionsResult.candidates || []).slice(0, 5).map((candidate) => (
+                                <div key={`${candidate.sourceCode}-${candidate.sourceRef}`} style={{ marginTop: 7, padding: 8, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }}>
+                                  <strong>{candidate.primaryName}</strong> · {candidate.sourceCode} · score {candidate.score} · similarity {candidate.nameSimilarity}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr auto", gap: 8, marginTop: 10 }}>
                         <select value={draft.status || ""} onChange={(e) => setCheckDrafts((p) => ({ ...p, [type]: { ...p[type], status: e.target.value } }))} style={{ padding: 9, borderRadius: 8, border: "1px solid #cbd5e1" }}><option value="">Select result</option>{statuses.map((s) => <option key={s} value={s}>{s}</option>)}</select>
                         <input placeholder="Provider / manual" value={draft.provider || ""} onChange={(e) => setCheckDrafts((p) => ({ ...p, [type]: { ...p[type], provider: e.target.value } }))} style={{ padding: 9, borderRadius: 8, border: "1px solid #cbd5e1" }} />
