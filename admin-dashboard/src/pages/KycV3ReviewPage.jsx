@@ -3,7 +3,8 @@ import api from "../lib/api";
 
 const CHECKS = [
   ["document_verification", "Document verification"],
-  ["liveness", "Liveness / face match"],
+  ["face_match", "Selfie / ID face match"],
+  ["liveness", "Live-session liveness"],
   ["sanctions", "Sanctions screening"],
   ["pep", "PEP screening"],
   ["adverse_media", "Adverse media"],
@@ -55,6 +56,14 @@ export default function KycV3ReviewPage() {
     for (const row of detail?.checks || []) if (!map[row.check_type]) map[row.check_type] = row;
     return map;
   }, [detail]);
+
+  const requiresEnhancedLiveness = Boolean(
+    detail?.application && (
+      detail.application.risk_rating === "high"
+      || detail.application.pep_self_declared
+      || detail.application.pep_related_declared
+    )
+  );
 
   const loadQueue = useCallback(async (cursor = null, append = false) => {
     setLoading(true);
@@ -108,6 +117,25 @@ export default function KycV3ReviewPage() {
     if (!detail?.application?.user_id) return;
     const draft = checkDrafts[type] || {};
     if (!draft.status) return setMessage("Choose a check result first");
+
+    if (type === "face_match" && draft.status === "manual_verified") {
+      if (!draft.selfieComparedToDocument) {
+        return setMessage("Confirm that you compared the selfie with the government-document portrait");
+      }
+      if (!String(draft.notes || "").trim()) {
+        return setMessage("Add a reviewer note describing the manual face comparison");
+      }
+    }
+
+    if (type === "liveness" && draft.status === "manual_verified") {
+      if (!draft.attendedSession) {
+        return setMessage("Manual liveness requires an attended live identity session");
+      }
+      if (!String(draft.notes || "").trim()) {
+        return setMessage("Add a reviewer note describing the attended live session");
+      }
+    }
+
     try {
       await api.post(`/admin/kyc/v3/${detail.application.user_id}/checks`, {
         checkType: type,
@@ -117,7 +145,9 @@ export default function KycV3ReviewPage() {
         notes: draft.notes || null,
         details: type === "liveness" && draft.status === "manual_verified"
           ? { attendedSession: Boolean(draft.attendedSession) }
-          : {},
+          : type === "face_match" && draft.status === "manual_verified"
+            ? { selfieComparedToDocument: Boolean(draft.selfieComparedToDocument) }
+            : {},
       });
       await openApplication(selected);
       setMessage("KYC check recorded");
@@ -156,7 +186,7 @@ export default function KycV3ReviewPage() {
       <header style={{ background: "#0f172a", color: "#fff", padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 800 }}>JeezPay KYC Review Workspace</div>
-          <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 3 }}>CDD · document verification · liveness · sanctions · PEP · risk · audit trail</div>
+          <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 3 }}>CDD · document review · selfie/ID face match · EDD liveness · sanctions · PEP · audit trail</div>
         </div>
         <button onClick={() => { window.location.href = "/"; }} style={{ border: "1px solid #475569", background: "transparent", color: "#fff", padding: "9px 12px", borderRadius: 10, cursor: "pointer" }}>Back to admin</button>
       </header>
@@ -200,11 +230,17 @@ export default function KycV3ReviewPage() {
                   <div><h2 style={{ margin: 0 }}>{detail.application.full_name}</h2><div style={{ color: "#64748b", marginTop: 5 }}>Application v{detail.application.application_version} · #{detail.application.review_seq}</div></div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{badge(detail.application.workflow_status)} {badge(detail.application.risk_rating)} {badge(detail.application.assurance_level)}</div>
                 </div>
+                {requiresEnhancedLiveness && (
+                  <div style={{ marginTop: 14, padding: 11, borderRadius: 10, background: "#fff7ed", color: "#9a3412", fontSize: 13, fontWeight: 700 }}>
+                    Enhanced due diligence: this case requires source-of-wealth evidence, an attended live identity session, and senior approval.
+                  </div>
+                )}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 14, marginTop: 18 }}>
                   <Field label="User" value={detail.application.user_id} /><Field label="Phone" value={detail.user?.phone} /><Field label="Nationality" value={detail.application.nationality} /><Field label="Residence" value={detail.application.residence_country} />
                   <Field label="DOB" value={detail.application.dob} /><Field label="Occupation" value={detail.application.occupation} /><Field label="Employment" value={detail.application.employment_status} /><Field label="Purpose" value={detail.application.account_purpose} />
                   <Field label="Source of funds" value={(detail.application.source_of_funds || []).join(", ")} /><Field label="Source of wealth" value={detail.application.source_of_wealth} /><Field label="Tax residencies" value={(detail.application.tax_residencies || []).join(", ")} /><Field label="Expected activity" value={`${detail.application.expected_monthly_volume_band} / ${detail.application.expected_monthly_tx_count_band || "-"}`} />
-                  <Field label="PEP self-declared" value={detail.application.pep_self_declared ? "Yes" : "No"} /><Field label="PEP related" value={detail.application.pep_related_declared ? "Yes" : "No"} /><Field label="Risk score" value={detail.application.risk_score} /><Field label="Next review" value={detail.application.next_review_at} />
+                  <Field label="PEP self-declared" value={detail.application.pep_self_declared ? "Yes" : "No"} /><Field label="PEP related" value={detail.application.pep_related_declared ? "Yes" : "No"} /><Field label="Risk score" value={detail.application.risk_score} /><Field label="EDD liveness" value={requiresEnhancedLiveness ? "Required" : "Not required"} />
+                  <Field label="Next review" value={detail.application.next_review_at} />
                 </div>
                 <button onClick={claim} style={{ marginTop: 16, border: 0, background: "#0f172a", color: "#fff", padding: "10px 14px", borderRadius: 10, cursor: "pointer", fontWeight: 700 }}>Claim / start review</button>
               </section>
@@ -221,23 +257,42 @@ export default function KycV3ReviewPage() {
 
               <section style={{ ...panel, padding: 18 }}>
                 <h3 style={{ marginTop: 0 }}>Verification & screening</h3>
+                <div style={{ color: "#64748b", fontSize: 12, marginBottom: 10 }}>
+                  Face match is required for every new KYC. Live-session liveness is required only for high-risk or PEP enhanced-due-diligence cases under the manual launch policy.
+                </div>
                 <div style={{ display: "grid", gap: 10 }}>
                   {CHECKS.map(([type, label]) => {
                     const current = checksByType[type];
                     const draft = checkDrafts[type] || {};
-                    const statuses = type === "document_verification" || type === "liveness"
+                    const biometricType = type === "document_verification" || type === "face_match" || type === "liveness";
+                    const statuses = biometricType
                       ? ["verified", "manual_verified", "failed", "inconclusive"]
                       : type === "pep"
                         ? ["clear", "manual_clear", "potential_match", "confirmed_pep", "inconclusive"]
                         : ["clear", "manual_clear", "potential_match", "confirmed_match", "inconclusive", "not_applicable"];
+                    const displayLabel = type === "liveness"
+                      ? `${label} · ${requiresEnhancedLiveness ? "REQUIRED" : "optional"}`
+                      : label;
                     return <div key={type} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}><strong>{label}</strong>{badge(current?.status || "pending")}</div>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}><strong>{displayLabel}</strong>{badge(current?.status || "pending")}</div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr auto", gap: 8, marginTop: 10 }}>
                         <select value={draft.status || ""} onChange={(e) => setCheckDrafts((p) => ({ ...p, [type]: { ...p[type], status: e.target.value } }))} style={{ padding: 9, borderRadius: 8, border: "1px solid #cbd5e1" }}><option value="">Select result</option>{statuses.map((s) => <option key={s} value={s}>{s}</option>)}</select>
                         <input placeholder="Provider / manual" value={draft.provider || ""} onChange={(e) => setCheckDrafts((p) => ({ ...p, [type]: { ...p[type], provider: e.target.value } }))} style={{ padding: 9, borderRadius: 8, border: "1px solid #cbd5e1" }} />
                         <input placeholder="Reviewer notes" value={draft.notes || ""} onChange={(e) => setCheckDrafts((p) => ({ ...p, [type]: { ...p[type], notes: e.target.value } }))} style={{ padding: 9, borderRadius: 8, border: "1px solid #cbd5e1" }} />
                         <button onClick={() => recordCheck(type)} style={{ border: 0, background: "#e2e8f0", padding: "8px 12px", borderRadius: 8, cursor: "pointer" }}>Record</button>
                       </div>
+                      {type === "face_match" && draft.status === "manual_verified" && (
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9, fontSize: 12, color: "#334155" }}>
+                          <input type="checkbox" checked={Boolean(draft.selfieComparedToDocument)} onChange={(e) => setCheckDrafts((p) => ({ ...p, [type]: { ...p[type], selfieComparedToDocument: e.target.checked } }))} />
+                          I personally compared the submitted selfie with the portrait on the government document.
+                        </label>
+                      )}
+                      {type === "liveness" && draft.status === "manual_verified" && (
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9, fontSize: 12, color: "#334155" }}>
+                          <input type="checkbox" checked={Boolean(draft.attendedSession)} onChange={(e) => setCheckDrafts((p) => ({ ...p, [type]: { ...p[type], attendedSession: e.target.checked } }))} />
+                          I attended a live identity session with this customer and verified that the live person matched the submitted evidence.
+                        </label>
+                      )}
                     </div>;
                   })}
                 </div>
