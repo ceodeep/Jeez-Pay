@@ -14,21 +14,43 @@ DECLARE
   v_payload jsonb;
   v_result jsonb;
   v_application_id uuid;
-  v_before_controls integer;
   v_failed boolean;
 BEGIN
-  SELECT u.id INTO v_user_id
-  FROM public.users u
-  LEFT JOIN public.kyc_profiles k ON k.user_id=u.id
-  WHERE COALESCE(u.is_system,false)=false
-    AND COALESCE(u.is_active,true)=true
-    AND u.role='user'
-    AND k.user_id IS NULL
-  ORDER BY u.created_at
-  LIMIT 1;
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'TEST_REQUIRES_ACTIVE_USER_WITHOUT_KYC';
-  END IF;
+  -- Always create a synthetic customer inside this transaction. This avoids
+  -- borrowing or mutating a real customer's KYC state. ROLLBACK removes it.
+  v_user_id := gen_random_uuid();
+
+  INSERT INTO public.users(
+    id,
+    phone,
+    email,
+    "fullName",
+    password_hash,
+    phone_verified,
+    email_verified,
+    account_type,
+    country_code,
+    terms_accepted,
+    role,
+    referral_code,
+    is_active,
+    is_system
+  ) VALUES (
+    v_user_id,
+    '+211999' || right(replace(v_user_id::text,'-',''),8),
+    lower(replace(v_user_id::text,'-','')) || '@kyc-v3-rollback.invalid',
+    'KYC V3 Rollback Test User',
+    'ROLLBACK_ONLY_NOT_LOGINABLE',
+    false,
+    true,
+    'personal',
+    'SS',
+    true,
+    'user',
+    'T' || upper(substr(replace(v_user_id::text,'-',''),1,5)),
+    true,
+    false
+  );
 
   SELECT id INTO v_admin_id FROM public.users
   WHERE role IN('super_admin','admin') AND COALESCE(is_active,true)=true AND COALESCE(is_system,false)=false
@@ -125,8 +147,7 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN v_failed:=true; END;
   IF NOT v_failed THEN RAISE EXCEPTION 'CONSENT_IMMUTABILITY_FAILED'; END IF;
 
-  -- Compliance hook: confirmed sanctions match must freeze the entity. Use a savepoint-like subtransaction
-  -- after temporarily reopening workflow inside the outer transaction.
+  -- Compliance hook: confirmed sanctions match must freeze the entity.
   PERFORM set_config('jeezpay.kyc_lifecycle_v3','on',true);
   PERFORM set_config('jeezpay.kyc_lifecycle_v2','on',true);
   UPDATE public.kyc_profiles SET status='pending',workflow_status='in_review' WHERE user_id=v_user_id;
@@ -134,7 +155,6 @@ BEGIN
   PERFORM set_config('jeezpay.kyc_lifecycle_v3','off',true);
   UPDATE public.kyc_applications_v3 SET workflow_status='in_review' WHERE id=v_application_id;
 
-  SELECT count(*) INTO v_before_controls FROM public.compliance_entity_controls;
   PERFORM public.record_kyc_check_v3(v_admin_id,v_user_id,'sanctions','confirmed_match','manual',NULL,'Rollback confirmed match','{}');
   IF NOT EXISTS(SELECT 1 FROM public.compliance_entity_controls WHERE entity_type='USER' AND entity_ref=v_user_id::text AND status='frozen') THEN
     RAISE EXCEPTION 'SANCTIONS_FREEZE_HOOK_FAILED';
