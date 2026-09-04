@@ -279,7 +279,7 @@ assert_runtime_invariants
 
 CORE_TESTS=(
   20260903_ledger_v2_foundation_test.sql
-  20260903_ledger_v2_legacy_balance_mirror_test.sql
+  20260904_ledger_v2_active_mirror_runtime_test.sql
   20260903_ledger_v2_native_p2p_test.sql
   20260903_ledger_v2_launch_writers_test.sql
   20260904_kyc_v3_test.sql
