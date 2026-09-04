@@ -28,9 +28,20 @@ BEGIN
     RAISE EXCEPTION 'PUBLIC_SANCTIONS_V1_CLIENT_PRIVILEGE_LEAK' USING ERRCODE='P0001';
   END IF;
 
-  IF NOT has_table_privilege('service_role','public.sanctions_sources_v1','SELECT,INSERT,UPDATE,DELETE')
-     OR NOT has_table_privilege('service_role','public.sanctions_entities_v1','SELECT,INSERT,UPDATE,DELETE')
-     OR NOT has_table_privilege('service_role','public.sanctions_names_v1','SELECT,INSERT,UPDATE,DELETE') THEN
+  IF NOT (
+       has_table_privilege('service_role','public.sanctions_sources_v1','SELECT')
+   AND has_table_privilege('service_role','public.sanctions_sources_v1','INSERT')
+   AND has_table_privilege('service_role','public.sanctions_sources_v1','UPDATE')
+   AND has_table_privilege('service_role','public.sanctions_sources_v1','DELETE')
+   AND has_table_privilege('service_role','public.sanctions_entities_v1','SELECT')
+   AND has_table_privilege('service_role','public.sanctions_entities_v1','INSERT')
+   AND has_table_privilege('service_role','public.sanctions_entities_v1','UPDATE')
+   AND has_table_privilege('service_role','public.sanctions_entities_v1','DELETE')
+   AND has_table_privilege('service_role','public.sanctions_names_v1','SELECT')
+   AND has_table_privilege('service_role','public.sanctions_names_v1','INSERT')
+   AND has_table_privilege('service_role','public.sanctions_names_v1','UPDATE')
+   AND has_table_privilege('service_role','public.sanctions_names_v1','DELETE')
+  ) THEN
     RAISE EXCEPTION 'PUBLIC_SANCTIONS_V1_SERVICE_ROLE_PRIVILEGES_MISSING' USING ERRCODE='P0001';
   END IF;
 END $$;
