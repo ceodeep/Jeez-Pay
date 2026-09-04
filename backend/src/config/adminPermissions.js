@@ -9,13 +9,14 @@ const ROLE_PERMISSIONS = {
     "wallets.view",
     "transactions.view",
     "wallets.adjust",
+    "agents.view",
     "audit_logs.view",
     "settings.view",
     "currency_settings.view",
     "currency_settings.update",
     "crypto.withdrawals.view",
-"crypto.withdrawals.approve",
-"crypto.withdrawals.reject",
+    "crypto.withdrawals.approve",
+    "crypto.withdrawals.reject",
   ],
 
   kyc_officer: [
@@ -33,6 +34,7 @@ const ROLE_PERMISSIONS = {
     "users.activate",
     "users.suspend",
     "transactions.view",
+    "agents.view",
     "audit_logs.view",
   ],
 
@@ -41,6 +43,7 @@ const ROLE_PERMISSIONS = {
     "users.view",
     "wallets.view",
     "transactions.view",
+    "agents.view",
     "kyc.view",
     "audit_logs.view",
     "settings.view",
@@ -59,6 +62,8 @@ const ALL_PERMISSIONS = [
   "wallets.view",
   "wallets.adjust",
   "transactions.view",
+  "agents.view",
+  "agents.manage",
   "kyc.view",
   "kyc.approve",
   "kyc.reject",
@@ -68,8 +73,8 @@ const ALL_PERMISSIONS = [
   "currency_settings.view",
   "currency_settings.update",
   "crypto.withdrawals.view",
-"crypto.withdrawals.approve",
-"crypto.withdrawals.reject",
+  "crypto.withdrawals.approve",
+  "crypto.withdrawals.reject",
 ];
 
 const MANAGEABLE_ROLES = [
