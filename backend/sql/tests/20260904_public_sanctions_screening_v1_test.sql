@@ -48,7 +48,7 @@ BEGIN
     'schemaVersion',3,'fullName','Test Sanctioned Person','dob','1990-01-02','nationality','SS','countryOfBirth','SS','residenceCountry','SS',
     'addressLine1','Rollback','city','Juba','employmentStatus','employed','occupation','Tester','sourceOfFunds',jsonb_build_array('salary'),
     'accountPurpose','personal_payments','expectedMonthlyVolumeBand','standard','expectedMonthlyTxCountBand','1_20','pepSelfDeclared',false,'pepRelatedDeclared',false,
-    'taxResidencies',jsonb_build_array('SS'),'document',jsonb_build_object('documentType','passport','issuingCountry','SS','documentNumber','SANCTIONS-ROLLBACK-1','issueDate','2024-01-01','expiryDate','2034-01-01','noExpiry',false,'frontPath',v_hit_user::text||'/id_front.jpg','selfiePath',v_hit_user::text||'/selfie.jpg'),
+    'taxResidencies',jsonb_build_array('SS'),'document',jsonb_build_object('documentType','passport','issuingCountry','SS','documentNumber','SANCTIONS-ROLLBACK-1','issueDate','2024-01-01','expiryDate','2034-01-01','noExpiry',false,'frontPath',v_hit_user::text||'/id_front.jpg','selfiePath',v_hit_user::text||'/selfie_test.jpg'),
     'consents',jsonb_build_object('privacyAccepted',true,'identityVerificationAccepted',true,'biometricAccepted',true,'ongoingScreeningAccepted',true,'privacyNoticeVersion','2026-09-v1','biometricNoticeVersion','2026-09-v1')
   );
   v_result:=public.submit_kyc_v3(v_hit_user,v_payload,'127.0.0.1','SANCTIONS-ROLLBACK-TEST');
@@ -69,7 +69,7 @@ BEGIN
   v_payload:=jsonb_set(v_payload,'{dob}','"1995-05-05"'::jsonb);
   v_payload:=jsonb_set(v_payload,'{document,documentNumber}','"SANCTIONS-ROLLBACK-2"'::jsonb);
   v_payload:=jsonb_set(v_payload,'{document,frontPath}',to_jsonb(v_clear_user::text||'/id_front.jpg'));
-  v_payload:=jsonb_set(v_payload,'{document,selfiePath}',to_jsonb(v_clear_user::text||'/selfie.jpg'));
+  v_payload:=jsonb_set(v_payload,'{document,selfiePath}',to_jsonb(v_clear_user::text||'/selfie_test.jpg'));
   v_result:=public.submit_kyc_v3(v_clear_user,v_payload,'127.0.0.1','SANCTIONS-ROLLBACK-TEST');
   IF COALESCE((v_result->>'ok')::boolean,false) IS NOT TRUE THEN RAISE EXCEPTION 'CLEAR_USER_SUBMIT_FAILED: %',v_result; END IF;
 
