@@ -6,7 +6,14 @@ data class KycPolicyResponse(
     val policyCode: String,
     val privacyNoticeVersion: String,
     val biometricNoticeVersion: String,
+    val minimumAge: Int? = null,
     val maxUploadBytes: Long,
+    val requireDocumentVerification: Boolean = true,
+    val requireLiveness: Boolean = true,
+    val requireSanctionsScreening: Boolean = true,
+    val requirePepScreening: Boolean = true,
+    val requireAdverseMediaScreening: Boolean = false,
+    val reviewMonths: Map<String, Int>? = null,
     val requirements: Map<String, Any>? = null
 )
 
@@ -18,8 +25,10 @@ data class KycProfile(
     val fullName: String?,
     val dob: String?,
     val address: String?,
-    val id_path: String?,
-    val selfie_path: String?,
+    // Kept nullable for backwards compatibility with old API builds. KYC v3
+    // intentionally does not return private storage object paths.
+    val id_path: String? = null,
+    val selfie_path: String? = null,
     val status: String?,
     val created_at: String?,
     val updated_at: String?,
@@ -35,6 +44,13 @@ data class KycProfile(
     val submittedAt: String? = null,
     val nextReviewAt: String? = null,
     val requiredAction: String? = null,
+    val riskScore: Int? = null,
+    val riskRating: String? = null,
+    val identityVerificationStatus: String? = null,
+    val livenessStatus: String? = null,
+    val sanctionsStatus: String? = null,
+    val pepScreeningStatus: String? = null,
+    val adverseMediaStatus: String? = null,
     val hasIdDocument: Boolean = false,
     val hasSelfie: Boolean = false,
     val nationality: String? = null,
@@ -49,11 +65,13 @@ data class KycProfile(
     val occupation: String? = null,
     val employerName: String? = null,
     val sourceOfFunds: List<String> = emptyList(),
+    val sourceOfWealth: String? = null,
     val accountPurpose: String? = null,
     val expectedMonthlyVolumeBand: String? = null,
     val expectedMonthlyTxCountBand: String? = null,
     val pepSelfDeclared: Boolean = false,
-    val pepRelatedDeclared: Boolean = false
+    val pepRelatedDeclared: Boolean = false,
+    val taxResidencies: List<String> = emptyList()
 )
 
 data class KycUploadUrlRequest(
@@ -113,7 +131,7 @@ data class KycSubmitRequest(
     val expectedMonthlyTxCountBand: String? = null,
     val pepSelfDeclared: Boolean,
     val pepRelatedDeclared: Boolean,
-    val taxResidencies: List<String> = emptyList(),
+    val taxResidencies: List<String>,
     val document: KycDocumentRequest,
     val consents: KycConsentsRequest
 )
@@ -137,5 +155,6 @@ data class SubmittedKyc(
     val applicationId: String? = null,
     val applicationVersion: Int? = null,
     val schemaVersion: Int? = null,
-    val policyVersion: Int? = null
+    val policyVersion: Int? = null,
+    val riskRating: String? = null
 )
