@@ -8,8 +8,15 @@ if ! /usr/bin/flock -n 9; then
   exit 0
 fi
 
+PM2_BIN="${PM2_BIN:-$(command -v pm2 || true)}"
+NODE_BIN="${NODE_BIN:-$(command -v node || true)}"
+if [ -z "$PM2_BIN" ] || [ ! -x "$PM2_BIN" ] || [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
+  echo "Sanctions sync: pm2/node executable not available" >&2
+  exit 2
+fi
+
 BACKEND_DIR="$(
-  pm2 jlist | node -e '
+  "$PM2_BIN" jlist | "$NODE_BIN" -e '
     let s="";
     process.stdin.on("data",d=>s+=d);
     process.stdin.on("end",()=>{
