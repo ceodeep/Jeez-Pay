@@ -362,7 +362,7 @@ GRANT EXECUTE ON FUNCTION public.confirm_merchant_payment_ledger_v2(uuid,uuid)
   TO service_role;
 GRANT EXECUTE ON FUNCTION public.execute_merchant_payout_ledger_v2(uuid,text,text,numeric,text,text,jsonb)
   TO service_role;
-GRANT EXECUTE ON FUNCTION public.create_merchant_payment_v1(uuid,text,numeric,text,text,text,text,text,text,jsonb)
+GRANT EXECUTE ON FUNCTION public.create_merchant_payment_v1(uuid,text,numeric,text,text,text,text,text,jsonb)
   TO service_role;
 GRANT EXECUTE ON FUNCTION public.claim_merchant_webhook_events_v1(integer,uuid)
   TO service_role;
