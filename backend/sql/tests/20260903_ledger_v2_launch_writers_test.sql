@@ -1,6 +1,6 @@
 \pset pager off
 \echo '=== LEDGER V2 CURRENT LAUNCH WRITER TEST ==='
-\echo 'ROLLBACK-ONLY: admin adjustment + fiat withdrawal + referral defer guard, with exact reconciliation.'
+\echo 'ROLLBACK-ONLY: admin adjustment + fiat withdrawal + referral launch guards, with exact reconciliation.'
 
 BEGIN;
 SET LOCAL statement_timeout = '90s';
@@ -87,7 +87,8 @@ BEGIN
       RAISE EXCEPTION 'TEST_REFERRAL_REENABLE_SHOULD_HAVE_FAILED';
     EXCEPTION
       WHEN SQLSTATE 'P0001' THEN
-        IF SQLERRM = 'REFERRAL_REWARDS_TEMPORARILY_DISABLED' THEN
+        IF SQLERRM = 'REFERRAL_REWARDS_TEMPORARILY_DISABLED'
+           OR SQLERRM LIKE 'PRODUCT_DISABLED:%referral rewards%' THEN
           v_referral_block_seen := true;
         ELSE
           RAISE;
@@ -95,7 +96,7 @@ BEGIN
     END;
 
     IF v_referral_block_seen IS NOT TRUE THEN
-      RAISE EXCEPTION 'TEST_REFERRAL_DEFER_GUARD_NOT_ENFORCED';
+      RAISE EXCEPTION 'TEST_REFERRAL_REENABLE_NOT_BLOCKED';
     END IF;
   END IF;
 
