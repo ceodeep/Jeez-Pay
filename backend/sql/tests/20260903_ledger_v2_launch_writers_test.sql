@@ -1,37 +1,34 @@
 \pset pager off
-
-\echo '=== LEDGER V2 LAUNCH WRITER TESTS ==='
-\echo 'ROLLBACK-ONLY: admin adjustment + referral reward + fiat withdrawal approval.'
+\echo '=== LEDGER V2 CURRENT LAUNCH WRITER TEST ==='
+\echo 'ROLLBACK-ONLY: admin adjustment + fiat withdrawal + referral defer guard, with exact reconciliation.'
 
 BEGIN;
 SET LOCAL statement_timeout = '90s';
 SET LOCAL lock_timeout = '10s';
 
-CREATE TEMP TABLE phase45_baseline (
+CREATE TEMP TABLE phase8_launch_baseline (
   key text PRIMARY KEY,
   value bigint NOT NULL
 ) ON COMMIT DROP;
 
-INSERT INTO phase45_baseline(key,value)
+INSERT INTO phase8_launch_baseline(key,value)
 VALUES
   ('admin_journals', (SELECT count(*) FROM public.ledger_journals_v2 WHERE source_type='ADMIN_BALANCE_ADJUSTMENT_V2')),
   ('referral_journals', (SELECT count(*) FROM public.ledger_journals_v2 WHERE source_type='REFERRAL_REWARD_V2')),
   ('withdraw_journals', (SELECT count(*) FROM public.ledger_journals_v2 WHERE source_type='FIAT_WITHDRAWAL_V2')),
-  ('mirror_journals', (SELECT count(*) FROM public.ledger_journals_v2 WHERE source_type='LEGACY_BALANCE_MIRROR')),
-  ('referral_rewards', (SELECT count(*) FROM public.referral_rewards)),
-  ('withdraw_requests', (SELECT count(*) FROM public.withdraw_requests));
+  ('mirror_journals', (SELECT count(*) FROM public.ledger_journals_v2 WHERE source_type='LEGACY_BALANCE_MIRROR'));
 
 DO $$
 DECLARE
   v_admin_id uuid;
   v_target_user_id uuid;
   v_target_wallet_id uuid;
-  v_referrer_id uuid;
-  v_referee_id uuid;
   v_withdraw_id text;
+  v_setting_id uuid;
   v_result jsonb;
   v_replay jsonb;
   v_conflict_seen boolean := false;
+  v_referral_block_seen boolean := false;
   v_before numeric(38,12);
   v_after numeric(38,12);
   v_count bigint;
@@ -41,11 +38,65 @@ BEGIN
   END IF;
 
   IF EXISTS (
-    SELECT 1 FROM public.ledger_v2_legacy_live_reconciliation
+    SELECT 1
+    FROM public.ledger_v2_legacy_live_reconciliation
     WHERE reconciliation_status <> 'MATCHED'
        OR difference IS DISTINCT FROM 0::numeric
   ) THEN
     RAISE EXCEPTION 'TEST_PRE_RECONCILIATION_NOT_CLEAN';
+  END IF;
+
+  IF to_regprocedure('public.guard_referral_rewards_deferred_v2()') IS NULL THEN
+    RAISE EXCEPTION 'TEST_REFERRAL_DEFER_GUARD_MISSING';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.referral_reward_settings
+    WHERE enabled IS TRUE
+  ) THEN
+    RAISE EXCEPTION 'TEST_REFERRAL_REWARDS_MUST_REMAIN_DISABLED';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger t
+    JOIN pg_class c ON c.oid=t.tgrelid
+    JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public'
+      AND c.relname='referral_reward_settings'
+      AND t.tgname='referral_rewards_deferred_v2_guard'
+      AND t.tgenabled <> 'D'
+      AND NOT t.tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'TEST_REFERRAL_DEFER_TRIGGER_MISSING_OR_DISABLED';
+  END IF;
+
+  SELECT id
+  INTO v_setting_id
+  FROM public.referral_reward_settings
+  ORDER BY updated_at DESC NULLS LAST, id
+  LIMIT 1;
+
+  IF v_setting_id IS NOT NULL THEN
+    BEGIN
+      UPDATE public.referral_reward_settings
+      SET enabled=true
+      WHERE id=v_setting_id;
+
+      RAISE EXCEPTION 'TEST_REFERRAL_REENABLE_SHOULD_HAVE_FAILED';
+    EXCEPTION
+      WHEN SQLSTATE 'P0001' THEN
+        IF SQLERRM = 'REFERRAL_REWARDS_TEMPORARILY_DISABLED' THEN
+          v_referral_block_seen := true;
+        ELSE
+          RAISE;
+        END IF;
+    END;
+
+    IF v_referral_block_seen IS NOT TRUE THEN
+      RAISE EXCEPTION 'TEST_REFERRAL_DEFER_GUARD_NOT_ENFORCED';
+    END IF;
   END IF;
 
   SELECT id INTO v_admin_id
@@ -63,7 +114,9 @@ BEGIN
   SELECT u.id, w.id, w.balance::numeric(38,12)
   INTO v_target_user_id, v_target_wallet_id, v_before
   FROM public.users u
-  JOIN public.wallets w ON w.user_id=u.id AND w.currency='SSP'
+  JOIN public.wallets w
+    ON w.user_id=u.id
+   AND upper(w.currency)='SSP'
   WHERE u.role='user'
     AND COALESCE(u.is_system,false)=false
     AND COALESCE(u.is_active,true)=true
@@ -75,15 +128,14 @@ BEGIN
     RAISE EXCEPTION 'TEST_SSP_USER_WITH_BALANCE_MISSING';
   END IF;
 
-  -- Admin credit: first execution, replay and conflict proof.
   v_result := public.admin_wallet_adjust_ledger_v2(
     v_admin_id,
     v_target_user_id,
     'SSP',
     1,
     'credit',
-    'Phase 4.5B rollback admin credit',
-    'phase45-admin-credit-v1'
+    'Phase 8 rollback admin credit',
+    'phase8-admin-credit-v1'
   );
 
   IF COALESCE((v_result->>'ok')::boolean,false) IS NOT TRUE
@@ -98,8 +150,8 @@ BEGIN
     'SSP',
     1,
     'credit',
-    'Phase 4.5B rollback admin credit',
-    'phase45-admin-credit-v1'
+    'Phase 8 rollback admin credit',
+    'phase8-admin-credit-v1'
   );
 
   IF COALESCE((v_replay->>'idempotentReplay')::boolean,false) IS NOT TRUE THEN
@@ -113,8 +165,8 @@ BEGIN
       'SSP',
       2,
       'credit',
-      'Phase 4.5B rollback admin credit',
-      'phase45-admin-credit-v1'
+      'Phase 8 rollback admin credit',
+      'phase8-admin-credit-v1'
     );
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM LIKE '%IDEMPOTENCY_CONFLICT%' THEN
@@ -128,87 +180,25 @@ BEGIN
     RAISE EXCEPTION 'TEST_ADMIN_IDEMPOTENCY_CONFLICT_NOT_BLOCKED';
   END IF;
 
-  -- Opposite adjustment restores the target wallet to its initial balance.
   v_result := public.admin_wallet_adjust_ledger_v2(
     v_admin_id,
     v_target_user_id,
     'SSP',
     1,
     'debit',
-    'Phase 4.5B rollback admin debit',
-    'phase45-admin-debit-v1'
+    'Phase 8 rollback admin debit',
+    'phase8-admin-debit-v1'
   );
 
-  SELECT balance::numeric(38,12) INTO v_after
-  FROM public.wallets WHERE id=v_target_wallet_id;
+  SELECT balance::numeric(38,12)
+  INTO v_after
+  FROM public.wallets
+  WHERE id=v_target_wallet_id;
 
   IF v_after <> v_before THEN
     RAISE EXCEPTION 'TEST_ADMIN_NET_BALANCE_NOT_RESTORED: before %, after %', v_before, v_after;
   END IF;
 
-  -- Pick a clean referral pair and temporarily configure a 1 SSP KYC reward.
-  SELECT r.id, e.id
-  INTO v_referrer_id, v_referee_id
-  FROM public.users r
-  CROSS JOIN public.users e
-  WHERE r.id <> e.id
-    AND r.role='user'
-    AND e.role='user'
-    AND COALESCE(r.is_system,false)=false
-    AND COALESCE(e.is_system,false)=false
-    AND COALESCE(r.is_active,true)=true
-    AND COALESCE(e.is_active,true)=true
-    AND NOT EXISTS (
-      SELECT 1 FROM public.referral_rewards rr
-      WHERE rr.referrer_user_id=r.id
-        AND rr.referee_user_id=e.id
-        AND rr.trigger_event='kyc_approved'
-    )
-  ORDER BY r.id,e.id
-  LIMIT 1;
-
-  IF v_referrer_id IS NULL OR v_referee_id IS NULL THEN
-    RAISE EXCEPTION 'TEST_CLEAN_REFERRAL_PAIR_MISSING';
-  END IF;
-
-  UPDATE public.users
-  SET referred_by_user_id=v_referrer_id
-  WHERE id=v_referee_id;
-
-  IF EXISTS (SELECT 1 FROM public.referral_reward_settings) THEN
-    UPDATE public.referral_reward_settings
-    SET enabled=true,
-        reward_amount=1,
-        currency='SSP',
-        trigger_event='kyc_approved',
-        max_rewards_per_user=100000,
-        updated_at=now()
-    WHERE id=(
-      SELECT id FROM public.referral_reward_settings
-      ORDER BY updated_at DESC
-      LIMIT 1
-    );
-  ELSE
-    INSERT INTO public.referral_reward_settings(
-      enabled,reward_amount,currency,trigger_event,max_rewards_per_user
-    ) VALUES (true,1,'SSP','kyc_approved',100000);
-  END IF;
-
-  v_result := public.grant_referral_reward_ledger_v2(v_referee_id,'kyc_approved');
-
-  IF v_result->>'status' <> 'rewarded'
-     OR v_result->>'currency' <> 'SSP'
-     OR (v_result->>'amount')::numeric <> 1 THEN
-    RAISE EXCEPTION 'TEST_REFERRAL_REWARD_FAILED: %', v_result;
-  END IF;
-
-  v_replay := public.grant_referral_reward_ledger_v2(v_referee_id,'kyc_approved');
-  IF v_replay->>'status' <> 'skipped'
-     OR v_replay->>'reason' <> 'reward already exists' THEN
-    RAISE EXCEPTION 'TEST_REFERRAL_DUPLICATE_NOT_BLOCKED: %', v_replay;
-  END IF;
-
-  -- Create one temporary pending fiat withdrawal and approve it atomically.
   INSERT INTO public.withdraw_requests(
     user_id,wallet_id,amount,currency,method,destination,status
   ) VALUES (
@@ -216,7 +206,7 @@ BEGIN
     v_target_wallet_id,
     1,
     'SSP',
-    'phase45_test',
+    'phase8_test',
     'ROLLBACK-ONLY',
     'pending'
   )
@@ -231,6 +221,7 @@ BEGIN
   END IF;
 
   v_replay := public.approve_fiat_withdrawal_ledger_v2(v_admin_id,v_withdraw_id);
+
   IF COALESCE((v_replay->>'ok')::boolean,false) IS NOT TRUE
      OR COALESCE((v_replay->>'idempotentReplay')::boolean,false) IS NOT TRUE THEN
     RAISE EXCEPTION 'TEST_WITHDRAWAL_REPLAY_FAILED: %', v_replay;
@@ -239,33 +230,38 @@ BEGIN
   SELECT count(*) INTO v_count
   FROM public.ledger_journals_v2
   WHERE source_type='ADMIN_BALANCE_ADJUSTMENT_V2';
-  IF v_count <> (SELECT value+2 FROM phase45_baseline WHERE key='admin_journals') THEN
+
+  IF v_count <> (SELECT value+2 FROM phase8_launch_baseline WHERE key='admin_journals') THEN
     RAISE EXCEPTION 'TEST_ADMIN_JOURNAL_COUNT_INVALID: %', v_count;
   END IF;
 
   SELECT count(*) INTO v_count
   FROM public.ledger_journals_v2
   WHERE source_type='REFERRAL_REWARD_V2';
-  IF v_count <> (SELECT value+1 FROM phase45_baseline WHERE key='referral_journals') THEN
-    RAISE EXCEPTION 'TEST_REFERRAL_JOURNAL_COUNT_INVALID: %', v_count;
+
+  IF v_count <> (SELECT value FROM phase8_launch_baseline WHERE key='referral_journals') THEN
+    RAISE EXCEPTION 'TEST_REFERRAL_JOURNAL_SHOULD_NOT_CHANGE_WHILE_DEFERRED: %', v_count;
   END IF;
 
   SELECT count(*) INTO v_count
   FROM public.ledger_journals_v2
   WHERE source_type='FIAT_WITHDRAWAL_V2';
-  IF v_count <> (SELECT value+1 FROM phase45_baseline WHERE key='withdraw_journals') THEN
+
+  IF v_count <> (SELECT value+1 FROM phase8_launch_baseline WHERE key='withdraw_journals') THEN
     RAISE EXCEPTION 'TEST_WITHDRAWAL_JOURNAL_COUNT_INVALID: %', v_count;
   END IF;
 
   SELECT count(*) INTO v_count
   FROM public.ledger_journals_v2
   WHERE source_type='LEGACY_BALANCE_MIRROR';
-  IF v_count <> (SELECT value FROM phase45_baseline WHERE key='mirror_journals') THEN
+
+  IF v_count <> (SELECT value FROM phase8_launch_baseline WHERE key='mirror_journals') THEN
     RAISE EXCEPTION 'TEST_GENERIC_MIRROR_DOUBLE_POST_DETECTED';
   END IF;
 
   IF EXISTS (
-    SELECT 1 FROM public.ledger_v2_legacy_live_reconciliation
+    SELECT 1
+    FROM public.ledger_v2_legacy_live_reconciliation
     WHERE reconciliation_status <> 'MATCHED'
        OR difference IS DISTINCT FROM 0::numeric
   ) THEN
@@ -277,18 +273,19 @@ BEGIN
   END IF;
 
   IF EXISTS (
-    SELECT 1 FROM public.ledger_v2_balance_reconciliation
+    SELECT 1
+    FROM public.ledger_v2_balance_reconciliation
     WHERE difference <> 0
   ) THEN
     RAISE EXCEPTION 'TEST_LEDGER_BALANCE_RECONCILIATION_DIFF';
   END IF;
 
-  RAISE NOTICE 'LEDGER V2 LAUNCH WRITER TESTS: OK';
+  RAISE NOTICE 'LEDGER V2 CURRENT LAUNCH WRITER TEST: OK';
 END;
 $$;
 
 \echo ''
-\echo '=== TEMPORARY NATIVE JOURNALS ==='
+\echo '=== TEMPORARY CURRENT-LAUNCH JOURNALS ==='
 SELECT source_type,count(*) AS journal_count
 FROM public.ledger_journals_v2
 WHERE source_type IN (
@@ -300,11 +297,23 @@ GROUP BY source_type
 ORDER BY source_type;
 
 \echo ''
-\echo '=== TEMPORARY INTEGRITY ==='
-SELECT count(*) AS generic_mirror_journals
-FROM public.ledger_journals_v2
-WHERE source_type='LEGACY_BALANCE_MIRROR';
+\echo '=== REFERRAL LAUNCH GATE ==='
+SELECT count(*) AS enabled_referral_settings
+FROM public.referral_reward_settings
+WHERE enabled IS TRUE;
 
+SELECT count(*) AS active_referral_defer_triggers
+FROM pg_trigger t
+JOIN pg_class c ON c.oid=t.tgrelid
+JOIN pg_namespace n ON n.oid=c.relnamespace
+WHERE n.nspname='public'
+  AND c.relname='referral_reward_settings'
+  AND t.tgname='referral_rewards_deferred_v2_guard'
+  AND t.tgenabled <> 'D'
+  AND NOT t.tgisinternal;
+
+\echo ''
+\echo '=== TEMPORARY INTEGRITY ==='
 SELECT count(*) AS bad_live_reconciliation
 FROM public.ledger_v2_legacy_live_reconciliation
 WHERE reconciliation_status <> 'MATCHED'
