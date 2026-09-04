@@ -9,6 +9,7 @@ SET LOCAL lock_timeout = '5s';
 DO $$
 DECLARE
   v_user uuid;
+  v_admin uuid;
   v_user_text text;
   v_front text;
   v_back text;
@@ -28,8 +29,19 @@ BEGIN
   ORDER BY kp.user_id
   LIMIT 1;
 
+  SELECT id INTO v_admin
+  FROM public.users
+  WHERE role IN ('admin','super_admin','kyc_officer')
+    AND COALESCE(is_system,false)=false
+    AND COALESCE(is_active,true)=true
+  ORDER BY CASE role WHEN 'kyc_officer' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,id
+  LIMIT 1;
+
   IF v_user IS NULL THEN
     RAISE EXCEPTION 'TEST_REQUIRES_ONE_APPROVED_NON_SYSTEM_KYC_USER';
+  END IF;
+  IF v_admin IS NULL THEN
+    RAISE EXCEPTION 'TEST_REQUIRES_ONE_ACTIVE_KYC_REVIEWER';
   END IF;
 
   SELECT * INTO v_policy FROM public.kyc_policy_versions
@@ -43,8 +55,6 @@ BEGIN
   v_back := v_user_text || '/id_back_phase53_back.jpg';
   v_selfie := v_user_text || '/selfie_phase53.jpg';
 
-  -- Temporarily make the already-approved fixture eligible to create a newer
-  -- application. The whole test rolls back.
   PERFORM set_config('jeezpay.kyc_lifecycle_v2','on',true);
   UPDATE public.kyc_profiles
   SET status='rejected', rejection_reason='Phase 5.3 rollback test', updated_at=now()
@@ -127,7 +137,6 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.kyc_risk_assessments WHERE application_id=v_app;
   IF v_count <> 1 THEN RAISE EXCEPTION 'RISK_ASSESSMENT_MISSING'; END IF;
 
-  -- Identity evidence must be immutable after submission.
   v_failed := false;
   BEGIN
     UPDATE public.kyc_applications SET full_name='Tampered name' WHERE id=v_app;
@@ -144,34 +153,33 @@ BEGIN
   END;
   IF NOT v_failed THEN RAISE EXCEPTION 'CONSENT_MUTATION_WAS_NOT_BLOCKED'; END IF;
 
-  -- Record the manual/provider evidence required for a standard-risk approval.
   PERFORM public.set_kyc_provider_check_v3(
-    v_user,v_app,'document_authenticity','manual_passed','manual',NULL,NULL,'VISUAL_REVIEW',
+    v_admin,v_app,'document_authenticity','manual_passed','manual',NULL,NULL,'VISUAL_REVIEW',
     jsonb_build_object('reviewMethod','trained_reviewer')
   );
   PERFORM public.set_kyc_provider_check_v3(
-    v_user,v_app,'document_presence','manual_passed','manual',NULL,NULL,'LIVE_CAPTURE_CONFIRMED',
+    v_admin,v_app,'document_presence','manual_passed','manual',NULL,NULL,'LIVE_CAPTURE_CONFIRMED',
     jsonb_build_object('captureMethod','camera')
   );
   PERFORM public.set_kyc_provider_check_v3(
-    v_user,v_app,'face_match','manual_passed','manual',NULL,NULL,'VISUAL_FACE_MATCH',
+    v_admin,v_app,'face_match','manual_passed','manual',NULL,NULL,'VISUAL_FACE_MATCH',
     jsonb_build_object('reviewMethod','trained_reviewer')
   );
   PERFORM public.set_kyc_provider_check_v3(
-    v_user,v_app,'liveness','manual_passed','manual',NULL,NULL,'ATTENDED_TEST',
+    v_admin,v_app,'liveness','manual_passed','manual',NULL,NULL,'ATTENDED_TEST',
     jsonb_build_object('attendedSession',true)
   );
 
   PERFORM public.set_kyc_screening_v3(
-    v_user,v_app,'sanctions','clear','manual',NULL,'TEST-LIST',NULL,0,
+    v_admin,v_app,'sanctions','clear','manual',NULL,'TEST-LIST',NULL,0,
     jsonb_build_object('test',true)
   );
   PERFORM public.set_kyc_screening_v3(
-    v_user,v_app,'pep','clear','manual',NULL,'TEST-LIST',NULL,0,
+    v_admin,v_app,'pep','clear','manual',NULL,'TEST-LIST',NULL,0,
     jsonb_build_object('test',true)
   );
   PERFORM public.set_kyc_screening_v3(
-    v_user,v_app,'adverse_media','clear','manual',NULL,'TEST-LIST',NULL,0,
+    v_admin,v_app,'adverse_media','clear','manual',NULL,'TEST-LIST',NULL,0,
     jsonb_build_object('test',true)
   );
 
@@ -179,7 +187,7 @@ BEGIN
   FROM public.kyc_documents WHERE application_id=v_app;
   IF NOT COALESCE(v_failed,false) THEN RAISE EXCEPTION 'DOCUMENT_VERIFICATION_STATUS_NOT_UPDATED'; END IF;
 
-  v_result := public.review_kyc_v3(v_user,v_user,'approved',NULL);
+  v_result := public.review_kyc_v3(v_admin,v_user,'approved',NULL);
   IF COALESCE((v_result->>'ok')::boolean,false) IS NOT TRUE
      OR v_result->>'workflowStatus' <> 'approved'
      OR v_result->>'nextReviewAt' IS NULL
