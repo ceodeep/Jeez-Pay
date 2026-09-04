@@ -18,8 +18,10 @@ const {
   merchantProductPolicy,
   serviceProductPolicy,
 } = require("./src/middlewares/nonWalletProductPolicy.middleware");
+const kycInternationalV3Routes = require("./src/routes/kycInternationalV3.routes");
 const kycLifecycleV2Routes = require("./src/routes/kycLifecycleV2.routes");
 const kycRoutes = require("./src/routes/kyc.routes");
+const adminKycInternationalV3Routes = require("./src/routes/adminKycInternationalV3.routes");
 const adminKycV2Routes = require("./src/routes/adminKycV2.routes");
 const adminComplianceV1Routes = require("./src/routes/adminComplianceV1.routes");
 const adminRoutes = require("./src/routes/admin.routes");
@@ -69,9 +71,6 @@ app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 
-// Public product configuration. This is safe to expose because it contains
-// launch availability and capability flags only; financial authorization is
-// still enforced by authenticated routes.
 app.use("/products", productRoutes);
 
 app.use("/auth/signup/request-otp", otpLimiter);
@@ -80,21 +79,22 @@ app.use("/auth/forgot-pin/request-otp", otpLimiter);
 app.use("/auth/change-email/request-otp", otpLimiter);
 app.use("/auth", authLimiter, authRoutes);
 
-// Phase 5.1 intercepts KYC submissions with the controlled lifecycle RPC.
-// Existing read/upload endpoints continue through the legacy KYC router.
-app.use("/kyc", kycLifecycleV2Routes, kycRoutes);
+// V3 is additive. New schemaVersion=3 submissions/upload sessions are handled
+// first, while old Android builds fall through to the hardened V2 lifecycle.
+// /kyc/me is sanitized for every client and never exposes private object paths.
+app.use(
+  "/kyc",
+  kycInternationalV3Routes,
+  kycLifecycleV2Routes,
+  kycRoutes,
+);
 
-// Secure external-account authorization.
-// Keep this before the generic /wallet router.
 app.use(
   "/wallet/account-links",
   authMiddleware,
   accountLinkRoutes,
 );
 
-// Product policy is evaluated after authentication and before wallet route
-// code. Phase 4 transition routers intercept only the money flows already
-// proven against Ledger v2; all remaining wallet routes fall through unchanged.
 app.use(
   "/wallet",
   authMiddleware,
@@ -106,34 +106,25 @@ app.use(
   walletRoutes,
 );
 
-// Admin reporting stays available, but manual balance/crypto configuration and
-// money actions must obey the same launch product policy as customer routes.
-// Phase 5.1 KYC review routes intercept approve/reject before legacy handlers.
-// Phase 5.2 compliance review/control endpoints are isolated here; Ledger-bound
-// transaction monitoring itself is enforced in PostgreSQL for every native
-// launch money journal.
+// V3 reviewer operations intercept the KYC queue/detail/review endpoints first.
+// Legacy KYC records without a V3 application fall through to Phase 5.1.
 app.use(
   "/admin",
   adminProductPolicy,
+  adminKycInternationalV3Routes,
   adminKycV2Routes,
   adminComplianceV1Routes,
   adminLaunchMoneyV2Routes,
   adminRoutes,
 );
 
-// Service payments sit outside /wallet, so enforce the same launch product
-// policy before their legacy route code executes.
 app.use("/services", serviceProductPolicy, servicesRoutes);
 
-// Merchant account-link endpoints are isolated from the existing
-// merchant payment/payout router.
 app.use(
   "/merchant/account-links",
   merchantAccountLinkRoutes,
 );
 
-// Phase 4.3C intercepts merchant payouts with the native Ledger v2 wrapper;
-// other merchant endpoints continue through the existing router unchanged.
 app.use(
   "/merchant",
   merchantProductPolicy,
