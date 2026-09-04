@@ -34,10 +34,15 @@ for (const [network, prefix] of [
 for (const [network, prefix] of [
   ["::", 128],
   ["::1", 128],
+  ["::ffff:0:0", 96],
+  ["64:ff9b::", 96],
+  ["64:ff9b:1::", 48],
   ["fc00::", 7],
   ["fe80::", 10],
   ["ff00::", 8],
+  ["2001::", 32],
   ["2001:db8::", 32],
+  ["2002::", 16],
 ]) {
   blockedNetworks.addSubnet(network, prefix, "ipv6");
 }
@@ -97,11 +102,6 @@ function isBlockedAddress(address, family) {
   }
 
   if (family === 6) {
-    const lower = String(address).toLowerCase();
-    const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) {
-      return blockedNetworks.check(mapped[1], "ipv4");
-    }
     return blockedNetworks.check(address, "ipv6");
   }
 
@@ -131,6 +131,7 @@ async function resolvePublicWebhookDestination(rawUrl) {
 
   return {
     parsed,
+    hostname,
     address: addresses[0].address,
     family: addresses[0].family,
   };
@@ -158,14 +159,14 @@ async function postSignedWebhook({ url, eventType, payloadString, signature, tim
     const request = https.request(
       {
         protocol: "https:",
-        hostname: destination.parsed.hostname,
+        hostname: destination.hostname,
         port: 443,
         path: `${destination.parsed.pathname}${destination.parsed.search}`,
         method: "POST",
         lookup: pinnedLookup(destination.address, destination.family),
-        servername: net.isIP(destination.parsed.hostname)
+        servername: net.isIP(destination.hostname)
           ? undefined
-          : destination.parsed.hostname,
+          : destination.hostname,
         agent: false,
         maxHeaderSize: 16 * 1024,
         headers: {
@@ -223,6 +224,10 @@ function normalizeRelation(value) {
   return Array.isArray(value) ? value[0] || null : value || null;
 }
 
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 async function sendMerchantWebhookEvent(event) {
   const payment = normalizeRelation(event.merchant_payments);
   const merchant = normalizeRelation(event.merchants);
@@ -261,12 +266,11 @@ async function sendMerchantWebhookEvent(event) {
   });
 }
 
-function isPlainObject(value) {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
 function retryAtIso(attempts) {
-  const index = Math.min(Math.max(attempts - 1, 0), RETRY_DELAYS_SECONDS.length - 1);
+  const index = Math.min(
+    Math.max(attempts - 1, 0),
+    RETRY_DELAYS_SECONDS.length - 1,
+  );
   return new Date(Date.now() + RETRY_DELAYS_SECONDS[index] * 1000).toISOString();
 }
 
@@ -354,10 +358,9 @@ async function processPendingMerchantWebhooks(limit = 10) {
 
       results.push({ event_id: event.id, status: "sent", result: sendResult });
     } catch (err) {
-      const message = String(err?.message || err || "Webhook delivery failed").slice(
-        0,
-        MAX_ERROR_LENGTH,
-      );
+      const message = String(
+        err?.message || err || "Webhook delivery failed",
+      ).slice(0, MAX_ERROR_LENGTH);
 
       const { error: updateErr } = await supabase
         .from("merchant_webhook_events")
@@ -372,9 +375,7 @@ async function processPendingMerchantWebhooks(limit = 10) {
         .eq("id", event.id)
         .eq("lock_token", lockToken);
 
-      if (updateErr) {
-        throw updateErr;
-      }
+      if (updateErr) throw updateErr;
 
       results.push({ event_id: event.id, status: "failed", error: message });
     }
