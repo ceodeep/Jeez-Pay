@@ -14,13 +14,21 @@ BEGIN
   END IF;
 END $$;
 
--- Operations layer.
+-- Operations layer. Guard trigger drops so rollback also works after a partial install.
 DROP FUNCTION IF EXISTS public.kyc_purge_candidates_v3(integer);
 DROP FUNCTION IF EXISTS public.mark_kyc_periodic_reviews_due_v3(integer);
 DROP FUNCTION IF EXISTS public.set_kyc_legal_hold_v3(uuid,uuid,boolean,text);
-DROP TRIGGER IF EXISTS kyc_applications_v3_initialize_retention ON public.kyc_applications_v3;
+DO $$ BEGIN
+  IF to_regclass('public.kyc_applications_v3') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS kyc_applications_v3_initialize_retention ON public.kyc_applications_v3';
+  END IF;
+END $$;
 DROP FUNCTION IF EXISTS public.initialize_kyc_retention_v3();
-DROP TRIGGER IF EXISTS kyc_evidence_access_log_v3_immutable ON public.kyc_evidence_access_log_v3;
+DO $$ BEGIN
+  IF to_regclass('public.kyc_evidence_access_log_v3') IS NOT NULL THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS kyc_evidence_access_log_v3_immutable ON public.kyc_evidence_access_log_v3';
+  END IF;
+END $$;
 DROP FUNCTION IF EXISTS public.reject_kyc_access_log_mutation_v3();
 DROP TABLE IF EXISTS public.kyc_evidence_access_log_v3;
 DROP TABLE IF EXISTS public.kyc_retention_v3;
@@ -53,18 +61,15 @@ DROP TABLE IF EXISTS public.kyc_policy_versions_v3;
 
 DROP FUNCTION IF EXISTS public.reject_kyc_v3_immutable_mutation();
 
--- Restore the Phase 5.1 immutable review-event vocabulary.
-ALTER TABLE public.kyc_review_events
-  DROP CONSTRAINT IF EXISTS kyc_review_events_event_type_check;
-ALTER TABLE public.kyc_review_events
-  ADD CONSTRAINT kyc_review_events_event_type_check
-  CHECK (event_type IN ('submitted','resubmitted','approved','rejected'));
-
-ALTER TABLE public.kyc_review_events
-  DROP CONSTRAINT IF EXISTS kyc_review_events_status_check;
-ALTER TABLE public.kyc_review_events
-  ADD CONSTRAINT kyc_review_events_status_check
-  CHECK (to_status IN ('pending','approved','rejected'));
+-- Restore the Phase 5.1 immutable review-event vocabulary if that table exists.
+DO $$ BEGIN
+  IF to_regclass('public.kyc_review_events') IS NOT NULL THEN
+    EXECUTE 'ALTER TABLE public.kyc_review_events DROP CONSTRAINT IF EXISTS kyc_review_events_event_type_check';
+    EXECUTE 'ALTER TABLE public.kyc_review_events ADD CONSTRAINT kyc_review_events_event_type_check CHECK (event_type IN (''submitted'',''resubmitted'',''approved'',''rejected''))';
+    EXECUTE 'ALTER TABLE public.kyc_review_events DROP CONSTRAINT IF EXISTS kyc_review_events_status_check';
+    EXECUTE 'ALTER TABLE public.kyc_review_events ADD CONSTRAINT kyc_review_events_status_check CHECK (to_status IN (''pending'',''approved'',''rejected''))';
+  END IF;
+END $$;
 
 -- Remove only columns introduced by the new v3 compatibility projection.
 ALTER TABLE public.kyc_profiles
