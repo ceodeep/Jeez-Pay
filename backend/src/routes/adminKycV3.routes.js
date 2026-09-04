@@ -20,6 +20,11 @@ function clampLimit(value, fallback = 50, max = 100) {
 function mapReviewError(error) {
   const message = String(error?.message || "");
   if (message.includes("NOT_AUTHORIZED")) return [403, "KYC review access denied"];
+  if (message.includes("KYC_V3_FACE_MATCH_REQUIRED")) return [409, "Selfie-to-document face comparison is required before approval"];
+  if (message.includes("KYC_V3_EDD_LIVENESS_REQUIRED")) return [409, "High-risk or PEP KYC requires an attended live identity session before approval"];
+  if (message.includes("KYC_V3_MANUAL_FACE_MATCH_EVIDENCE_REQUIRED")) return [400, "Manual face comparison requires reviewer confirmation and notes"];
+  if (message.includes("KYC_V3_MANUAL_LIVENESS_EVIDENCE_REQUIRED")) return [400, "Manual liveness requires an attended live session and reviewer notes"];
+  if (message.includes("KYC_V3_PROVIDER_LIVENESS_REFERENCE_REQUIRED")) return [400, "Provider liveness verification requires a provider reference"];
   if (message.includes("KYC_V3_INVALID") || message.includes("KYC_V3_REVIEW_REASON")) return [400, "Invalid KYC review request"];
   return [500, "KYC review operation failed"];
 }
