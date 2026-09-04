@@ -28,6 +28,54 @@ ALTER TABLE public.kyc_checks_v3
     'adverse_media','proof_of_address'
   ));
 
+-- Extend the existing controlled check RPC so face_match is recorded through
+-- the same permissioned/audited path as every other KYC check. The current-state
+-- compatibility profile has no separate face-match column; approval reads the
+-- immutable check evidence directly from kyc_checks_v3.
+CREATE OR REPLACE FUNCTION public.record_kyc_check_v3(
+  p_admin_user_id uuid,p_user_id uuid,p_check_type text,p_status text,p_provider text DEFAULT NULL,
+  p_provider_reference text DEFAULT NULL,p_notes text DEFAULT NULL,p_details jsonb DEFAULT '{}'::jsonb
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,extensions AS $$
+DECLARE
+  v_role text; v_profile public.kyc_profiles%ROWTYPE; v_check_type text:=lower(btrim(COALESCE(p_check_type,'')));
+  v_status text:=lower(btrim(COALESCE(p_status,''))); v_check_id uuid; v_new_workflow text;
+BEGIN
+  SELECT role INTO v_role FROM public.users WHERE id=p_admin_user_id AND COALESCE(is_active,true)=true AND COALESCE(is_system,false)=false;
+  IF v_role NOT IN('admin','super_admin','kyc_officer') THEN RAISE EXCEPTION 'KYC_V3_CHECK_NOT_AUTHORIZED' USING ERRCODE='P0001'; END IF;
+  IF v_check_type NOT IN('document_verification','face_match','liveness','sanctions','pep','adverse_media','proof_of_address')
+     OR v_status NOT IN('pending','verified','manual_verified','clear','manual_clear','potential_match','confirmed_match','confirmed_pep','failed','inconclusive','not_applicable')
+     OR jsonb_typeof(COALESCE(p_details,'{}'::jsonb))<>'object' THEN RAISE EXCEPTION 'KYC_V3_INVALID_CHECK' USING ERRCODE='P0001'; END IF;
+  SELECT * INTO v_profile FROM public.kyc_profiles WHERE user_id=p_user_id FOR UPDATE;
+  IF NOT FOUND OR v_profile.current_application_id IS NULL THEN RAISE EXCEPTION 'KYC_V3_APPLICATION_NOT_FOUND' USING ERRCODE='P0001'; END IF;
+  IF COALESCE(v_profile.workflow_status,v_profile.status) NOT IN('submitted','in_review','needs_more_info') THEN RAISE EXCEPTION 'KYC_V3_APPLICATION_NOT_REVIEWABLE' USING ERRCODE='P0001'; END IF;
+
+  INSERT INTO public.kyc_checks_v3(application_id,user_id,check_type,status,provider,provider_reference,performed_by,notes,details)
+  VALUES(v_profile.current_application_id,p_user_id,v_check_type,v_status,NULLIF(btrim(COALESCE(p_provider,'')),''),NULLIF(btrim(COALESCE(p_provider_reference,'')),''),p_admin_user_id,
+    NULLIF(left(btrim(COALESCE(p_notes,'')),1000),''),COALESCE(p_details,'{}'::jsonb)) RETURNING id INTO v_check_id;
+  v_new_workflow:=CASE WHEN COALESCE(v_profile.workflow_status,v_profile.status)='submitted' THEN 'in_review' ELSE COALESCE(v_profile.workflow_status,v_profile.status) END;
+
+  PERFORM set_config('jeezpay.kyc_lifecycle_v3','on',true);
+  UPDATE public.kyc_profiles SET identity_verification_status=CASE WHEN v_check_type='document_verification' THEN v_status ELSE identity_verification_status END,
+    liveness_status=CASE WHEN v_check_type='liveness' THEN v_status ELSE liveness_status END,sanctions_status=CASE WHEN v_check_type='sanctions' THEN v_status ELSE sanctions_status END,
+    pep_screening_status=CASE WHEN v_check_type='pep' THEN v_status ELSE pep_screening_status END,adverse_media_status=CASE WHEN v_check_type='adverse_media' THEN v_status ELSE adverse_media_status END,
+    workflow_status=v_new_workflow,required_action=CASE WHEN v_check_type='sanctions' AND v_status IN('potential_match','confirmed_match') THEN 'sanctions_review'
+      WHEN v_check_type='pep' AND v_status IN('potential_match','confirmed_pep') THEN 'pep_review' ELSE required_action END,updated_at=now() WHERE user_id=p_user_id;
+  PERFORM set_config('jeezpay.kyc_lifecycle_v3','off',true);
+  UPDATE public.kyc_applications_v3 SET workflow_status=v_new_workflow,updated_at=now() WHERE id=v_profile.current_application_id;
+
+  IF v_check_type='sanctions' AND v_status='confirmed_match' THEN
+    PERFORM public.set_compliance_entity_control_v1(p_admin_user_id,'USER',p_user_id::text,'frozen','Confirmed sanctions match during KYC',NULL);
+  ELSIF (v_check_type='sanctions' AND v_status='potential_match') OR (v_check_type='pep' AND v_status IN('potential_match','confirmed_pep')) THEN
+    PERFORM public.set_compliance_entity_control_v1(p_admin_user_id,'USER',p_user_id::text,'review','KYC screening requires compliance review',NULL);
+  END IF;
+
+  INSERT INTO public.kyc_review_events(user_id,actor_user_id,event_type,from_status,to_status,reason,snapshot)
+  VALUES(p_user_id,p_admin_user_id,'check_recorded',COALESCE(v_profile.workflow_status,v_profile.status),v_new_workflow,NULLIF(left(btrim(COALESCE(p_notes,'')),500),''),
+    jsonb_build_object('applicationId',v_profile.current_application_id,'checkId',v_check_id,'checkType',v_check_type,'status',v_status,'provider',p_provider));
+  RETURN jsonb_build_object('ok',true,'checkId',v_check_id,'checkType',v_check_type,'status',v_status,'workflowStatus',v_new_workflow);
+END $$;
+
 -- Preserve policy history. V1 stays immutable/historical; V2 is the launch
 -- policy. The privacy/biometric notice versions are unchanged because this
 -- changes verification mode, not the notices themselves.
