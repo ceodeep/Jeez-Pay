@@ -176,6 +176,7 @@ WITH input AS (
   JOIN public.sanctions_entities_v1 e ON e.id=n.entity_id
   CROSS JOIN input i
   WHERE i.n<>''
+    AND n.normalized_name OPERATOR(extensions.%) i.n
     AND extensions.similarity(n.normalized_name,i.n)>=0.55
 ), ranked AS (
   SELECT *,
