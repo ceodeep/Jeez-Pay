@@ -90,10 +90,9 @@ class KycActivity : AppCompatActivity() {
     )
 
     private enum class CaptureKind { ID_FRONT, ID_BACK, SELFIE }
+    private enum class DateTarget { DOB, ISSUE_DATE, EXPIRY_DATE }
 
-    private val takePicture = registerForActivityResult(
-        ActivityResultContracts.TakePicture()
-    ) { success ->
+    private val takePicture = registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         val uri = pendingCameraUri
         val kind = pendingCapture
         pendingCameraUri = null
@@ -122,12 +121,9 @@ class KycActivity : AppCompatActivity() {
         }
     }
 
-    private val requestCameraPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            pendingCapture?.let { launchCamera(it) }
-        } else {
+    private val requestCameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) pendingCapture?.let { launchCamera(it) }
+        else {
             pendingCapture = null
             toast("Camera permission is required for identity verification")
         }
@@ -144,6 +140,7 @@ class KycActivity : AppCompatActivity() {
         configureCameraButtons()
         configureNavigation()
         configureConsentLinks()
+        configureEddHints()
 
         binding.btnSubmitKyc.setOnClickListener { submitKyc() }
         renderStep()
@@ -157,28 +154,18 @@ class KycActivity : AppCompatActivity() {
             .sortedBy { it.second.lowercase(Locale.getDefault()) }
             .forEach { (code, name) -> countryLabelToCode["$name ($code)"] = code }
 
-        val countryLabels = countryLabelToCode.keys.toList()
-        val countryAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, countryLabels)
+        val countries = countryLabelToCode.keys.toList()
+        val countryAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, countries)
         binding.acNationality.setAdapter(countryAdapter)
         binding.acCountryOfBirth.setAdapter(countryAdapter)
         binding.acResidenceCountry.setAdapter(countryAdapter)
         binding.acIssuingCountry.setAdapter(countryAdapter)
 
-        binding.acDocumentType.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_list_item_1, documentTypeMap.keys.toList())
-        )
-        binding.acEmploymentStatus.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_list_item_1, employmentMap.keys.toList())
-        )
-        binding.acAccountPurpose.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_list_item_1, purposeMap.keys.toList())
-        )
-        binding.acExpectedVolume.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_list_item_1, volumeMap.keys.toList())
-        )
-        binding.acExpectedTxCount.setAdapter(
-            ArrayAdapter(this, android.R.layout.simple_list_item_1, txCountMap.keys.toList())
-        )
+        binding.acDocumentType.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, documentTypeMap.keys.toList()))
+        binding.acEmploymentStatus.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, employmentMap.keys.toList()))
+        binding.acAccountPurpose.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, purposeMap.keys.toList()))
+        binding.acExpectedVolume.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, volumeMap.keys.toList()))
+        binding.acExpectedTxCount.setAdapter(ArrayAdapter(this, android.R.layout.simple_list_item_1, txCountMap.keys.toList()))
 
         binding.acDocumentType.setOnItemClickListener { _, _, _, _ -> updateBackRequirement() }
     }
@@ -193,8 +180,6 @@ class KycActivity : AppCompatActivity() {
         }
     }
 
-    private enum class DateTarget { DOB, ISSUE_DATE, EXPIRY_DATE }
-
     private fun openDatePicker(target: DateTarget) {
         val cal = Calendar.getInstance()
         val dialog = DatePickerDialog(
@@ -207,9 +192,7 @@ class KycActivity : AppCompatActivity() {
                     DateTarget.EXPIRY_DATE -> binding.etDocumentExpiryDate.setText(value)
                 }
             },
-            cal.get(Calendar.YEAR),
-            cal.get(Calendar.MONTH),
-            cal.get(Calendar.DAY_OF_MONTH)
+            cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)
         )
         when (target) {
             DateTarget.DOB, DateTarget.ISSUE_DATE -> dialog.datePicker.maxDate = System.currentTimeMillis()
@@ -227,8 +210,8 @@ class KycActivity : AppCompatActivity() {
     private fun startCamera(kind: CaptureKind) {
         if (formLocked) return
         pendingCapture = kind
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        if (granted) launchCamera(kind) else requestCameraPermission.launch(Manifest.permission.CAMERA)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) launchCamera(kind)
+        else requestCameraPermission.launch(Manifest.permission.CAMERA)
     }
 
     private fun launchCamera(kind: CaptureKind) {
@@ -259,13 +242,23 @@ class KycActivity : AppCompatActivity() {
 
     private fun configureConsentLinks() {
         binding.cbPrivacyConsent.setOnLongClickListener {
-            startActivity(Intent(this, PrivacyActivity::class.java))
-            true
+            startActivity(Intent(this, PrivacyActivity::class.java)); true
         }
         binding.tvKycStatusMessage.setOnLongClickListener {
-            startActivity(Intent(this, PrivacyActivity::class.java))
-            true
+            startActivity(Intent(this, PrivacyActivity::class.java)); true
         }
+    }
+
+    private fun configureEddHints() {
+        val update = {
+            val edd = binding.cbPepSelf.isChecked || binding.cbPepRelated.isChecked ||
+                volumeMap[binding.acExpectedVolume.text.toString()] == "very_high"
+            binding.etSourceOfWealth.hint = if (edd) "Required for enhanced due diligence" else "Optional unless enhanced due diligence is required"
+        }
+        binding.cbPepSelf.setOnCheckedChangeListener { _, _ -> update() }
+        binding.cbPepRelated.setOnCheckedChangeListener { _, _ -> update() }
+        binding.acExpectedVolume.setOnItemClickListener { _, _, _, _ -> update() }
+        update()
     }
 
     private fun renderStep() {
@@ -295,7 +288,6 @@ class KycActivity : AppCompatActivity() {
                     return@launch
                 }
             }
-
             when (val result = repo.meSafe()) {
                 is ApiResult.Success -> applyProfile(result.data.kyc)
                 is ApiResult.Error -> handleKycError(result.error) { loadPolicyAndProfile() }
@@ -315,6 +307,8 @@ class KycActivity : AppCompatActivity() {
         binding.etPostalCode.setText(kyc.postalCode.orEmpty())
         binding.etOccupation.setText(kyc.occupation.orEmpty())
         binding.etEmployerName.setText(kyc.employerName.orEmpty())
+        binding.etSourceOfWealth.setText(kyc.sourceOfWealth.orEmpty())
+        binding.etTaxResidencies.setText(kyc.taxResidencies.joinToString(", "))
 
         setCountry(binding.acNationality, kyc.nationality)
         setCountry(binding.acCountryOfBirth, kyc.countryOfBirth)
@@ -331,15 +325,20 @@ class KycActivity : AppCompatActivity() {
         when {
             kyc.status.equals("approved", true) -> lockForm(
                 "Identity verified",
-                if (kyc.nextReviewAt.isNullOrBlank()) "Your identity verification is approved." else "Approved. Your next periodic review is scheduled for ${kyc.nextReviewAt}."
+                buildString {
+                    append("Your identity verification is approved")
+                    kyc.assuranceLevel?.let { append(" at $it assurance") }
+                    append(".")
+                    if (!kyc.nextReviewAt.isNullOrBlank()) append(" Next periodic review: ${kyc.nextReviewAt}.")
+                }
             )
             workflow == "submitted" || workflow == "in_review" || kyc.status.equals("pending", true) && workflow != "needs_more_info" -> lockForm(
                 "Verification in review",
-                "Your information has been submitted. We will notify you when review is complete."
+                "Your information was submitted securely and is undergoing identity, screening and risk checks."
             )
             workflow == "needs_more_info" -> {
                 binding.tvKycStatusTitle.text = "More information needed"
-                binding.tvKycStatusMessage.text = kyc.rejectionReason ?: "Please update your information and submit again."
+                binding.tvKycStatusMessage.text = kyc.rejectionReason ?: "Please update the requested information and submit a new application version."
             }
             kyc.status.equals("rejected", true) -> {
                 binding.tvKycStatusTitle.text = "Verification needs attention"
@@ -366,11 +365,7 @@ class KycActivity : AppCompatActivity() {
         countryLabelToCode.entries.firstOrNull { it.value.equals(code, true) }?.key?.let { view.setText(it, false) }
     }
 
-    private fun setMappedValue(
-        view: com.google.android.material.textfield.MaterialAutoCompleteTextView,
-        map: Map<String, String>,
-        value: String?
-    ) {
+    private fun setMappedValue(view: com.google.android.material.textfield.MaterialAutoCompleteTextView, map: Map<String, String>, value: String?) {
         if (value.isNullOrBlank()) return
         map.entries.firstOrNull { it.value.equals(value, true) }?.key?.let { view.setText(it, false) }
     }
@@ -391,8 +386,7 @@ class KycActivity : AppCompatActivity() {
                     countryCode(binding.acNationality) == null || countryCode(binding.acCountryOfBirth) == null ||
                     countryCode(binding.acResidenceCountry) == null || text(binding.etAddress).isBlank() || text(binding.etCity).isBlank()
                 ) {
-                    toast("Complete all required personal identity fields")
-                    false
+                    toast("Complete all required personal identity fields"); false
                 } else true
             }
             2 -> {
@@ -400,40 +394,39 @@ class KycActivity : AppCompatActivity() {
                 val backRequired = documentType != null && documentType != "passport"
                 val noExpiry = binding.cbDocumentNoExpiry.isChecked
                 if (documentType == null || countryCode(binding.acIssuingCountry) == null || text(binding.etDocumentNumber).isBlank()) {
-                    toast("Complete the government document details")
-                    false
+                    toast("Complete the government document details"); false
                 } else if (!noExpiry && text(binding.etDocumentExpiryDate).isBlank()) {
-                    toast("Enter the document expiry date or select no expiry")
-                    false
+                    toast("Enter the document expiry date or select no expiry"); false
                 } else if (idFrontUri == null) {
-                    toast("Capture the front of your identity document")
-                    false
+                    toast("Capture the front of your identity document"); false
                 } else if (backRequired && idBackUri == null) {
-                    toast("Capture the back of this identity document")
-                    false
+                    toast("Capture the back of this identity document"); false
                 } else true
             }
             3 -> {
+                val taxResidencies = parseTaxResidencies()
+                val edd = binding.cbPepSelf.isChecked || binding.cbPepRelated.isChecked ||
+                    volumeMap[binding.acExpectedVolume.text.toString()] == "very_high"
                 if (employmentMap[binding.acEmploymentStatus.text.toString()] == null || text(binding.etOccupation).isBlank() ||
                     selectedSources().isEmpty() || purposeMap[binding.acAccountPurpose.text.toString()] == null ||
                     volumeMap[binding.acExpectedVolume.text.toString()] == null || txCountMap[binding.acExpectedTxCount.text.toString()] == null
                 ) {
-                    toast("Complete your financial profile")
-                    false
+                    toast("Complete your financial profile"); false
+                } else if (taxResidencies.isEmpty()) {
+                    toast("Enter at least one tax residence country code, for example SS"); false
                 } else if (!validTaxResidencies()) {
-                    toast("Tax residence countries must use two-letter ISO codes")
-                    false
+                    toast("Tax residence countries must use two-letter ISO codes, for example SS, KE"); false
+                } else if (edd && text(binding.etSourceOfWealth).isBlank()) {
+                    toast("Source of wealth is required for enhanced due diligence"); false
                 } else true
             }
             4 -> {
                 if (selfieUri == null) {
-                    toast("Capture a selfie for identity comparison")
-                    false
+                    toast("Capture a selfie for identity comparison"); false
                 } else if (!binding.cbPrivacyConsent.isChecked || !binding.cbIdentityConsent.isChecked ||
                     !binding.cbBiometricConsent.isChecked || !binding.cbScreeningConsent.isChecked
                 ) {
-                    toast("Accept all required verification and privacy notices")
-                    false
+                    toast("Accept all required verification and privacy notices"); false
                 } else true
             }
             else -> true
@@ -460,12 +453,13 @@ class KycActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val frontPath = uploadEvidence("id_front", front, currentPolicy.maxUploadBytes)
-                val backPath = idBackUri?.let { uploadEvidence("id_back", it, currentPolicy.maxUploadBytes) }
-                val selfiePath = uploadEvidence("selfie", selfie, currentPolicy.maxUploadBytes)
-
+                val frontPath = uploadEvidence("id_front", front, currentPolicy)
+                val backPath = idBackUri?.let { uploadEvidence("id_back", it, currentPolicy) }
+                val selfiePath = uploadEvidence("selfie", selfie, currentPolicy)
                 val documentType = documentTypeMap[binding.acDocumentType.text.toString()] ?: error("Document type missing")
+
                 val request = KycSubmitRequest(
+                    schemaVersion = currentPolicy.schemaVersion,
                     fullName = text(binding.etFullName),
                     dob = text(binding.etDob),
                     nationality = countryCode(binding.acNationality) ?: error("Nationality missing"),
@@ -510,10 +504,8 @@ class KycActivity : AppCompatActivity() {
 
                 when (val result = repo.submitSafe(request)) {
                     is ApiResult.Success -> {
-                        toast("Identity verification submitted")
-                        idFrontUri = null
-                        idBackUri = null
-                        selfieUri = null
+                        toast("Identity verification submitted securely")
+                        idFrontUri = null; idBackUri = null; selfieUri = null
                         loadPolicyAndProfile()
                     }
                     is ApiResult.Error -> handleKycError(result.error) { submitKyc() }
@@ -528,22 +520,17 @@ class KycActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun uploadEvidence(fileType: String, uri: Uri, maxBytes: Long): String {
+    private suspend fun uploadEvidence(fileType: String, uri: Uri, currentPolicy: KycPolicyResponse): String {
         val contentType = contentResolver.getType(uri)?.lowercase(Locale.ROOT) ?: "image/jpeg"
-        if (contentType !in setOf("image/jpeg", "image/jpg", "image/png")) {
-            throw IllegalStateException("Only JPEG or PNG identity images are allowed")
-        }
-
+        if (contentType !in setOf("image/jpeg", "image/jpg", "image/png")) throw IllegalStateException("Only JPEG or PNG identity images are allowed")
         val bytes = withContext(Dispatchers.IO) { readAllBytes(uri) }
         if (bytes.isEmpty()) throw IllegalStateException("Captured image is empty")
-        if (bytes.size.toLong() > maxBytes) throw IllegalStateException("Captured image is too large")
+        if (bytes.size.toLong() > currentPolicy.maxUploadBytes) throw IllegalStateException("Captured image is too large")
 
-        return when (val uploadResult = repo.uploadUrlSafe(fileType, contentType, 3)) {
+        return when (val uploadResult = repo.uploadUrlSafe(fileType, contentType, currentPolicy.schemaVersion)) {
             is ApiResult.Error -> throw KycFlowException(uploadResult.error)
             is ApiResult.Success -> {
-                withContext(Dispatchers.IO) {
-                    SignedUploader.putBytes(uploadResult.data.signedUrl, bytes, contentType)
-                }
+                withContext(Dispatchers.IO) { SignedUploader.putBytes(uploadResult.data.signedUrl, bytes, contentType) }
                 uploadResult.data.path
             }
         }
@@ -565,11 +552,12 @@ class KycActivity : AppCompatActivity() {
         .distinct()
         .take(10)
 
-    private fun validTaxResidencies(): Boolean = parseTaxResidencies().all { it.matches(Regex("^[A-Z]{2}$")) }
+    private fun validTaxResidencies(): Boolean {
+        val values = parseTaxResidencies()
+        return values.isNotEmpty() && values.all { it.matches(Regex("^[A-Z]{2}$")) }
+    }
 
-    private fun countryCode(view: com.google.android.material.textfield.MaterialAutoCompleteTextView): String? =
-        countryLabelToCode[view.text.toString()]
-
+    private fun countryCode(view: com.google.android.material.textfield.MaterialAutoCompleteTextView): String? = countryLabelToCode[view.text.toString()]
     private fun text(view: android.widget.EditText): String = view.text?.toString()?.trim().orEmpty()
 
     private fun readAllBytes(uri: Uri): ByteArray {
@@ -592,11 +580,11 @@ class KycActivity : AppCompatActivity() {
     private fun setPageLoading(loading: Boolean) {
         if (loading) {
             binding.tvKycStatusTitle.text = "Loading verification"
-            binding.tvKycStatusMessage.text = "Preparing the latest KYC requirements…"
+            binding.tvKycStatusMessage.text = "Preparing the latest identity-verification requirements…"
         } else if (!formLocked) {
             binding.tvKycStatusTitle.text = "Verify your identity"
             if (binding.tvKycStatusMessage.text.toString().startsWith("Preparing")) {
-                binding.tvKycStatusMessage.text = "Complete the four verification steps below. Long-press this message or the privacy checkbox to open JeezPay's privacy policy."
+                binding.tvKycStatusMessage.text = "Complete all four steps. JeezPay uses this information for identity verification, risk assessment and financial-crime prevention. Long-press for the privacy notice."
             }
         }
     }
@@ -604,9 +592,7 @@ class KycActivity : AppCompatActivity() {
     private fun showNoInternetDialog(onRetry: () -> Unit = {}) {
         showCustomConfirmDialog(
             message = "No internet connection. Please check your network and try again.",
-            confirmText = "Retry",
-            cancelText = "Close",
-            onConfirm = onRetry
+            confirmText = "Retry", cancelText = "Close", onConfirm = onRetry
         )
     }
 
