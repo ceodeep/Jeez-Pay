@@ -4,103 +4,197 @@ const { merchantAuthMiddleware } = require("../middlewares/merchantAuth.middlewa
 
 const router = express.Router();
 
-function cleanString(value, max = 255) {
-  return String(value || "").trim().slice(0, max);
+function text(value) {
+  return String(value ?? "").trim();
 }
 
-function cleanUrl(value, max = 1000) {
-  const raw = cleanString(value, max);
-  if (!raw) return null;
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
 
-  if (!raw.startsWith("https://") && !raw.startsWith("http://") && !raw.includes("://")) {
-    return raw;
+function metadataSizeOk(value) {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), "utf8") <= 8192;
+  } catch {
+    return false;
   }
-
-  return raw;
 }
 
+function normalizeOptionalText(value, max) {
+  const valueText = text(value);
+  if (!valueText) return { ok: true, value: null };
+  if (valueText.length > max) return { ok: false, value: null };
+  return { ok: true, value: valueText };
+}
+
+function normalizeHttpsCallback(value) {
+  const normalized = normalizeOptionalText(value, 1000);
+  if (!normalized.ok || normalized.value == null) return normalized;
+
+  try {
+    const parsed = new URL(normalized.value);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      !parsed.hostname
+    ) {
+      return { ok: false, value: null };
+    }
+    return { ok: true, value: parsed.toString() };
+  } catch {
+    return { ok: false, value: null };
+  }
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+/**
+ * Phase 7 merchant payment-request API.
+ * Creation is atomic in PostgreSQL and merchant_order_id is a true idempotency
+ * contract: exact replay returns the existing payment, changed semantics return
+ * 409. SSP is enforced here, by product policy, and again in PostgreSQL.
+ */
 router.post("/payments", merchantAuthMiddleware, async (req, res) => {
   try {
     const merchant = req.merchant;
 
-    const merchantOrderId = cleanString(req.body.merchant_order_id, 120);
-    const amount = Number(req.body.amount);
-    const currency = cleanString(req.body.currency || "USDT", 12).toUpperCase();
-    const description = cleanString(req.body.description, 500);
-    const callbackUrl = cleanUrl(req.body.callback_url);
-    const successUrl = cleanUrl(req.body.success_url);
-    const cancelUrl = cleanUrl(req.body.cancel_url);
-    const metadata =
-      req.body.metadata && typeof req.body.metadata === "object"
-        ? req.body.metadata
-        : {};
+    const merchantOrderId = text(req.body?.merchant_order_id);
+    const amountRaw = text(req.body?.amount);
+    const currency = text(req.body?.currency || "SSP").toUpperCase();
+    const descriptionResult = normalizeOptionalText(req.body?.description, 500);
+    const callbackResult = normalizeHttpsCallback(req.body?.callback_url);
+    const successResult = normalizeOptionalText(req.body?.success_url, 1000);
+    const cancelResult = normalizeOptionalText(req.body?.cancel_url, 1000);
+    const metadata = req.body?.metadata == null ? {} : req.body.metadata;
 
-    if (!merchantOrderId) {
-      return res.status(400).json({ message: "merchant_order_id is required" });
-    }
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return res.status(400).json({ message: "Valid amount is required" });
-    }
-
-    const supportedCurrencies = ["USDT", "SSP"];
-
-    if (!supportedCurrencies.includes(currency)) {
+    if (!merchantOrderId || merchantOrderId.length > 120) {
       return res.status(400).json({
-        message: "Only USDT and SSP are supported for now",
+        code: "INVALID_MERCHANT_ORDER_ID",
+        message: "merchant_order_id must be between 1 and 120 characters",
       });
     }
 
-    const { data: existing, error: existingErr } = await supabase
-      .from("merchant_payments")
-      .select("*")
-      .eq("merchant_id", merchant.id)
-      .eq("merchant_order_id", merchantOrderId)
-      .maybeSingle();
-
-    if (existingErr) {
-      console.error("[merchant-payments] existing lookup error:", existingErr);
-      return res.status(500).json({ message: "Failed to create payment" });
-    }
-
-    if (existing) {
-      return res.status(200).json({
-        payment: existing,
-        checkout_url: `jeezpay://merchant-pay/${existing.id}`,
+    if (!/^\d+(?:\.\d{1,6})?$/.test(amountRaw)) {
+      return res.status(400).json({
+        code: "INVALID_AMOUNT",
+        message: "A valid payment amount is required",
       });
     }
 
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const numericAmount = Number(amountRaw);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({
+        code: "INVALID_AMOUNT",
+        message: "A valid payment amount is required",
+      });
+    }
 
-    const { data: payment, error: insertErr } = await supabase
-      .from("merchant_payments")
-      .insert({
-        merchant_id: merchant.id,
-        merchant_order_id: merchantOrderId,
-        amount,
-        currency,
-        description,
-        callback_url: callbackUrl,
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        metadata,
-        status: "pending",
-        expires_at: expiresAt,
-      })
-      .select("*")
-      .single();
+    if (currency !== "SSP") {
+      return res.status(400).json({
+        code: "UNSUPPORTED_CURRENCY",
+        message: "Only SSP merchant payments are enabled for launch",
+      });
+    }
 
-    if (insertErr) {
-      console.error("[merchant-payments] insert error:", insertErr);
+    if (!descriptionResult.ok) {
+      return res.status(400).json({
+        code: "INVALID_DESCRIPTION",
+        message: "description must not exceed 500 characters",
+      });
+    }
+
+    if (!callbackResult.ok) {
+      return res.status(400).json({
+        code: "INVALID_CALLBACK_URL",
+        message: "callback_url must be a valid HTTPS URL",
+      });
+    }
+
+    if (!successResult.ok) {
+      return res.status(400).json({
+        code: "INVALID_SUCCESS_URL",
+        message: "success_url must not exceed 1000 characters",
+      });
+    }
+
+    if (!cancelResult.ok) {
+      return res.status(400).json({
+        code: "INVALID_CANCEL_URL",
+        message: "cancel_url must not exceed 1000 characters",
+      });
+    }
+
+    if (!isPlainObject(metadata) || !metadataSizeOk(metadata)) {
+      return res.status(400).json({
+        code: "INVALID_METADATA",
+        message: "metadata must be a JSON object no larger than 8KB",
+      });
+    }
+
+    const { data, error } = await supabase.rpc("create_merchant_payment_v1", {
+      p_merchant_id: merchant.id,
+      p_merchant_order_id: merchantOrderId,
+      p_amount: amountRaw,
+      p_currency: currency,
+      p_description: descriptionResult.value,
+      p_callback_url: callbackResult.value,
+      p_success_url: successResult.value,
+      p_cancel_url: cancelResult.value,
+      p_metadata: metadata,
+    });
+
+    if (error) {
+      console.error("[merchant-payments-v1] create RPC error:", {
+        message: error.message,
+        code: error.code,
+      });
       return res.status(500).json({ message: "Failed to create payment" });
     }
 
-    return res.status(201).json({
+    if (!data || typeof data !== "object") {
+      console.error("[merchant-payments-v1] invalid RPC result:", data);
+      return res.status(500).json({ message: "Failed to create payment" });
+    }
+
+    if (data.ok !== true) {
+      const code = text(data.code).slice(0, 80) || "PAYMENT_CREATE_FAILED";
+      const message =
+        text(data.message).slice(0, 500) || "Payment could not be created";
+      const statusByCode = {
+        INVALID_MERCHANT_ORDER_ID: 400,
+        INVALID_AMOUNT: 400,
+        UNSUPPORTED_CURRENCY: 400,
+        INVALID_DESCRIPTION: 400,
+        INVALID_METADATA: 400,
+        INVALID_CALLBACK_URL: 400,
+        INVALID_SUCCESS_URL: 400,
+        INVALID_CANCEL_URL: 400,
+        MERCHANT_NOT_FOUND: 404,
+        MERCHANT_DISABLED: 403,
+        IDEMPOTENCY_CONFLICT: 409,
+      };
+
+      return res.status(statusByCode[code] || 400).json({ code, message });
+    }
+
+    const payment = data.payment;
+    if (!payment?.id) {
+      console.error("[merchant-payments-v1] payment missing from RPC result:", data);
+      return res.status(500).json({ message: "Failed to create payment" });
+    }
+
+    return res.status(data.created === true ? 201 : 200).json({
       payment,
       checkout_url: `jeezpay://merchant-pay/${payment.id}`,
+      idempotent_replay: data.created !== true,
     });
   } catch (err) {
-    console.error("[merchant-payments] create crash:", err);
+    console.error("[merchant-payments-v1] create crash:", err);
     return res.status(500).json({ message: "Failed to create payment" });
   }
 });
@@ -108,7 +202,14 @@ router.post("/payments", merchantAuthMiddleware, async (req, res) => {
 router.get("/payments/:id", merchantAuthMiddleware, async (req, res) => {
   try {
     const merchant = req.merchant;
-    const paymentId = req.params.id;
+    const paymentId = text(req.params.id);
+
+    if (!isUuid(paymentId)) {
+      return res.status(400).json({
+        code: "INVALID_PAYMENT_ID",
+        message: "A valid payment ID is required",
+      });
+    }
 
     const { data, error } = await supabase
       .from("merchant_payments")
@@ -133,162 +234,60 @@ router.get("/payments/:id", merchantAuthMiddleware, async (req, res) => {
   }
 });
 
-router.get("/payments/by-order/:merchantOrderId", merchantAuthMiddleware, async (req, res) => {
-  try {
-    const merchant = req.merchant;
-    const merchantOrderId = cleanString(req.params.merchantOrderId, 120);
+router.get(
+  "/payments/by-order/:merchantOrderId",
+  merchantAuthMiddleware,
+  async (req, res) => {
+    try {
+      const merchant = req.merchant;
+      const merchantOrderId = text(req.params.merchantOrderId);
 
-    const { data, error } = await supabase
-      .from("merchant_payments")
-      .select("*")
-      .eq("merchant_id", merchant.id)
-      .eq("merchant_order_id", merchantOrderId)
-      .maybeSingle();
+      if (!merchantOrderId || merchantOrderId.length > 120) {
+        return res.status(400).json({
+          code: "INVALID_MERCHANT_ORDER_ID",
+          message: "A valid merchant order ID is required",
+        });
+      }
 
-    if (error) {
-      console.error("[merchant-payments] get by order error:", error);
+      const { data, error } = await supabase
+        .from("merchant_payments")
+        .select("*")
+        .eq("merchant_id", merchant.id)
+        .eq("merchant_order_id", merchantOrderId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("[merchant-payments] get by order error:", error);
+        return res.status(500).json({ message: "Failed to fetch payment" });
+      }
+
+      if (!data) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+
+      return res.json({ payment: data });
+    } catch (err) {
+      console.error("[merchant-payments] get by order crash:", err);
       return res.status(500).json({ message: "Failed to fetch payment" });
     }
-
-    if (!data) {
-      return res.status(404).json({ message: "Payment not found" });
-    }
-
-    return res.json({ payment: data });
-  } catch (err) {
-    console.error("[merchant-payments] get by order crash:", err);
-    return res.status(500).json({ message: "Failed to fetch payment" });
-  }
-});
-
-
+  },
+);
 
 /**
- * POST /merchant/payouts
- *
- * Merchant-only atomic payout from merchant balance to a verified JeezPay wallet.
- * Retry-safe through merchant-scoped idempotency_key.
+ * The payout writer intentionally lives only in merchantMoneyV2.routes.js.
+ * Keeping a second legacy POST /payouts handler here would make money behavior
+ * depend on Express router ordering and could bypass the native Ledger wrapper.
  */
-router.post("/payouts", merchantAuthMiddleware, async (req, res) => {
-  try {
-    const merchant = req.merchant;
 
-    const idempotencyKey = cleanString(req.body.idempotency_key, 120);
-    const rawAccountNumber = cleanString(req.body.account_number, 40);
-    const amountRaw = cleanString(req.body.amount, 80);
-    const currency = cleanString(req.body.currency, 12).toUpperCase();
-    const description = cleanString(req.body.description, 500);
-    const metadata =
-      req.body.metadata &&
-      typeof req.body.metadata === "object" &&
-      !Array.isArray(req.body.metadata)
-        ? req.body.metadata
-        : {};
-
-    if (!idempotencyKey) {
-      return res.status(400).json({
-        code: "INVALID_IDEMPOTENCY_KEY",
-        message: "idempotency_key is required",
-      });
-    }
-
-    if (!rawAccountNumber || !/^\d{1,19}$/.test(rawAccountNumber)) {
-      return res.status(400).json({
-        code: "INVALID_ACCOUNT_NUMBER",
-        message: "A valid JeezPay account number is required",
-      });
-    }
-
-    if (!/^\d+(?:\.\d{1,6})?$/.test(amountRaw) || Number(amountRaw) <= 0) {
-      return res.status(400).json({
-        code: "INVALID_AMOUNT",
-        message: "A valid payout amount is required",
-      });
-    }
-
-    if (!["SSP", "USDT"].includes(currency)) {
-      return res.status(400).json({
-        code: "UNSUPPORTED_CURRENCY",
-        message: "Only SSP and USDT merchant payouts are supported",
-      });
-    }
-
-    const accountNumber = rawAccountNumber.replace(/^0+(?=\d)/, "");
-
-    const { data, error } = await supabase.rpc("execute_merchant_payout", {
-      p_merchant_id: merchant.id,
-      p_idempotency_key: idempotencyKey,
-      p_account_number: accountNumber,
-      p_amount: amountRaw,
-      p_currency: currency,
-      p_description: description || null,
-      p_metadata: metadata,
-    });
-
-    if (error) {
-      console.error("[merchant-payouts] rpc error:", error);
-      return res.status(500).json({ message: "Failed to process payout" });
-    }
-
-    if (!data || typeof data !== "object") {
-      console.error("[merchant-payouts] invalid rpc response:", data);
-      return res.status(500).json({ message: "Failed to process payout" });
-    }
-
-    if (data.ok !== true) {
-      const code = cleanString(data.code, 80) || "PAYOUT_FAILED";
-      const message =
-        cleanString(data.message, 500) || "Payout could not be completed";
-
-      const statusByCode = {
-        INVALID_IDEMPOTENCY_KEY: 400,
-        INVALID_ACCOUNT_NUMBER: 400,
-        INVALID_AMOUNT: 400,
-        INVALID_DESCRIPTION: 400,
-        INVALID_METADATA: 400,
-        UNSUPPORTED_CURRENCY: 400,
-        RECIPIENT_NOT_FOUND: 404,
-        RECIPIENT_NOT_ELIGIBLE: 400,
-        KYC_REQUIRED: 400,
-        WALLET_NOT_FOUND: 400,
-        MERCHANT_NOT_FOUND: 404,
-        MERCHANT_DISABLED: 403,
-        MERCHANT_BALANCE_NOT_FOUND: 400,
-        INSUFFICIENT_MERCHANT_BALANCE: 409,
-        IDEMPOTENCY_CONFLICT: 409,
-      };
-
-      return res.status(statusByCode[code] || 400).json({
-        code,
-        message,
-      });
-    }
-
-    return res.status(data.already_processed === true ? 200 : 201).json({
-      success: true,
-      already_processed: data.already_processed === true,
-      payout: data.payout,
-    });
-  } catch (err) {
-    console.error("[merchant-payouts] crash:", err);
-    return res.status(500).json({ message: "Failed to process payout" });
-  }
-});
-
-/**
- * GET /merchant/payouts/by-idempotency/:idempotencyKey
- *
- * Safe recovery lookup for a merchant payout.
- */
 router.get(
   "/payouts/by-idempotency/:idempotencyKey",
   merchantAuthMiddleware,
   async (req, res) => {
     try {
       const merchant = req.merchant;
-      const idempotencyKey = cleanString(req.params.idempotencyKey, 120);
+      const idempotencyKey = text(req.params.idempotencyKey);
 
-      if (!idempotencyKey) {
+      if (!idempotencyKey || idempotencyKey.length > 120) {
         return res.status(400).json({
           code: "INVALID_IDEMPOTENCY_KEY",
           message: "A valid idempotency key is required",
@@ -342,23 +341,17 @@ router.get(
   },
 );
 
-/**
- * GET /merchant/recipients/resolve?account_number=...
- *
- * Merchant-only payout destination resolver.
- */
 router.get("/recipients/resolve", merchantAuthMiddleware, async (req, res) => {
   try {
-    const rawAccountNumber = cleanString(req.query.account_number, 40);
+    const rawAccountNumber = text(req.query.account_number);
 
-    if (!rawAccountNumber || !/^\d+$/.test(rawAccountNumber)) {
+    if (!/^\d{1,19}$/.test(rawAccountNumber)) {
       return res.status(400).json({
         code: "INVALID_ACCOUNT_NUMBER",
         message: "A valid JeezPay account number is required",
       });
     }
 
-    // Postgres stores this as bigint. Keep it as a decimal string in JS.
     const accountNumber = rawAccountNumber.replace(/^0+(?=\d)/, "");
 
     const { data: user, error: userErr } = await supabase
@@ -386,14 +379,27 @@ router.get("/recipients/resolve", merchantAuthMiddleware, async (req, res) => {
       });
     }
 
-    const { data: kyc, error: kycErr } = await supabase
-      .from("kyc_profiles")
-      .select("fullName, status")
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const [{ data: kyc, error: kycErr }, { data: controls, error: controlErr }] =
+      await Promise.all([
+        supabase
+          .from("kyc_profiles")
+          .select("fullName, status")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("compliance_entity_controls")
+          .select("status")
+          .eq("entity_type", "USER")
+          .eq("entity_ref", String(user.id))
+          .in("status", ["review", "frozen"])
+          .limit(1),
+      ]);
 
-    if (kycErr) {
-      console.error("[merchant-recipient-resolve] KYC lookup error:", kycErr);
+    if (kycErr || controlErr) {
+      console.error("[merchant-recipient-resolve] eligibility lookup error:", {
+        kyc: kycErr,
+        compliance: controlErr,
+      });
       return res.status(500).json({ message: "Recipient lookup failed" });
     }
 
@@ -404,10 +410,17 @@ router.get("/recipients/resolve", merchantAuthMiddleware, async (req, res) => {
       });
     }
 
-    const fullName =
-      cleanString(kyc.fullName, 255) ||
-      cleanString(user.fullName, 255) ||
-      "JeezPay User";
+    if ((controls || []).length > 0) {
+      return res.status(403).json({
+        code: "RECIPIENT_RESTRICTED",
+        message: "JeezPay account is not eligible to receive payouts",
+      });
+    }
+
+    const fullName = text(kyc.fullName || user.fullName || "JeezPay User").slice(
+      0,
+      255,
+    );
 
     return res.json({
       recipient: {
