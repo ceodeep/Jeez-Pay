@@ -18,11 +18,10 @@ const {
   merchantProductPolicy,
   serviceProductPolicy,
 } = require("./src/middlewares/nonWalletProductPolicy.middleware");
-const kycInternationalV3Routes = require("./src/routes/kycInternationalV3.routes");
+const kycV3Routes = require("./src/routes/kycV3.routes");
 const kycLifecycleV2Routes = require("./src/routes/kycLifecycleV2.routes");
 const kycRoutes = require("./src/routes/kyc.routes");
-const adminKycInternationalV3ScaleRoutes = require("./src/routes/adminKycInternationalV3Scale.routes");
-const adminKycInternationalV3Routes = require("./src/routes/adminKycInternationalV3.routes");
+const adminKycV3Routes = require("./src/routes/adminKycV3.routes");
 const adminKycV2Routes = require("./src/routes/adminKycV2.routes");
 const adminComplianceV1Routes = require("./src/routes/adminComplianceV1.routes");
 const adminRoutes = require("./src/routes/admin.routes");
@@ -80,12 +79,12 @@ app.use("/auth/forgot-pin/request-otp", otpLimiter);
 app.use("/auth/change-email/request-otp", otpLimiter);
 app.use("/auth", authLimiter, authRoutes);
 
-// V3 is additive. New schemaVersion=3 submissions/upload sessions are handled
-// first, while old Android builds fall through to the hardened V2 lifecycle.
-// /kyc/me is sanitized for every client and never exposes private object paths.
+// KYC v3 is the authoritative international customer contract. Hardened V2
+// remains only as backward compatibility for old clients/routes that V3 does
+// not intercept. V3 /me never exposes private storage object paths.
 app.use(
   "/kyc",
-  kycInternationalV3Routes,
+  kycV3Routes,
   kycLifecycleV2Routes,
   kycRoutes,
 );
@@ -107,13 +106,13 @@ app.use(
   walletRoutes,
 );
 
-// Database-backed keyset queue/search and atomic claim handling sit before the
-// rest of the V3 reviewer API. Legacy V2 records still fall through safely.
+// KYC v3 reviewer APIs use deterministic keyset pagination, atomic claiming,
+// signed evidence only on detail view, controlled checks and senior approval.
+// Existing V2 admin routes remain as fallback for legacy records.
 app.use(
   "/admin",
   adminProductPolicy,
-  adminKycInternationalV3ScaleRoutes,
-  adminKycInternationalV3Routes,
+  adminKycV3Routes,
   adminKycV2Routes,
   adminComplianceV1Routes,
   adminLaunchMoneyV2Routes,
