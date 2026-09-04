@@ -3,7 +3,8 @@ import KycV3ReviewPage from "./pages/KycV3ReviewPage";
 
 export default function Root() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const isKycWorkspace = path === "/kyc-review";
+  const hash = String(window.location.hash || "").toLowerCase();
+  const isKycWorkspace = path === "/kyc-review" || hash === "#/kyc-review";
   const hasAdminSession = Boolean(localStorage.getItem("admin_token"));
 
   if (isKycWorkspace) {
@@ -17,7 +18,7 @@ export default function Root() {
         <button
           type="button"
           onClick={() => {
-            window.location.href = "/kyc-review";
+            window.location.href = "/#/kyc-review";
           }}
           style={{
             position: "fixed",
