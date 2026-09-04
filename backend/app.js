@@ -21,6 +21,7 @@ const {
 const kycInternationalV3Routes = require("./src/routes/kycInternationalV3.routes");
 const kycLifecycleV2Routes = require("./src/routes/kycLifecycleV2.routes");
 const kycRoutes = require("./src/routes/kyc.routes");
+const adminKycInternationalV3ScaleRoutes = require("./src/routes/adminKycInternationalV3Scale.routes");
 const adminKycInternationalV3Routes = require("./src/routes/adminKycInternationalV3.routes");
 const adminKycV2Routes = require("./src/routes/adminKycV2.routes");
 const adminComplianceV1Routes = require("./src/routes/adminComplianceV1.routes");
@@ -106,11 +107,12 @@ app.use(
   walletRoutes,
 );
 
-// V3 reviewer operations intercept the KYC queue/detail/review endpoints first.
-// Legacy KYC records without a V3 application fall through to Phase 5.1.
+// Database-backed keyset queue/search and atomic claim handling sit before the
+// rest of the V3 reviewer API. Legacy V2 records still fall through safely.
 app.use(
   "/admin",
   adminProductPolicy,
+  adminKycInternationalV3ScaleRoutes,
   adminKycInternationalV3Routes,
   adminKycV2Routes,
   adminComplianceV1Routes,
