@@ -309,6 +309,7 @@ CORE_TESTS=(
   20260906_admin_mfa_v1_test.sql
   20260906_admin_mfa_enrollment_finalize_v1_test.sql
   20260906_admin_mfa_verification_v1_test.sql
+  20260906_phase9_privacy_storage_hardening_test.sql
 )
 
 # --full means the complete CURRENT production-safe
