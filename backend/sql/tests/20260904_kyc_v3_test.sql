@@ -124,7 +124,11 @@ BEGIN
   IF v_result->>'code'<>'DOCUMENT_VERIFICATION_REQUIRED' THEN RAISE EXCEPTION 'APPROVAL_DID_NOT_FAIL_CLOSED: %',v_result; END IF;
 
   PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'document_verification','manual_verified','manual',NULL,'Rollback manual document verification','{}');
-  PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'liveness','manual_verified','manual',NULL,'Rollback manual liveness verification','{}');
+  PERFORM public.record_kyc_check_v3(
+    v_kyc_officer_id,v_user_id,'face_match','manual_verified','manual',NULL,
+    'Compared selfie with government-document portrait; visual match accepted',
+    jsonb_build_object('selfieComparedToDocument',true)
+  );
   PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'sanctions','manual_clear','manual',NULL,'Rollback sanctions clear','{}');
   PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'pep','manual_clear','manual',NULL,'Rollback PEP clear','{}');
 
@@ -138,7 +142,11 @@ BEGIN
   IF (SELECT count(*) FROM public.kyc_retention_v3 WHERE application_id=v_application_id)<>1 THEN RAISE EXCEPTION 'RESUBMISSION_RETENTION_RECORD_MISSING'; END IF;
 
   PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'document_verification','manual_verified','manual',NULL,'Rollback document verification','{}');
-  PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'liveness','manual_verified','manual',NULL,'Rollback liveness verification','{}');
+  PERFORM public.record_kyc_check_v3(
+    v_kyc_officer_id,v_user_id,'face_match','manual_verified','manual',NULL,
+    'Compared selfie with government-document portrait; visual match accepted',
+    jsonb_build_object('selfieComparedToDocument',true)
+  );
   PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'sanctions','manual_clear','manual',NULL,'Rollback sanctions clear','{}');
   PERFORM public.record_kyc_check_v3(v_kyc_officer_id,v_user_id,'pep','manual_clear','manual',NULL,'Rollback PEP clear','{}');
 
