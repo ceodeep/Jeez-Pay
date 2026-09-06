@@ -33,6 +33,12 @@ const {
 );
 
 const {
+  verifyAdminMfaForSession,
+} = require(
+  "../services/adminMfaAuth.service"
+);
+
+const {
   logAdminAction,
 } = require(
   "../utils/auditLogger"
@@ -205,6 +211,79 @@ router.post(
           "MFA enabled successfully",
 
         ...result,
+      });
+    } catch (err) {
+      return sendMfaError(
+        res,
+        err
+      );
+    }
+  }
+);
+
+
+router.post(
+  "/mfa/verify",
+
+  authMiddleware,
+  requireAdmin,
+  adminMfaLimiter,
+
+  async (req, res) => {
+    try {
+      const result =
+        await verifyAdminMfaForSession({
+          userId:
+            req.user.userId,
+
+          sessionId:
+            req.user.sessionId,
+
+          token:
+            req.body?.token,
+
+          recoveryCode:
+            req.body?.recoveryCode,
+
+          requireUnverified:
+            false,
+        });
+
+      await logAdminAction({
+        adminId:
+          req.adminUser.id,
+
+        adminPhone:
+          req.adminUser.phone,
+
+        action:
+          "ADMIN_MFA_SESSION_VERIFIED",
+
+        targetType:
+          "admin_mfa",
+
+        targetId:
+          req.adminUser.id,
+
+        newValue: {
+          verified: true,
+
+          usedRecoveryCode:
+            result.usedRecovery,
+        },
+
+        req,
+      });
+
+      return res.json({
+        message:
+          "MFA verification successful",
+
+        verifiedAt:
+          result.verifiedAt,
+
+        usedRecoveryCode:
+          result.usedRecovery,
       });
     } catch (err) {
       return sendMfaError(

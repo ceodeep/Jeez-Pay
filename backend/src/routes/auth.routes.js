@@ -9,6 +9,12 @@ const {
   revokeUserSessions,
   revokeCurrentSession,
 } = require("../services/session.service");
+const {
+  ADMIN_ROLES,
+  getEnabledAdminMfaFactor,
+  createAdminMfaLoginChallenge,
+  revokeUnverifiedAdminMfaSessions,
+} = require("../services/adminMfaAuth.service");
 const { otpVerifyLimiter, pinVerifyLimiter } = require("../middlewares/rateLimit.middleware");
 const {
   generateOTP,
@@ -1045,6 +1051,31 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    const isAdminLogin =
+      ADMIN_ROLES.has(
+        String(user.role || "")
+      );
+
+    let adminMfaFactor = null;
+
+    if (isAdminLogin) {
+      adminMfaFactor =
+        await getEnabledAdminMfaFactor(
+          user.id
+        );
+
+      if (adminMfaFactor) {
+        /*
+         * Revoke abandoned password-only MFA
+         * challenges. Existing verified admin
+         * sessions are retained.
+         */
+        await revokeUnverifiedAdminMfaSessions(
+          user.id
+        );
+      }
+    }
+
     const deviceName =
       req.headers["x-device-name"] ||
       req.body.deviceName ||
@@ -1080,6 +1111,32 @@ router.post("/login", async (req, res) => {
       return res.status(500).json({ message: "Failed to create session" });
     }
 
+    if (adminMfaFactor) {
+      const challengeToken =
+        createAdminMfaLoginChallenge({
+          userId:
+            user.id,
+
+          sessionId:
+            sessionRow.id,
+        });
+
+      return res
+        .status(202)
+        .json({
+          message:
+            "MFA verification required",
+
+          mfaRequired:
+            true,
+
+          challengeToken,
+
+          challengeExpiresInSeconds:
+            300,
+        });
+    }
+
     const token = generateToken({
       userId: user.id,
       phone: user.phone,
@@ -1102,6 +1159,10 @@ router.post("/login", async (req, res) => {
       token,
       hasPin: !!user.pin_hash,
       isNewUser: false,
+
+      mfaEnrollmentRequired:
+        isAdminLogin &&
+        !adminMfaFactor,
     });
   } catch (err) {
     console.error("login crash:", err);

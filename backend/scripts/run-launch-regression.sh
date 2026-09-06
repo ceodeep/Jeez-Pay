@@ -73,6 +73,9 @@ static_checks() {
   "$NODE_BIN" \
     "$ROOT/scripts/self-test-admin-mfa-enrollment.js"
 
+  "$NODE_BIN" \
+    "$ROOT/scripts/self-test-admin-mfa-auth.js"
+
   if [ -f "$ROOT/.env" ]; then
     "$NODE_BIN" \
       "$ROOT/scripts/process-merchant-webhooks.js" \
@@ -302,6 +305,7 @@ CORE_TESTS=(
   20260906_phase9_db_privilege_hardening_test.sql
   20260906_admin_mfa_v1_test.sql
   20260906_admin_mfa_enrollment_finalize_v1_test.sql
+  20260906_admin_mfa_verification_v1_test.sql
 )
 
 FULL_EXTRA_TESTS=(

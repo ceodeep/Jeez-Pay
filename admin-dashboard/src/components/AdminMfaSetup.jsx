@@ -39,6 +39,7 @@ export default function AdminMfaSetup() {
   const [password, setPassword] = useState("");
   const [setup, setSetup] = useState(null);
   const [token, setToken] = useState("");
+  const [verifyToken, setVerifyToken] = useState("");
   const [recoveryCodes, setRecoveryCodes] =
     useState([]);
 
@@ -164,6 +165,45 @@ export default function AdminMfaSetup() {
         err?.response?.data?.message ||
           err?.message ||
           "Unable to confirm MFA enrollment."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyCurrentSession() {
+    if (!/^\d{6}$/.test(verifyToken)) {
+      setMessage(
+        "Enter the current 6-digit authenticator code."
+      );
+      return;
+    }
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await api.post(
+        "/admin/mfa/verify",
+        {
+          token: verifyToken,
+        }
+      );
+
+      setVerifyToken("");
+
+      setMessage(
+        "Current admin session verified. Sensitive actions are unlocked for 10 minutes."
+      );
+
+      if (res.data?.verifiedAt) {
+        await loadStatus();
+      }
+    } catch (err) {
+      setMessage(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Unable to verify the current session."
       );
     } finally {
       setLoading(false);
@@ -377,6 +417,77 @@ export default function AdminMfaSetup() {
                   ?.recoveryCodesRemaining
               }
             </strong>
+          </div>
+
+          <div
+            style={{
+              marginTop: 10,
+              paddingTop: 14,
+              borderTop: "1px solid #e2e8f0",
+              display: "grid",
+              gap: 10,
+              maxWidth: 420,
+            }}
+          >
+            <div
+              style={{
+                color: "#0f172a",
+                fontWeight: 800,
+              }}
+            >
+              Unlock sensitive actions
+            </div>
+
+            <div>
+              Enter a fresh authenticator code before
+              changing administrative data. Verification
+              remains valid for 10 minutes.
+            </div>
+
+            <input
+              value={verifyToken}
+              onChange={(event) =>
+                setVerifyToken(
+                  event.target.value
+                    .replace(/\D/g, "")
+                    .slice(0, 6)
+                )
+              }
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              disabled={loading}
+              style={{
+                ...inputStyle,
+                maxWidth: 220,
+                letterSpacing: 5,
+                fontWeight: 800,
+              }}
+            />
+
+            <div>
+              <button
+                type="button"
+                onClick={verifyCurrentSession}
+                disabled={
+                  loading ||
+                  verifyToken.length !== 6
+                }
+                style={{
+                  ...buttonStyle,
+                  background: "#0f172a",
+                  color: "#ffffff",
+                  opacity:
+                    loading ||
+                    verifyToken.length !== 6
+                      ? 0.6
+                      : 1,
+                }}
+              >
+                Verify current session
+              </button>
+            </div>
           </div>
         </div>
       ) : (

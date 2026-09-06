@@ -6,12 +6,15 @@ const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
 
 const authRoutes = require("./src/routes/auth.routes");
+const adminMfaLoginRoutes = require("./src/routes/adminMfaLogin.routes");
 const walletRoutes = require("./src/routes/wallet.routes");
 const walletTransferV2Routes = require("./src/routes/walletTransferV2.routes");
 const walletMerchantV2Routes = require("./src/routes/walletMerchantV2.routes");
 const walletAgentV2Routes = require("./src/routes/walletAgentV2.routes");
 const walletAdminCreditV2Routes = require("./src/routes/walletAdminCreditV2.routes");
 const authMiddleware = require("./src/middlewares/auth.middleware");
+const { requireAdmin } = require("./src/middlewares/admin.middleware");
+const { adminMfaAccessPolicy } = require("./src/middlewares/adminMfa.middleware");
 const { walletProductPolicy } = require("./src/middlewares/productPolicy.middleware");
 const {
   adminProductPolicy,
@@ -113,7 +116,12 @@ app.use("/auth/signup/request-otp", otpLimiter);
 app.use("/auth/forgot-password/request-otp", otpLimiter);
 app.use("/auth/forgot-pin/request-otp", otpLimiter);
 app.use("/auth/change-email/request-otp", otpLimiter);
-app.use("/auth", authLimiter, authRoutes);
+app.use(
+  "/auth",
+  authLimiter,
+  adminMfaLoginRoutes,
+  authRoutes,
+);
 
 // KYC v3 is the authoritative international customer contract. Hardened V2
 // remains only as backward compatibility for old clients/routes that V3 does
@@ -151,6 +159,9 @@ app.use(
   "/admin",
   adminProductPolicy,
   adminMfaRoutes,
+  authMiddleware,
+  requireAdmin,
+  adminMfaAccessPolicy,
   adminSanctionsV1Routes,
   adminAgentsV1Routes,
   adminKycV3Routes,
