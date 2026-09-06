@@ -1,0 +1,156 @@
+name: JeezPay CI
+
+on:
+  push:
+    branches:
+      - "hardening/**"
+
+  pull_request:
+    branches:
+      - "hardening/production-v1"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeezpay-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-safety:
+    name: Repository Safety
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Reject tracked secret-like files
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          BAD="$(
+            git ls-files |
+            grep -E \
+              '(^|/)\.env$|\.pem$|\.p12$|\.pfx$|\.jks$|(^|/)key\.properties$' \
+              || true
+          )"
+
+          if [ -n "$BAD" ]; then
+            echo "Tracked secret-like files detected:"
+            printf '%s\n' "$BAD"
+            exit 1
+          fi
+
+      - name: Reject generated Python bytecode
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          BAD="$(
+            git ls-files |
+            grep -E \
+              '(^|/)__pycache__/|\.pyc$' \
+              || true
+          )"
+
+          if [ -n "$BAD" ]; then
+            echo "Generated Python bytecode is tracked:"
+            printf '%s\n' "$BAD"
+            exit 1
+          fi
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Static launch regression
+        run: npm test
+
+  admin-dashboard:
+    name: Admin Dashboard
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: admin-dashboard
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Node 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: admin-dashboard/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  mobile:
+    name: Mobile Flutter Analyze
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile/jeezpay_app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Flutter stable
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Explain test exclusion
+        shell: bash
+        run: |
+          echo "flutter test is intentionally not a required CI gate yet."
+          echo "The existing widget_test.dart is the stale template counter test."

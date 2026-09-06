@@ -9,6 +9,9 @@ const jwt =
 process.env.JWT_SECRET =
   "phase9-active-status-self-test-secret";
 
+process.env.OTP_HASH_SECRET =
+  "phase9-active-status-otp-self-test-secret";
+
 const sessions =
   new Map();
 
