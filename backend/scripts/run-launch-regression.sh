@@ -316,8 +316,12 @@ CORE_TESTS=(
 # tests live in run-historical-ledger-tests.sh instead.
 FULL_EXTRA_TESTS=(
   20260903_kyc_lifecycle_v2_test.sql
-  20260904_kyc_international_v3_test.sql
 )
+
+# 20260904_kyc_international_v3_test.sql targets the retired
+# pre-versioned KYC v3 schema (kyc_policy_versions, kyc_applications,
+# kyc_documents, etc.). The live/current v3 model is covered by
+# 20260904_kyc_v3_test.sql in CORE_TESTS.
 
 for test_file in "${CORE_TESTS[@]}"; do
   run_sql_test "$test_file"
