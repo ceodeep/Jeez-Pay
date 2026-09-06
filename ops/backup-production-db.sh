@@ -21,7 +21,7 @@ require_mode_600() {
     abort "file must be mode 600: $file"
 }
 
-for cmd in pg_dump pg_restore psql openssl sha256sum flock nice find ln stat; do
+for cmd in pg_dump pg_restore psql openssl sha256sum flock nice find ln stat mktemp; do
   command -v "$cmd" >/dev/null || abort "missing command: $cmd"
 done
 
@@ -64,11 +64,16 @@ DAY_OF_MONTH="$(date -u +%d)"
 
 NAME="jeezpay-${STAMP}.dump.enc"
 TMP="$BACKUP_ROOT/.${NAME}.tmp.$$"
+VERIFY_TMP=""
 FINAL="$BACKUP_ROOT/daily/$NAME"
 CHECKSUM="${FINAL}.sha256"
 
 cleanup() {
   rm -f "$TMP"
+
+  if [ -n "$VERIFY_TMP" ]; then
+    rm -f "$VERIFY_TMP"
+  fi
 }
 trap cleanup EXIT
 
@@ -114,16 +119,26 @@ test -s "$TMP" || abort "encrypted dump is empty"
 
 echo "ENCRYPTED DUMP: CREATED"
 
+VERIFY_TMP="$(mktemp "$BACKUP_ROOT/.verify-${STAMP}.XXXXXX.dump")"
+chmod 600 "$VERIFY_TMP"
+
 openssl enc \
   -d \
   -aes-256-cbc \
   -pbkdf2 \
   -iter 200000 \
   -pass "file:$KEY_FILE" \
-  -in "$TMP" |
-  pg_restore --list >/dev/null
+  -in "$TMP" \
+  -out "$VERIFY_TMP"
+
+test -s "$VERIFY_TMP" || abort "decrypted verification archive is empty"
+
+pg_restore --list "$VERIFY_TMP" >/dev/null
 
 echo "ARCHIVE STRUCTURE: GREEN"
+
+rm -f "$VERIFY_TMP"
+VERIFY_TMP=""
 
 mv "$TMP" "$FINAL"
 chmod 600 "$FINAL"
