@@ -6,7 +6,8 @@
   "scripts": {
     "test": "bash scripts/run-launch-regression.sh --static-only",
     "test:launch": "bash scripts/run-launch-regression.sh",
-    "test:launch:full": "bash scripts/run-launch-regression.sh --full"
+    "test:launch:full": "bash scripts/run-launch-regression.sh --full",
+    "test:launch:historical": "bash scripts/run-historical-ledger-tests.sh"
   },
   "keywords": [],
   "author": "",

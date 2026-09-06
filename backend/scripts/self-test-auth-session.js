@@ -12,6 +12,7 @@ process.env.OTP_HASH_SECRET =
 const jwt = require("jsonwebtoken");
 
 const sessions = new Map();
+const users = new Map();
 
 function matches(row, filters) {
   return filters.every((filter) => {
@@ -34,7 +35,17 @@ function matches(row, filters) {
 }
 
 function makeBuilder(table) {
-  assert.strictEqual(table, "user_sessions");
+  const source =
+    table === "user_sessions"
+      ? sessions
+      : table === "users"
+        ? users
+        : null;
+
+  assert.ok(
+    source,
+    `Unexpected table: ${table}`
+  );
 
   let mode = "select";
   let updatePayload = null;
@@ -43,7 +54,7 @@ function makeBuilder(table) {
   const filters = [];
 
   const execute = async () => {
-    const rows = [...sessions.values()]
+    const rows = [...source.values()]
       .filter((row) => matches(row, filters));
 
     if (mode === "select") {
@@ -186,6 +197,7 @@ async function invokeAuth(payload) {
 
 async function main() {
   sessions.clear();
+  users.clear();
 
   let result = await invokeAuth({
     userId: "user-1",
@@ -216,6 +228,11 @@ async function main() {
 
   assert.strictEqual(result.statusCode, 401);
   assert.strictEqual(result.nextCalled, false);
+
+  users.set("user-1", {
+    id: "user-1",
+    is_active: true,
+  });
 
   sessions.set("active-session", {
     id: "active-session",

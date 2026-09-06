@@ -68,6 +68,9 @@ static_checks() {
     "$ROOT/scripts/self-test-auth-session.js"
 
   "$NODE_BIN" \
+    "$ROOT/scripts/self-test-auth-active-status.js"
+
+  "$NODE_BIN" \
     "$ROOT/scripts/self-test-admin-mfa.js"
 
   "$NODE_BIN" \
@@ -308,10 +311,10 @@ CORE_TESTS=(
   20260906_admin_mfa_verification_v1_test.sql
 )
 
+# --full means the complete CURRENT production-safe
+# post-cutover regression. Historical Ledger bootstrap
+# tests live in run-historical-ledger-tests.sh instead.
 FULL_EXTRA_TESTS=(
-  20260903_ledger_v2_legacy_mapping_test.sql
-  20260903_ledger_v2_opening_snapshot_test.sql
-  20260903_ledger_v2_opening_cutover_test.sql
   20260903_kyc_lifecycle_v2_test.sql
   20260904_kyc_international_v3_test.sql
 )
