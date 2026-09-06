@@ -92,7 +92,26 @@ BEGIN
   IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='kyc_documents_v3' AND column_name='document_number') THEN RAISE EXCEPTION 'RAW_DOCUMENT_NUMBER_COLUMN_FORBIDDEN'; END IF;
   IF (SELECT count(*) FROM public.kyc_consents_v3 WHERE application_id=v_application_id)<>1 THEN RAISE EXCEPTION 'CONSENT_MISSING'; END IF;
   IF (SELECT count(*) FROM public.kyc_risk_assessments_v3 WHERE application_id=v_application_id)<>1 THEN RAISE EXCEPTION 'RISK_ASSESSMENT_MISSING'; END IF;
-  IF (SELECT count(*) FROM public.kyc_provider_jobs_v3 WHERE application_id=v_application_id)<>4 THEN RAISE EXCEPTION 'EXPECTED_FOUR_REQUIRED_PROVIDER_JOBS'; END IF;
+
+  IF (
+    SELECT COALESCE(array_agg(job_type ORDER BY job_type),ARRAY[]::text[])
+    FROM public.kyc_provider_jobs_v3
+    WHERE application_id=v_application_id
+  ) IS DISTINCT FROM (
+    SELECT COALESCE(array_agg(v.job_type ORDER BY v.job_type) FILTER (WHERE v.required),ARRAY[]::text[])
+    FROM public.kyc_policy_versions_v3 p
+    CROSS JOIN LATERAL (
+      VALUES
+        ('document_verification'::text,p.require_document_verification),
+        ('liveness'::text,p.require_liveness),
+        ('sanctions'::text,p.require_sanctions_screening),
+        ('pep'::text,p.require_pep_screening),
+        ('adverse_media'::text,p.require_adverse_media_screening)
+    ) AS v(job_type,required)
+    WHERE p.active=true
+  ) THEN
+    RAISE EXCEPTION 'REQUIRED_PROVIDER_JOB_SET_MISMATCH';
+  END IF;
 
   -- Atomic reviewer assignment and queue-state transition.
   v_result:=public.claim_kyc_application_v3(v_kyc_officer_id,v_application_id);
