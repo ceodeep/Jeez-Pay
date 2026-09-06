@@ -40,6 +40,28 @@ const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
 
+// API-only security headers. HSTS is emitted only when the request arrived over
+// HTTPS at the trusted reverse proxy so local HTTP development is not pinned.
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  );
+
+  if (req.secure) {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains"
+    );
+  }
+
+  next();
+});
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
@@ -56,7 +78,16 @@ const otpLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use(morgan("dev"));
+// Never log query strings, authorization headers, request bodies, referrers or
+// user agents. This keeps operational logs useful without leaking common PII or
+// secrets carried in URLs/headers.
+morgan.token("safe-url", (req) => {
+  const url = req.originalUrl || req.url || "/";
+  return url.split("?", 1)[0];
+});
+app.use(
+  morgan(":method :safe-url :status :res[content-length] - :response-time ms")
+);
 
 const corsOptions = {
   origin: [
@@ -71,7 +102,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
-app.use(express.json());
+// KYC evidence uses signed object-storage uploads; API JSON payloads should
+// remain small. Bounding parser input limits memory/CPU abuse at the edge.
+app.use(express.json({ limit: "1mb" }));
 
 app.use("/products", productRoutes);
 
