@@ -1,0 +1,123 @@
+name: Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type DEPLOY_PRODUCTION"
+        required: true
+        type: string
+
+      database_migrations:
+        description: "Have required DB migrations already been applied?"
+        required: true
+        default: "NO"
+        type: choice
+        options:
+          - "NO"
+          - "YES"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jeezpay-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Production Deploy
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+
+    timeout-minutes: 30
+
+    steps:
+      - name: Validate protected production invocation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          test "$GITHUB_REF" = \
+            "refs/heads/hardening/production-v1"
+
+          test "${{ inputs.confirmation }}" = \
+            "DEPLOY_PRODUCTION"
+
+      - name: Checkout protected production commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Configure pinned SSH identity
+        shell: bash
+        env:
+          DEPLOY_KEY: ${{ secrets.JEEZPAY_DEPLOY_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.JEEZPAY_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+
+          install -m 700 -d "$HOME/.ssh"
+
+          printf '%s\n' "$DEPLOY_KEY" \
+            > "$HOME/.ssh/id_jeezpay_deploy"
+
+          chmod 600 \
+            "$HOME/.ssh/id_jeezpay_deploy"
+
+          printf '%s\n' "$KNOWN_HOSTS" \
+            > "$HOME/.ssh/known_hosts"
+
+          chmod 600 \
+            "$HOME/.ssh/known_hosts"
+
+      - name: Deploy exact production SHA
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.JEEZPAY_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.JEEZPAY_DEPLOY_USER }}
+          MIGRATIONS_CONFIRMED: ${{ inputs.database_migrations }}
+        run: |
+          set -Eeuo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+
+          ssh \
+            -i "$HOME/.ssh/id_jeezpay_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            bash -s -- \
+            "$GITHUB_SHA" \
+            "$MIGRATIONS_CONFIRMED" \
+            <<'REMOTE'
+          set -Eeuo pipefail
+
+          TARGET_SHA="$1"
+          MIGRATIONS_CONFIRMED="$2"
+
+          REPO="$HOME/Jeez-Pay"
+          PROD_BRANCH="hardening/production-v1"
+
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          git -C "$REPO" \
+            fetch origin "$PROD_BRANCH"
+
+          test "$(
+            git -C "$REPO" \
+              rev-parse "origin/$PROD_BRANCH"
+          )" = "$TARGET_SHA"
+
+          git -C "$REPO" \
+            show \
+            "${TARGET_SHA}:ops/deploy-production.sh" |
+          MIGRATIONS_CONFIRMED="$MIGRATIONS_CONFIRMED" \
+            bash -s -- "$TARGET_SHA"
+          REMOTE
