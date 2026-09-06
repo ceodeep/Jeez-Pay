@@ -5,6 +5,10 @@ const router = express.Router();
 const supabase = require("../config/supabase");
 const { generateToken } = require("../services/jwt.service");
 const authMiddleware = require("../middlewares/auth.middleware");
+const {
+  revokeUserSessions,
+  revokeCurrentSession,
+} = require("../services/session.service");
 const { otpVerifyLimiter, pinVerifyLimiter } = require("../middlewares/rateLimit.middleware");
 const {
   generateOTP,
@@ -1226,6 +1230,21 @@ router.post("/change-pin", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Current PIN is incorrect" });
     }
 
+    try {
+      await revokeUserSessions(userId, {
+        exceptSessionId: req.user.sessionId,
+      });
+    } catch (sessionErr) {
+      console.error(
+        "[change-pin] session revocation error:",
+        sessionErr
+      );
+
+      return res.status(500).json({
+        message: "Failed to secure other sessions",
+      });
+    }
+
     const newPinHash = await bcrypt.hash(newPin, 10);
 
     const { data: updatedUser, error: updateErr } = await supabase
@@ -1315,6 +1334,21 @@ router.post("/change-password", authMiddleware, async (req, res) => {
     if (!passwordMatches) {
       return res.status(400).json({
         message: "Current password is incorrect",
+      });
+    }
+
+    try {
+      await revokeUserSessions(userId, {
+        exceptSessionId: req.user.sessionId,
+      });
+    } catch (sessionErr) {
+      console.error(
+        "[change-password] session revocation error:",
+        sessionErr
+      );
+
+      return res.status(500).json({
+        message: "Failed to secure other sessions",
       });
     }
 
@@ -1721,11 +1755,27 @@ router.post("/forgot-password/verify-otp", otpVerifyLimiter, async (req, res) =>
       });
     }
 
+    try {
+      await revokeUserSessions(user.id);
+    } catch (sessionErr) {
+      console.error(
+        "[forgot-password] session revocation error:",
+        sessionErr
+      );
+
+      return res.status(500).json({
+        message: "Failed to secure account sessions",
+      });
+    }
+
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     const { error: updateErr } = await supabase
       .from("users")
-      .update({ password_hash: passwordHash })
+      .update({
+        password_hash: passwordHash,
+        password_updated_at: new Date().toISOString(),
+      })
       .eq("id", user.id);
 
     if (updateErr) {
@@ -1910,6 +1960,19 @@ router.post("/forgot-pin/verify-otp", otpVerifyLimiter, async (req, res) => {
     if (!otpCheck.ok) {
       return res.status(otpCheck.status).json({
         message: otpCheck.message,
+      });
+    }
+
+    try {
+      await revokeUserSessions(user.id);
+    } catch (sessionErr) {
+      console.error(
+        "[forgot-pin] session revocation error:",
+        sessionErr
+      );
+
+      return res.status(500).json({
+        message: "Failed to secure account sessions",
       });
     }
 
@@ -2163,6 +2226,37 @@ router.get("/sessions", authMiddleware, async (req, res) => {
   } catch (err) {
     console.error("[sessions] crash:", err);
     return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/sessions/logout", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const sessionId = req.user.sessionId;
+
+    const revoked = await revokeCurrentSession(
+      userId,
+      sessionId
+    );
+
+    if (!revoked) {
+      return res.status(401).json({
+        message: "Session expired. Please login again.",
+      });
+    }
+
+    return res.json({
+      message: "Logged out successfully",
+    });
+  } catch (err) {
+    console.error(
+      "[sessions] current logout error:",
+      err
+    );
+
+    return res.status(500).json({
+      message: "Failed to logout",
+    });
   }
 });
 

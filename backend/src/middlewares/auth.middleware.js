@@ -30,46 +30,73 @@ async function authMiddleware(req, res, next) {
     const decoded = jwt.verify(token, jwtSecret);
 
     if (!decoded.userId) {
-      return res.status(401).json({ message: "Invalid token payload" });
+      return res.status(401).json({
+        message: "Invalid token payload",
+      });
     }
 
-    if (decoded.sessionId) {
-      const { data: session, error } = await supabase
+    const sessionId = String(
+      decoded.sessionId || ""
+    ).trim();
+
+    // Every authenticated user token must be bound to a server-side
+    // revocable session. Legacy/non-trackable JWTs fail closed.
+    if (!sessionId) {
+      return res.status(401).json({
+        message: "Session expired. Please login again.",
+      });
+    }
+
+    const { data: session, error } = await supabase
+      .from("user_sessions")
+      .select("id, revoked_at")
+      .eq("id", sessionId)
+      .eq("user_id", decoded.userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[auth] session lookup error:", error);
+
+      return res.status(500).json({
+        message: "Session check failed",
+      });
+    }
+
+    if (!session || session.revoked_at) {
+      return res.status(401).json({
+        message: "Session expired. Please login again.",
+      });
+    }
+
+    if (shouldUpdateLastSeen(sessionId)) {
+      supabase
         .from("user_sessions")
-        .select("id, revoked_at")
-        .eq("id", decoded.sessionId)
-        .eq("user_id", decoded.userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("[auth] session lookup error:", error);
-        return res.status(500).json({ message: "Session check failed" });
-      }
-
-      if (!session || session.revoked_at) {
-        return res.status(401).json({
-          message: "Session expired. Please login again.",
+        .update({
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId)
+        .then(({ error: updateErr }) => {
+          if (updateErr) {
+            console.error(
+              "[auth] last_seen update error:",
+              updateErr
+            );
+          }
         });
-      }
-
-      if (shouldUpdateLastSeen(decoded.sessionId)) {
-        supabase
-          .from("user_sessions")
-          .update({ last_seen_at: new Date().toISOString() })
-          .eq("id", decoded.sessionId)
-          .then(({ error: updateErr }) => {
-            if (updateErr) {
-              console.error("[auth] last_seen update error:", updateErr);
-            }
-          });
-      }
     }
 
-    req.user = decoded;
+    req.user = {
+      ...decoded,
+      sessionId,
+    };
+
     next();
   } catch (err) {
     console.error("JWT error:", err.message);
-    return res.status(401).json({ message: "Invalid token" });
+
+    return res.status(401).json({
+      message: "Invalid token",
+    });
   }
 }
 

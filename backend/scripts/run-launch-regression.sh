@@ -64,6 +64,9 @@ static_checks() {
       --self-test
   fi
 
+  "$NODE_BIN" \
+    "$ROOT/scripts/self-test-auth-session.js"
+
   if [ -f "$ROOT/.env" ]; then
     "$NODE_BIN" \
       "$ROOT/scripts/process-merchant-webhooks.js" \
