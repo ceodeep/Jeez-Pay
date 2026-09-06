@@ -74,7 +74,7 @@ jobs:
           chmod 600 \
             "$HOME/.ssh/known_hosts"
 
-      - name: Deploy exact production SHA
+      - name: Deploy exact protected production SHA
         shell: bash
         env:
           DEPLOY_HOST: ${{ secrets.JEEZPAY_DEPLOY_HOST }}
@@ -92,32 +92,6 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o RequestTTY=no \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            bash -s -- \
-            "$GITHUB_SHA" \
-            "$MIGRATIONS_CONFIRMED" \
-            <<'REMOTE'
-          set -Eeuo pipefail
-
-          TARGET_SHA="$1"
-          MIGRATIONS_CONFIRMED="$2"
-
-          REPO="$HOME/Jeez-Pay"
-          PROD_BRANCH="hardening/production-v1"
-
-          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
-
-          git -C "$REPO" \
-            fetch origin "$PROD_BRANCH"
-
-          test "$(
-            git -C "$REPO" \
-              rev-parse "origin/$PROD_BRANCH"
-          )" = "$TARGET_SHA"
-
-          git -C "$REPO" \
-            show \
-            "${TARGET_SHA}:ops/deploy-production.sh" |
-          MIGRATIONS_CONFIRMED="$MIGRATIONS_CONFIRMED" \
-            bash -s -- "$TARGET_SHA"
-          REMOTE
+            "deploy $GITHUB_SHA $MIGRATIONS_CONFIRMED"
