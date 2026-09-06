@@ -67,6 +67,9 @@ static_checks() {
   "$NODE_BIN" \
     "$ROOT/scripts/self-test-auth-session.js"
 
+  "$NODE_BIN" \
+    "$ROOT/scripts/self-test-admin-mfa.js"
+
   if [ -f "$ROOT/.env" ]; then
     "$NODE_BIN" \
       "$ROOT/scripts/process-merchant-webhooks.js" \
@@ -294,6 +297,7 @@ CORE_TESTS=(
   20260904_merchant_api_v1_test.sql
   20260904_merchant_api_v1_money_test.sql
   20260906_phase9_db_privilege_hardening_test.sql
+  20260906_admin_mfa_v1_test.sql
 )
 
 FULL_EXTRA_TESTS=(
@@ -332,4 +336,5 @@ echo "SANCTIONS: GREEN"
 echo "AGENTS: GREEN"
 echo "MERCHANT API: GREEN"
 echo "DB PRIVILEGES: GREEN"
+echo "ADMIN MFA FOUNDATION: GREEN"
 echo "================================================"
