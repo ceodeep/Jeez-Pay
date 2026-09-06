@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "./lib/api";
 import LoginPage from "./pages/LoginPage";
+import AdminMfaSetup from "./components/AdminMfaSetup";
 
 function StatusBadge({ value }) {
   const normalized = String(value || "").toLowerCase();
@@ -1493,6 +1494,8 @@ async function saveExchangeRate(e) {
     >
       Welcome back. Monitor JeezPay operations and platform activity.
     </p>
+
+    <AdminMfaSetup />
 
     {adminProfile ? (
       <p
