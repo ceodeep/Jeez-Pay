@@ -12,7 +12,7 @@ abort() {
   exit 1
 }
 
-for cmd in openssl pg_restore sha256sum stat mktemp; do
+for cmd in openssl pg_restore sha256sum stat mktemp find sort head cut grep; do
   command -v "$cmd" >/dev/null || abort "missing command: $cmd"
 done
 
@@ -50,11 +50,12 @@ test -f "$CHECKSUM" || abort "checksum sidecar missing"
 
 echo "CHECKSUM: GREEN"
 
-TOC="$(mktemp /tmp/jeezpay-backup-toc.XXXXXX)"
-chmod 600 "$TOC"
+PLAIN_TMP="$(mktemp "$BACKUP_ROOT/.verify.XXXXXX.dump")"
+TOC="$(mktemp "$BACKUP_ROOT/.verify-toc.XXXXXX")"
+chmod 600 "$PLAIN_TMP" "$TOC"
 
 cleanup() {
-  rm -f "$TOC"
+  rm -f "$PLAIN_TMP" "$TOC"
 }
 trap cleanup EXIT
 
@@ -64,8 +65,12 @@ openssl enc \
   -pbkdf2 \
   -iter 200000 \
   -pass "file:$KEY_FILE" \
-  -in "$BACKUP" |
-  pg_restore --list > "$TOC"
+  -in "$BACKUP" \
+  -out "$PLAIN_TMP"
+
+test -s "$PLAIN_TMP" || abort "decrypted archive is empty"
+
+pg_restore --list "$PLAIN_TMP" > "$TOC"
 
 ENTRY_COUNT="$(grep -Ec '^[0-9]+;' "$TOC" || true)"
 
