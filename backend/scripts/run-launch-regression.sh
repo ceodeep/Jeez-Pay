@@ -290,6 +290,7 @@ CORE_TESTS=(
   20260903_ledger_v2_native_agent_test.sql
   20260904_merchant_api_v1_test.sql
   20260904_merchant_api_v1_money_test.sql
+  20260906_phase9_db_privilege_hardening_test.sql
 )
 
 FULL_EXTRA_TESTS=(
@@ -327,4 +328,5 @@ echo "KYC/COMPLIANCE: GREEN"
 echo "SANCTIONS: GREEN"
 echo "AGENTS: GREEN"
 echo "MERCHANT API: GREEN"
+echo "DB PRIVILEGES: GREEN"
 echo "================================================"
