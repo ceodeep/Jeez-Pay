@@ -434,7 +434,7 @@ SMOKE_LOG="$TMP_RELEASE/backend/.smoke.log"
 
   PORT="$SMOKE_PORT" \
   NODE_ENV=production \
-    node server.js \
+    exec node server.js \
     >"$SMOKE_LOG" \
     2>&1
 ) &
