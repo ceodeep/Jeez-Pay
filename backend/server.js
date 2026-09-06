@@ -1,5 +1,6 @@
 const app = require("./app");
 const PORT = process.env.PORT || 3000;
+const BIND_HOST = process.env.BIND_HOST || "127.0.0.1";
 const { startUsdtDepositScannerJob } = require("./src/jobs/usdtDepositScanner.job");
 const {
     CAPABILITIES,
@@ -32,7 +33,7 @@ async function startBackgroundJobs() {
     }
 }
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+app.listen(PORT, BIND_HOST, () => {
+    console.log(`Server is running on ${BIND_HOST}:${PORT}`);
     void startBackgroundJobs();
 });
