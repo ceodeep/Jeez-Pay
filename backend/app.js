@@ -26,6 +26,7 @@ const adminSanctionsV1Routes = require("./src/routes/adminSanctionsV1.routes");
 const adminAgentsV1Routes = require("./src/routes/adminAgentsV1.routes");
 const adminKycV2Routes = require("./src/routes/adminKycV2.routes");
 const adminComplianceV1Routes = require("./src/routes/adminComplianceV1.routes");
+const adminMfaRoutes = require("./src/routes/adminMfa.routes");
 const adminRoutes = require("./src/routes/admin.routes");
 const adminLaunchMoneyV2Routes = require("./src/routes/adminLaunchMoneyV2.routes");
 const servicesRoutes = require("./src/routes/services.routes");
@@ -149,6 +150,7 @@ app.use(
 app.use(
   "/admin",
   adminProductPolicy,
+  adminMfaRoutes,
   adminSanctionsV1Routes,
   adminAgentsV1Routes,
   adminKycV3Routes,

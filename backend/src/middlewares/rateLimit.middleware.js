@@ -24,8 +24,20 @@ const pinVerifyLimiter = rateLimit({
   message: { message: "Too many PIN verification attempts. Please try again later." },
 });
 
+
+const adminMfaLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    message: "Too many MFA attempts. Please wait and try again.",
+  },
+});
+
 module.exports = {
   transferLimiter,
   otpVerifyLimiter,
   pinVerifyLimiter,
+  adminMfaLimiter,
 };
