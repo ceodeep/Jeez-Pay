@@ -22,6 +22,8 @@ class DepositActivity : BaseFintechActivity() {
     private val productRepo = ProductRepository()
 
     private lateinit var btnBack: View
+    
+    private lateinit var tvCryptoHeader: TextView
     private lateinit var rowUsdt: LinearLayout
     private lateinit var rowEgp: LinearLayout
     private lateinit var rowSdg: LinearLayout
@@ -37,6 +39,7 @@ class DepositActivity : BaseFintechActivity() {
         initBlockingLoader()
 
         btnBack = findViewById(R.id.btnBack)
+        tvCryptoHeader = findViewById(R.id.tvCryptoHeader)
         rowUsdt = findViewById(R.id.rowUsdt)
         rowEgp = findViewById(R.id.rowEgp)
         rowSdg = findViewById(R.id.rowSdg)
@@ -141,6 +144,8 @@ class DepositActivity : BaseFintechActivity() {
             View.GONE
         }
 
+        tvCryptoHeader.visibility = rowUsdt.visibility
+
         policyReady = listOf(rowUsdt, rowEgp, rowSdg, rowSsp, rowUgx)
             .any { it.visibility == View.VISIBLE }
 
@@ -178,6 +183,7 @@ class DepositActivity : BaseFintechActivity() {
     }
 
     private fun hideAllDepositRows() {
+        if (::tvCryptoHeader.isInitialized) tvCryptoHeader.visibility = View.GONE
         if (::rowUsdt.isInitialized) rowUsdt.visibility = View.GONE
         if (::rowEgp.isInitialized) rowEgp.visibility = View.GONE
         if (::rowSdg.isInitialized) rowSdg.visibility = View.GONE

@@ -1,4 +1,4 @@
-﻿package com.jeezpay.app
+package com.jeezpay.app
 
 
 import android.content.Intent
@@ -884,8 +884,34 @@ class AuthActivity : BaseFintechActivity() {
                     val res = result.data
                     withContext(Dispatchers.Main) {
                         setFullScreenLoading(false)
-                        Toast.makeText(this@AuthActivity, res.message, Toast.LENGTH_SHORT).show()
-                        onSuccess(res.token, res.hasPin)
+
+                        if (res.mfaRequired) {
+                            Toast.makeText(
+                                this@AuthActivity,
+                                "Additional administrator verification is required. Please use the JeezPay admin portal.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@withContext
+                        }
+
+                        val token = res.token
+
+                        if (token.isNullOrBlank()) {
+                            Toast.makeText(
+                                this@AuthActivity,
+                                "Login failed: no session token was returned.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@withContext
+                        }
+
+                        Toast.makeText(
+                            this@AuthActivity,
+                            res.message,
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        onSuccess(token, res.hasPin)
                     }
                 }
 

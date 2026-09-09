@@ -75,7 +75,7 @@ class ReferralActivity : AppCompatActivity() {
         tvReferralCode.text = "--"
         tvInvitedCount.text = "0"
         tvSuccessfulCount.text = "0"
-        tvEarnedAmount.text = "0.00 USDT"
+        tvEarnedAmount.text = "0.00"
         tvHistoryState.text = "Loading..."
 
         lifecycleScope.launch {

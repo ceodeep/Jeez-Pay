@@ -20,6 +20,7 @@ import com.facebook.shimmer.ShimmerFrameLayout
 
 class TransactionsAdapter(
     private var displayCurrency: String = "USDT",
+    private val embedded: Boolean = false,
     private val onTransactionClick: ((TransactionDto) -> Unit)? = null
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     private val nf = NumberFormat.getNumberInstance(Locale.US).apply {
@@ -158,7 +159,7 @@ class TransactionsAdapter(
             }
             else -> {
                 val v = inflater.inflate(R.layout.item_transaction, parent, false)
-                TxVH(v, nf, onTransactionClick)
+                TxVH(v, nf, embedded, onTransactionClick)
             }
         }
     }
@@ -194,6 +195,7 @@ class TransactionsAdapter(
      private class TxVH(
          itemView: View,
          private val nf: NumberFormat,
+         private val embedded: Boolean,
          private val onTransactionClick: ((TransactionDto) -> Unit)?
      ) :
         RecyclerView.ViewHolder(itemView) {
@@ -202,6 +204,7 @@ class TransactionsAdapter(
         private val tvTitle: TextView = itemView.findViewById(R.id.tvTitle)
         private val tvAmount: TextView = itemView.findViewById(R.id.tvAmount)
         private val tvDesc: TextView = itemView.findViewById(R.id.tvDesc)
+        private val tvNote: TextView = itemView.findViewById(R.id.tvNote)
         private val tvDate: TextView = itemView.findViewById(R.id.tvDate)
 
         // New views from the new XML ✅
@@ -211,13 +214,19 @@ class TransactionsAdapter(
         fun bind(tx: TransactionDto, displayCurrency: String) {
             val ctx = itemView.context
 
+            if (embedded) {
+                (itemView as? MaterialCardView)?.apply {
+                    strokeWidth = 0
+                    cardElevation = 0f
+                    setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
+                }
+            }
+
             val typeRaw = (tx.type ?: "").trim().lowercase(Locale.US)
             val isSwap = typeRaw == "swap_in" || typeRaw == "swap_out"
             val isCredit = typeRaw == "credit" || typeRaw.contains("receive") || typeRaw == "swap_in"
             val isDebit = typeRaw == "debit" || typeRaw.contains("send") || typeRaw == "swap_out"
-
-            // Title + desc
-            // Title + description: user-friendly activity labels
+            // Professional title / subtitle / note presentation.
             val description = tx.description?.trim().orEmpty()
 
             val friendlyTitle = when {
@@ -231,21 +240,47 @@ class TransactionsAdapter(
                 typeRaw.contains("deposit") -> "Deposit"
                 typeRaw.isNotBlank() -> typeRaw
                     .replace("_", " ")
-                    .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+                    .replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString()
+                    }
                 else -> "Transaction"
             }
 
-            val friendlyDesc = when {
-                description.equals("Transfer fee", ignoreCase = true) -> "Transfer fee"
-                typeRaw == "swap_in" -> description.ifBlank { "Currency swap received" }
-                typeRaw == "swap_out" -> description.ifBlank { "Currency swap sent" }
-                typeRaw == "credit" -> description.ifBlank { "Money received" }
-                typeRaw == "debit" -> description.ifBlank { "Money sent" }
-                else -> description.ifBlank { "—" }
+            val merchantPayout = Regex(
+                """^Merchant payout from\s+(.+?)\s+-\s+(.+)$""",
+                RegexOption.IGNORE_CASE
+            ).find(description)
+
+            val friendlyDesc: String
+            val friendlyNote: String?
+
+            if (merchantPayout != null) {
+                friendlyDesc = "From ${merchantPayout.groupValues[1].trim()}"
+                friendlyNote = merchantPayout.groupValues[2].trim()
+            } else {
+                friendlyDesc = when {
+                    description.equals("Transfer fee", ignoreCase = true) -> "Transfer fee"
+                    typeRaw == "swap_in" ->
+                        description.ifBlank { "Currency swap received" }
+                    typeRaw == "swap_out" ->
+                        description.ifBlank { "Currency swap sent" }
+                    typeRaw == "credit" ->
+                        description.ifBlank { "Money received" }
+                    typeRaw == "debit" ->
+                        description.ifBlank { "Money sent" }
+                    else ->
+                        description.ifBlank { "Transaction activity" }
+                }
+
+                friendlyNote = null
             }
 
             tvTitle.text = friendlyTitle
             tvDesc.text = friendlyDesc
+
+            tvNote.text = friendlyNote.orEmpty()
+            tvNote.visibility =
+                if (friendlyNote.isNullOrBlank()) View.GONE else View.VISIBLE
 
             // Date
             tvDate.text = formatTxDate(tx.created_at)
@@ -330,7 +365,7 @@ class TransactionsAdapter(
             )
 
             val cleaned = raw.trim()
-            val outFmt = SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.US)
+            val outFmt = SimpleDateFormat("MMM d \u2022 h:mm a", Locale.US)
 
             for (pattern in candidates) {
                 try {

@@ -523,8 +523,10 @@ class SendMoneyActivity : BaseFintechActivity() {
                 WalletRepository().transferQuoteSafe(cur, amount)
             }) {
                 is ApiResult.Success -> {
-                    if (!isTransferCurrencyAllowed(cur) ||
-                        ddCurrency.text.toString().trim().uppercase() != cur
+                    if (
+                        !isTransferCurrencyAllowed(cur) ||
+                        ddCurrency.text.toString().trim().uppercase() != cur ||
+                        etAmount.text.toString().trim().toDoubleOrNull() != amount
                     ) {
                         return@launch
                     }
@@ -537,7 +539,10 @@ class SendMoneyActivity : BaseFintechActivity() {
                 }
 
                 is ApiResult.Error -> {
-                    if (ddCurrency.text.toString().trim().uppercase() != cur) {
+                    if (
+                        ddCurrency.text.toString().trim().uppercase() != cur ||
+                        etAmount.text.toString().trim().toDoubleOrNull() != amount
+                    ) {
                         return@launch
                     }
 

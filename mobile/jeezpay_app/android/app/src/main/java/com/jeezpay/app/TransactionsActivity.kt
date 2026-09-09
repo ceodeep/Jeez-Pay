@@ -70,7 +70,7 @@ class TransactionsActivity : BaseFintechActivity() {
             showCurrencyPicker()
         }
 
-        tvCurrency.text = "Wallet: --"
+        tvCurrency.text = "-- Wallet"
         setLoading(true)
         loadProductPolicy()
     }
@@ -104,7 +104,7 @@ class TransactionsActivity : BaseFintechActivity() {
                     ProductPolicyStore.clear(ProductPolicyStore.LAUNCH_COUNTRY_CODE)
                     currencies = emptyArray()
                     selectedCurrency = ""
-                    tvCurrency.text = "Wallet: --"
+                    tvCurrency.text = "-- Wallet"
                     adapter.showEmpty()
                     setLoading(false)
                     showError(errorMessage(result.error))
@@ -120,7 +120,7 @@ class TransactionsActivity : BaseFintechActivity() {
         if (currencies.isEmpty()) {
             productPolicyReady = false
             selectedCurrency = ""
-            tvCurrency.text = "Wallet: --"
+            tvCurrency.text = "-- Wallet"
             adapter.showEmpty()
             setLoading(false)
             showError("No wallet product is currently available")
@@ -166,7 +166,9 @@ class TransactionsActivity : BaseFintechActivity() {
     }
 
     private fun applyCurrency() {
-        tvCurrency.text = "Wallet: $selectedCurrency"
+        tvCurrency.text = "$selectedCurrency Wallet"
+        btnChangeCurrency.visibility =
+            if (productPolicyReady && currencies.size > 1) View.VISIBLE else View.GONE
         adapter.setCurrency(selectedCurrency)
         btnChangeCurrency.isEnabled = productPolicyReady && currencies.size > 1
         btnChangeCurrency.alpha = if (btnChangeCurrency.isEnabled) 1f else 0.6f

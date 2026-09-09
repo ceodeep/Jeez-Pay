@@ -11,9 +11,12 @@ data class LoginRequest(
 
 data class LoginResponse(
     val message: String,
-    val token: String,
+    val token: String? = null,
     val hasPin: Boolean = false,
-    val isNewUser: Boolean = false
+    val isNewUser: Boolean = false,
+    val mfaRequired: Boolean = false,
+    val challengeToken: String? = null,
+    val challengeExpiresInSeconds: Int? = null
 )
 
 // -------- SIGNUP OTP --------

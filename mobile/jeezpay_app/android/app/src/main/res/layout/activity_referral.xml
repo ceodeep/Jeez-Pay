@@ -56,7 +56,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Invite friends, earn rewards"
+                    android:text="Invite friends to JeezPay"
                     android:textColor="@color/text_primary"
                     android:textSize="22sp"
                     android:textStyle="bold" />
@@ -65,7 +65,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="Share your referral code with friends. When they join JeezPay, you can reward and track all invites here."
+                    android:text="Share your referral code with friends. When they join JeezPay, you can track your invites here."
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp"
                     android:lineSpacingExtra="4dp" />
@@ -214,7 +214,9 @@
         </LinearLayout>
 
         <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
+                        android:id="@+id/referralEarnedCard"
+            android:visibility="gone"
+android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
             app:cardCornerRadius="20dp"
@@ -289,7 +291,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="3. You track successful referrals and rewards here."
+                    android:text="3. Track successful referrals here."
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp" />
             </LinearLayout>

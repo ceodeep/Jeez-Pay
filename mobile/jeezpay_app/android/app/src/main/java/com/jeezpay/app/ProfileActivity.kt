@@ -42,12 +42,12 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private val avatarOptions = listOf(
-        "avatar_1" to R.drawable.avatar_1,
-        "avatar_2" to R.drawable.avatar_2,
-        "avatar_3" to R.drawable.avatar_3,
-        "avatar_4" to R.drawable.avatar_4,
-        "avatar_5" to R.drawable.avatar_5,
-        "avatar_6" to R.drawable.avatar_6
+        "avatar_1" to R.drawable.avatar_default,
+        "avatar_2" to R.drawable.avatar_modern_2,
+        "avatar_3" to R.drawable.avatar_modern_3,
+        "avatar_4" to R.drawable.avatar_modern_4,
+        "avatar_5" to R.drawable.avatar_modern_5,
+        "avatar_6" to R.drawable.avatar_modern_6
     )
 
     private var currentAvatarDialog: AlertDialog? = null
@@ -165,7 +165,7 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     private fun getAvatarResIdFromKey(key: String?): Int {
-        return avatarOptions.firstOrNull { it.first == key }?.second ?: R.drawable.avatar_1
+        return avatarOptions.firstOrNull { it.first == key }?.second ?: R.drawable.avatar_default
     }
 
     private fun saveSelectedAvatarKey(key: String) {

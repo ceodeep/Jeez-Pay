@@ -175,7 +175,7 @@ class MainActivity : BaseFintechActivity() {
 
     private fun setupTransactions() {
         rvTransactions.layoutManager = LinearLayoutManager(this)
-        txAdapter = TransactionsAdapter(selectedCode) { tx ->
+        txAdapter = TransactionsAdapter(selectedCode, embedded = true) { tx ->
             TransactionDetailsBottomSheet(
                 tx = tx,
                 displayCurrency = selectedCode
@@ -269,6 +269,7 @@ class MainActivity : BaseFintechActivity() {
         val btnReceive = findViewById<View>(R.id.btnEarn)
         val btnReferral = findViewById<View>(R.id.btnReferral)
         val btnSwap = findViewById<View>(R.id.btnSwap)
+        val btnMore = findViewById<View>(R.id.btnMore)
         val btnDeposit = findViewById<View>(R.id.btnDeposit)
         val btnBill = findViewById<View>(R.id.btnBill)
         val btnWithdraw = findViewById<View>(R.id.btnWithdraw)
@@ -300,8 +301,11 @@ class MainActivity : BaseFintechActivity() {
                 startActivity(Intent(this, SwapActivity::class.java))
             }
         }
-
-        btnReceive.setOnClickListener {
+        
+        btnMore.setOnClickListener {
+            showMoreMenu()
+        }
+btnReceive.setOnClickListener {
             runCapabilityAction(ProductCapability.P2P_TRANSFER) {
                 startActivity(
                     Intent(this, ReceiveQrActivity::class.java)
@@ -351,6 +355,74 @@ class MainActivity : BaseFintechActivity() {
         }
     }
 
+    private fun showMoreMenu() {
+        val dialog = BottomSheetDialog(this)
+        val sheet = layoutInflater.inflate(R.layout.bottom_sheet_more, null)
+
+        dialog.setContentView(sheet)
+
+        fun openRow(rowId: Int, action: () -> Unit) {
+            sheet.findViewById<View>(rowId).setOnClickListener {
+                dialog.dismiss()
+                action()
+            }
+        }
+
+        openRow(R.id.rowMoreTransactions) {
+            if (requireEnabledCurrency()) {
+                startActivity(
+                    Intent(this, TransactionsActivity::class.java).apply {
+                        putExtra("currency", selectedCode)
+                    }
+                )
+            }
+        }
+
+        openRow(R.id.rowMoreProfile) {
+            startActivity(Intent(this, ProfileActivity::class.java))
+        }
+
+        openRow(R.id.rowMoreSecurity) {
+            startActivity(Intent(this, SecurityActivity::class.java))
+        }
+
+        openRow(R.id.rowMorePayments) {
+            startActivity(Intent(this, PaymentSettingsActivity::class.java))
+        }
+
+        openRow(R.id.rowMoreLimits) {
+            startActivity(Intent(this, LimitsActivity::class.java))
+        }
+
+        openRow(R.id.rowMoreReferral) {
+            startActivity(Intent(this, ReferralActivity::class.java))
+        }
+
+        val swapRow = sheet.findViewById<View>(R.id.rowMoreSwap)
+
+        val hasFx =
+            ProductPolicyStore.current()
+                ?.products
+                ?.any {
+                    it.isCapabilityEnabled(ProductCapability.FX_CONVERT)
+                } == true
+
+        swapRow.visibility =
+            if (hasFx) View.VISIBLE else View.GONE
+
+        if (hasFx) {
+            openRow(R.id.rowMoreSwap) {
+                startActivity(Intent(this, SwapActivity::class.java))
+            }
+        }
+
+        sheet.findViewById<View>(R.id.btnCloseMore)
+            .setOnClickListener {
+                dialog.dismiss()
+            }
+
+        dialog.show()
+    }
     private fun setupCustomBottomNav() {
         selectTab(0)
 
@@ -487,9 +559,12 @@ class MainActivity : BaseFintechActivity() {
             it.isCapabilityEnabled(ProductCapability.FX_CONVERT)
         }
 
-        // FX is fully hidden when the server says it is unavailable. Other
-        // launch actions stay visible and are capability-checked on tap.
-        findViewById<View>(R.id.btnSwap).visibility = if (hasFx) View.VISIBLE else View.GONE
+        // Swap is a real product action and follows server capability policy.
+        findViewById<View>(R.id.btnSwap).visibility =
+            if (hasFx) View.VISIBLE else View.GONE
+
+        // More is always available.
+        findViewById<View>(R.id.btnMore).visibility = View.VISIBLE
     }
 
     private fun walletIconFor(currency: String): Int {
@@ -792,12 +867,12 @@ class MainActivity : BaseFintechActivity() {
     }
 
     private val avatarOptions = listOf(
-        "avatar_1" to R.drawable.avatar_1,
-        "avatar_2" to R.drawable.avatar_2,
-        "avatar_3" to R.drawable.avatar_3,
-        "avatar_4" to R.drawable.avatar_4,
-        "avatar_5" to R.drawable.avatar_5,
-        "avatar_6" to R.drawable.avatar_6
+        "avatar_1" to R.drawable.avatar_default,
+        "avatar_2" to R.drawable.avatar_modern_2,
+        "avatar_3" to R.drawable.avatar_modern_3,
+        "avatar_4" to R.drawable.avatar_modern_4,
+        "avatar_5" to R.drawable.avatar_modern_5,
+        "avatar_6" to R.drawable.avatar_modern_6
     )
 
     private fun getSelectedAvatarKey(): String {
@@ -806,7 +881,7 @@ class MainActivity : BaseFintechActivity() {
 
     private fun getAvatarResIdFromKey(key: String): Int {
         return avatarOptions.firstOrNull { it.first == key }?.second
-            ?: R.drawable.avatar_1
+            ?: R.drawable.avatar_default
     }
 
     private fun applyHeaderAvatar() {

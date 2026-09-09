@@ -27,11 +27,6 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // CRITICAL: Only build ARM64 for debug (3x faster)
-        ndk {
-            abiFilters.add("arm64-v8a")
-        }
     }
 
     signingConfigs {
