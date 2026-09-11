@@ -12,6 +12,10 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import com.jeezpay.app.storage.SessionManager
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PinVerifyActivity : AppCompatActivity() {
 
@@ -22,6 +26,7 @@ class PinVerifyActivity : AppCompatActivity() {
     }
 
     private val pin = StringBuilder()
+    private var pinVerificationInProgress = false
 
     private lateinit var sessionManager: SessionManager
 
@@ -136,6 +141,7 @@ class PinVerifyActivity : AppCompatActivity() {
     }
 
     private fun onDigit(digit: Int) {
+        if (pinVerificationInProgress) return
         if (sessionManager.isPinLocked()) {
             showLockedMessage()
             return
@@ -154,6 +160,7 @@ class PinVerifyActivity : AppCompatActivity() {
     }
 
     private fun onBackspace() {
+        if (pinVerificationInProgress) return
         if (sessionManager.isPinLocked()) {
             showLockedMessage()
             return
@@ -169,14 +176,15 @@ class PinVerifyActivity : AppCompatActivity() {
     }
 
     private fun verifyOrReject() {
+        if (pinVerificationInProgress) return
+
         if (sessionManager.isPinLocked()) {
             showLockedMessage()
             clearPin()
             return
         }
 
-        val entered =
-            pin.toString()
+        val entered = pin.toString()
 
         if (!sessionManager.hasPin()) {
             Toast.makeText(
@@ -190,69 +198,75 @@ class PinVerifyActivity : AppCompatActivity() {
             return
         }
 
-        val verified =
-            sessionManager.verifyPin(entered)
+        pinVerificationInProgress = true
 
-        if (!verified) {
-            val attempts =
-                sessionManager
-                    .incrementFailedPinAttempts()
+        lifecycleScope.launch {
+            val verified = withContext(Dispatchers.Default) {
+                sessionManager.verifyPin(entered)
+            }
+
+            if (isFinishing || isDestroyed) {
+                pinVerificationInProgress = false
+                return@launch
+            }
+
+            if (!verified) {
+                val attempts =
+                    sessionManager.incrementFailedPinAttempts()
+
+                if (attempts >= SessionManager.MAX_PIN_ATTEMPTS) {
+                    sessionManager.lockPinForMillis(
+                        SessionManager.PIN_LOCK_DURATION_MS
+                    )
+
+                    Toast.makeText(
+                        this@PinVerifyActivity,
+                        "Too many attempts. Locked for 60 seconds.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    val remaining =
+                        SessionManager.MAX_PIN_ATTEMPTS - attempts
+
+                    Toast.makeText(
+                        this@PinVerifyActivity,
+                        "Wrong PIN. $remaining attempt(s) left.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                pinVerificationInProgress = false
+                clearPin()
+                return@launch
+            }
+
+            sessionManager.resetFailedPinAttempts()
 
             if (
-                attempts >=
-                SessionManager.MAX_PIN_ATTEMPTS
+                sessionManager.isBiometricEnabled() &&
+                !sessionManager.hasBiometricPinCredential()
             ) {
-                sessionManager.lockPinForMillis(
-                    SessionManager.PIN_LOCK_DURATION_MS
-                )
+                val provisioned =
+                    withContext(Dispatchers.Default) {
+                        sessionManager.provisionBiometricPin(entered)
+                    }
 
-                Toast.makeText(
-                    this,
-                    "Too many attempts. Locked for 60 seconds.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                val remaining =
-                    SessionManager.MAX_PIN_ATTEMPTS -
-                        attempts
-
-                Toast.makeText(
-                    this,
-                    "Wrong PIN. $remaining attempt(s) left.",
-                    Toast.LENGTH_SHORT
-                ).show()
+                if (provisioned) {
+                    Toast.makeText(
+                        this@PinVerifyActivity,
+                        "Fingerprint payments are ready for next time.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
 
-            clearPin()
-            return
+            pinVerificationInProgress = false
+            finishWithPin(entered)
         }
-
-        sessionManager.resetFailedPinAttempts()
-
-        // First-time biometric payment enrollment:
-        // the user has already enabled biometrics AND just
-        // successfully supplied the real transaction PIN.
-        if (
-            sessionManager.isBiometricEnabled() &&
-            !sessionManager.hasBiometricPinCredential()
-        ) {
-            val provisioned =
-                sessionManager
-                    .provisionBiometricPin(entered)
-
-            if (provisioned) {
-                Toast.makeText(
-                    this,
-                    "Fingerprint payments are ready for next time.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-
-        finishWithPin(entered)
     }
 
     private fun startBiometricApproval() {
+        if (pinVerificationInProgress) return
         if (sessionManager.isPinLocked()) {
             showLockedMessage()
             return
