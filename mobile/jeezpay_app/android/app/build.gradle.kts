@@ -24,7 +24,7 @@ android {
         applicationId = "com.jeezpay.app"
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
