@@ -70,6 +70,7 @@ class SendMoneyActivity : BaseFintechActivity() {
     private lateinit var tvError: TextView
 
     private lateinit var tvFee: TextView
+    private lateinit var tvTotalDebit: TextView
     private lateinit var tvRecipientName: TextView
     private lateinit var tvAvailable: TextView
 
@@ -121,16 +122,56 @@ class SendMoneyActivity : BaseFintechActivity() {
             pendingAction = null
         }
 
-        val i = Intent(this, com.jeezpay.app.PinVerifyActivity::class.java).apply {
-            putExtra(com.jeezpay.app.PinVerifyActivity.EXTRA_TITLE, "Enter your PIN")
-            putExtra(
-                com.jeezpay.app.PinVerifyActivity.EXTRA_SUBTITLE,
-                "Kindly enter your transaction PIN to continue"
-            )
-        }
+        val transferAmount =
+            etAmount.text
+                .toString()
+                .trim()
+                .toDoubleOrNull()
+
+        val transferCurrency =
+            ddCurrency.text
+                .toString()
+                .trim()
+                .uppercase()
+
+        val recipient =
+            resolvedReceiverName
+                ?.trim()
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+                ?: "recipient"
+
+        val subtitle =
+            if (
+                transferAmount != null &&
+                transferAmount > 0 &&
+                transferCurrency.isNotBlank()
+            ) {
+                "Sending ${df.format(transferAmount)} $transferCurrency to $recipient"
+            } else {
+                "Verify this transfer with your transaction PIN or fingerprint."
+            }
+
+        val i =
+            Intent(
+                this,
+                com.jeezpay.app.PinVerifyActivity::class.java
+            ).apply {
+
+                putExtra(
+                    com.jeezpay.app.PinVerifyActivity.EXTRA_TITLE,
+                    "Confirm transfer"
+                )
+
+                putExtra(
+                    com.jeezpay.app.PinVerifyActivity.EXTRA_SUBTITLE,
+                    subtitle
+                )
+            }
+
         pinLauncher.launch(i)
     }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_send_money)
@@ -166,6 +207,7 @@ class SendMoneyActivity : BaseFintechActivity() {
         tvError = findViewById(R.id.tvError)
 
         tvFee = findViewById(R.id.tvFee)
+        tvTotalDebit = findViewById(R.id.tvTotalDebit)
         tvRecipientName = findViewById(R.id.tvRecipientName)
         tvAvailable = findViewById(R.id.tvAvailable)
 
@@ -232,9 +274,22 @@ class SendMoneyActivity : BaseFintechActivity() {
 
         ddCurrency.text = "--"
         tvAvailable.text = "Available: --"
-        tvFee.text = "Fee: --"
+        tvFee.text = "--"
+        tvTotalDebit.text = "--"
         setSendLoading(false)
         loadTransferPolicy()
+        // BALANCE LIVE REFRESH
+        // Update the displayed balance as soon as loadBalances()
+        // publishes the API result. No amount entry required.
+        lifecycleScope.launch {
+            repeatOnLifecycle(
+                androidx.lifecycle.Lifecycle.State.STARTED
+            ) {
+                vm.balances.collect {
+                    refreshFeeAndAvailable()
+                }
+            }
+        }
 
         currencyPill.setOnClickListener { showCurrencyPicker() }
 
@@ -293,7 +348,9 @@ class SendMoneyActivity : BaseFintechActivity() {
                 recipientDisplay = receiverDisplayForReview,
                 currency = currency,
                 amount = amount,
-                fee = fee
+                fee = fee,
+                totalDebit = total,
+                note = description
             )  {
                 openPinThenConfirm { pin ->
                     requireTransactionApproval {
@@ -422,7 +479,8 @@ class SendMoneyActivity : BaseFintechActivity() {
                     quotedFee = 0.0
                     quotedTotalDebit = 0.0
                     tvAvailable.text = "Available: --"
-                    tvFee.text = "Fee: --"
+                    tvFee.text = "--"
+                    tvTotalDebit.text = "--"
                     hideBlockingLoader()
                     setSendLoading(false)
                     handleSendError(result.error) {
@@ -475,7 +533,8 @@ class SendMoneyActivity : BaseFintechActivity() {
         quotedTotalDebit = 0.0
         ddCurrency.text = "--"
         tvAvailable.text = "Available: --"
-        tvFee.text = "Fee: --"
+        tvFee.text = "--"
+        tvTotalDebit.text = "--"
         hideBlockingLoader()
         setSendLoading(false)
         showError(message)
@@ -493,55 +552,139 @@ class SendMoneyActivity : BaseFintechActivity() {
     }
 
     private fun refreshFeeAndAvailable() {
-        val cur = ddCurrency.text.toString().trim().uppercase()
-        val amount = etAmount.text.toString().trim().toDoubleOrNull()
+        val cur =
+            ddCurrency.text
+                .toString()
+                .trim()
+                .uppercase()
+
+        val amount =
+            etAmount.text
+                .toString()
+                .trim()
+                .toDoubleOrNull()
 
         if (!isTransferCurrencyAllowed(cur)) {
             quotedFee = 0.0
             quotedTotalDebit = 0.0
             quoteLoading = false
-            tvAvailable.text = "Available: --"
-            tvFee.text = "Fee: --"
+
+            tvAvailable.text =
+                "Available: --"
+
+            tvFee.text =
+                "--"
+
+            tvTotalDebit.text =
+                "--"
+
             return
         }
 
-        val avail = vm.availableFor(cur)
-        tvAvailable.text = "Available: ${df.format(avail)}"
+        val balancesSnapshot =
+            vm.balances.value
 
-        if (amount == null || amount <= 0) {
+        val balanceLoaded =
+            balancesSnapshot.containsKey(cur)
+
+        val avail =
+            balancesSnapshot[cur] ?: 0.0
+
+        tvAvailable.text =
+            if (balanceLoaded) {
+                "Available: ${df.format(avail)} $cur"
+            } else {
+                "Available: -- $cur"
+            }
+
+        if (
+            amount == null ||
+            amount <= 0
+        ) {
             quotedFee = 0.0
             quotedTotalDebit = 0.0
-            tvFee.text = "Fee: -- $cur"
+            quoteLoading = false
+
+            tvFee.text =
+                "-- $cur"
+
+            tvTotalDebit.text =
+                "-- $cur"
+
             return
         }
 
         quoteLoading = true
-        tvFee.text = "Fee: loading..."
+
+        tvFee.text =
+            "Calculating..."
+
+        tvTotalDebit.text =
+            "Calculating..."
 
         lifecycleScope.launch {
-            when (val result = withContext(Dispatchers.IO) {
-                WalletRepository().transferQuoteSafe(cur, amount)
-            }) {
+            when (
+                val result =
+                    withContext(
+                        Dispatchers.IO
+                    ) {
+                        WalletRepository()
+                            .transferQuoteSafe(
+                                cur,
+                                amount
+                            )
+                    }
+            ) {
                 is ApiResult.Success -> {
+
+                    // Ignore stale quote responses.
                     if (
                         !isTransferCurrencyAllowed(cur) ||
-                        ddCurrency.text.toString().trim().uppercase() != cur ||
-                        etAmount.text.toString().trim().toDoubleOrNull() != amount
+                        ddCurrency.text
+                            .toString()
+                            .trim()
+                            .uppercase() != cur ||
+                        etAmount.text
+                            .toString()
+                            .trim()
+                            .toDoubleOrNull() != amount
                     ) {
                         return@launch
                     }
 
                     quoteLoading = false
-                    val quote = result.data
-                    quotedFee = quote.fee ?: 0.0
-                    quotedTotalDebit = quote.totalDebit ?: (amount + quotedFee)
-                    tvFee.text = "Fee: ${df.format(quotedFee)} $cur"
+
+                    val quote =
+                        result.data
+
+                    quotedFee =
+                        quote.fee ?: 0.0
+
+                    quotedTotalDebit =
+                        quote.totalDebit
+                            ?: (
+                                amount +
+                                    quotedFee
+                            )
+
+                    tvFee.text =
+                        "${df.format(quotedFee)} $cur"
+
+                    tvTotalDebit.text =
+                        "${df.format(quotedTotalDebit)} $cur"
                 }
 
                 is ApiResult.Error -> {
+
                     if (
-                        ddCurrency.text.toString().trim().uppercase() != cur ||
-                        etAmount.text.toString().trim().toDoubleOrNull() != amount
+                        ddCurrency.text
+                            .toString()
+                            .trim()
+                            .uppercase() != cur ||
+                        etAmount.text
+                            .toString()
+                            .trim()
+                            .toDoubleOrNull() != amount
                     ) {
                         return@launch
                     }
@@ -549,12 +692,16 @@ class SendMoneyActivity : BaseFintechActivity() {
                     quoteLoading = false
                     quotedFee = 0.0
                     quotedTotalDebit = 0.0
-                    tvFee.text = "Fee: unavailable"
+
+                    tvFee.text =
+                        "Unavailable"
+
+                    tvTotalDebit.text =
+                        "Unavailable"
                 }
             }
         }
     }
-
     private fun showCurrencyPicker() {
         if (!productPolicyReady) {
             showError("Transfer products are still loading")
@@ -582,22 +729,50 @@ class SendMoneyActivity : BaseFintechActivity() {
         etPhone.text?.clear()
 
         if (mode == IdMode.UID) {
-            etPhone.hint = "UID"
-            etPhone.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            etPhone.hint =
+                "Enter recipient UID"
+
+            etPhone.inputType =
+                android.text.InputType.TYPE_CLASS_NUMBER
         } else {
-            etPhone.hint = "Phone"
-            etPhone.inputType = android.text.InputType.TYPE_CLASS_PHONE
+            etPhone.hint =
+                "Enter phone number"
+
+            etPhone.inputType =
+                android.text.InputType.TYPE_CLASS_PHONE
         }
 
         setNextEnabled(false)
     }
-
     private fun setNextEnabled(enabled: Boolean) {
-        val canContinue = enabled && productPolicyReady
-        btnNext.isEnabled = canContinue
-        btnNext.alpha = if (canContinue) 1f else 0.75f
-    }
+        val canContinue =
+            enabled &&
+                productPolicyReady
 
+        btnNext.isEnabled =
+            canContinue
+
+        btnNext.alpha =
+            1f
+
+        btnNext.setBackgroundResource(
+            if (canContinue) {
+                R.drawable.bg_send_btn
+            } else {
+                R.drawable.bg_send_next_disabled
+            }
+        )
+
+        btnNext.setTextColor(
+            getColor(
+                if (canContinue) {
+                    android.R.color.white
+                } else {
+                    R.color.text_secondary
+                }
+            )
+        )
+    }
     private fun showError(msg: String) {
         tvError.text = msg
         tvError.visibility = View.VISIBLE
@@ -663,28 +838,89 @@ class SendMoneyActivity : BaseFintechActivity() {
     }
 
     private fun renderRecentRecipients() {
-        val items = recentStore.list(10)
+        val items =
+            recentStore.list(10)
+
         recentList.removeAllViews()
 
-        items.forEach { rec ->
-            val row = layoutInflater.inflate(R.layout.item_recent_recipient, recentList, false)
-            val tvName = row.findViewById<TextView>(R.id.tvRecentName)
-            val tvId = row.findViewById<TextView>(R.id.tvRecentId)
+        if (items.isEmpty()) {
+            val verticalPadding =
+                (
+                    20 *
+                        resources.displayMetrics.density
+                ).toInt()
 
-            tvName.text = rec.displayName ?: "Recipient"
-            tvId.text = rec.identifier
+            val emptyState =
+                TextView(this).apply {
+
+                    text =
+                        "No recent recipients yet"
+
+                    textSize =
+                        14f
+
+                    gravity =
+                        android.view.Gravity.CENTER
+
+                    setTextColor(
+                        getColor(
+                            R.color.text_secondary
+                        )
+                    )
+
+                    setPadding(
+                        0,
+                        verticalPadding,
+                        0,
+                        verticalPadding
+                    )
+                }
+
+            recentList.addView(
+                emptyState
+            )
+
+            return
+        }
+
+        items.forEach { rec ->
+            val row =
+                layoutInflater.inflate(
+                    R.layout.item_recent_recipient,
+                    recentList,
+                    false
+                )
+
+            val tvName =
+                row.findViewById<TextView>(
+                    R.id.tvRecentName
+                )
+
+            val tvId =
+                row.findViewById<TextView>(
+                    R.id.tvRecentId
+                )
+
+            tvName.text =
+                rec.displayName
+                    ?: "Recipient"
+
+            tvId.text =
+                rec.identifier
 
             row.setOnClickListener {
-                etPhone.setText(rec.identifier)
-                resolveReceiverAndContinue(rec.identifier)
+                etPhone.setText(
+                    rec.identifier
+                )
+
+                resolveReceiverAndContinue(
+                    rec.identifier
+                )
             }
 
             recentList.addView(row)
         }
     }
-
-
-
     private fun setSendLoading(loading: Boolean) {
         if (loading) showBlockingLoader() else if (!productPolicyLoading) hideBlockingLoader()
 
@@ -696,7 +932,7 @@ class SendMoneyActivity : BaseFintechActivity() {
         currencyPill.isEnabled = !loading && productPolicyReady && currencies.size > 1
 
         etPhone.isEnabled = !loading
-        btnNext.isEnabled = !loading && productPolicyReady && !etPhone.text.isNullOrBlank()
+        setNextEnabled(!loading && !etPhone.text.isNullOrBlank())
         btnUid.isEnabled = !loading
         btnPhone.isEnabled = !loading
         ivBack.isEnabled = !loading

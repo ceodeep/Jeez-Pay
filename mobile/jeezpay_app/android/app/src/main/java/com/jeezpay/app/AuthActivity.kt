@@ -362,6 +362,15 @@ class AuthActivity : BaseFintechActivity() {
                     InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 }
 
+            ivLoginEye.setImageResource(
+                if (loginPasswordVisible) R.drawable.ic_eye_off
+                else R.drawable.ic_eye
+            )
+
+            ivLoginEye.contentDescription =
+                if (loginPasswordVisible) "Hide password"
+                else "Show password"
+
             etLoginPassword.setSelection(etLoginPassword.text?.length ?: 0)
         }
     }
@@ -743,7 +752,6 @@ class AuthActivity : BaseFintechActivity() {
                 return@setOnClickListener
             }
 
-            android.util.Log.d("AuthActivity", "SET_PIN value=[$pin], length=${pin.length}")
             setPinOnBackend(pin)
         }
 
@@ -1040,7 +1048,7 @@ class AuthActivity : BaseFintechActivity() {
                     withContext(Dispatchers.Main) {
                         setFullScreenLoading(false)
 
-                        handleAuthError(result.error) {
+                        handleOtpVerificationError(result.error) {
                             signupVerifyOtp(
                                 fullName,
                                 email,
@@ -1329,6 +1337,15 @@ class AuthActivity : BaseFintechActivity() {
                     InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 }
 
+            ivSignupEye1.setImageResource(
+                if (signupPasswordVisible) R.drawable.ic_eye_off
+                else R.drawable.ic_eye
+            )
+
+            ivSignupEye1.contentDescription =
+                if (signupPasswordVisible) "Hide password"
+                else "Show password"
+
             etSignupPassword.setSelection(etSignupPassword.text?.length ?: 0)
         }
 
@@ -1342,6 +1359,15 @@ class AuthActivity : BaseFintechActivity() {
                 } else {
                     InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
                 }
+
+            ivSignupEye2.setImageResource(
+                if (signupConfirmVisible) R.drawable.ic_eye_off
+                else R.drawable.ic_eye
+            )
+
+            ivSignupEye2.contentDescription =
+                if (signupConfirmVisible) "Hide password"
+                else "Show password"
 
             etSignupConfirmPassword.setSelection(etSignupConfirmPassword.text?.length ?: 0)
         }
@@ -1503,11 +1529,52 @@ class AuthActivity : BaseFintechActivity() {
 
                 is ApiResult.Error -> {
                     withContext(Dispatchers.Main) {
-                        handleAuthError(result.error) {
+                        handleOtpVerificationError(result.error) {
                             forgotPinVerifyOtp(identifier, otp, onSuccess)
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private fun handleOtpVerificationError(
+        error: AppError,
+        retryAction: () -> Unit = {}
+    ) {
+        when (error) {
+
+            is AppError.Unauthorized -> {
+                Toast.makeText(
+                    this,
+                    error.message.ifBlank {
+                        "Invalid verification code. Please try again."
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                etOtp.text?.clear()
+                etOtp.requestFocus()
+            }
+
+            is AppError.Validation -> {
+                Toast.makeText(
+                    this,
+                    error.message.ifBlank {
+                        "Invalid verification code. Please try again."
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                etOtp.text?.clear()
+                etOtp.requestFocus()
+            }
+
+            else -> {
+                handleAuthError(
+                    error = error,
+                    retryAction = retryAction
+                )
             }
         }
     }

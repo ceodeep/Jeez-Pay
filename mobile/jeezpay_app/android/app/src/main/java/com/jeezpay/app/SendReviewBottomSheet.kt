@@ -16,45 +16,134 @@ class SendReviewBottomSheet(
     private val currency: String,
     private val amount: Double,
     private val fee: Double,
+    private val totalDebit: Double,
+    private val note: String? = null,
     private val onConfirm: () -> Unit
 ) : BottomSheetDialogFragment() {
 
-    private val df = DecimalFormat("#,##0.##")
-    private var confirmLocked = false
+    private val df =
+        DecimalFormat("#,##0.##")
+
+    private var confirmLocked =
+        false
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        return inflater.inflate(R.layout.bottom_sheet_send_review, container, false)
+        return inflater.inflate(
+            R.layout.bottom_sheet_send_review,
+            container,
+            false
+        )
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        val btnClose = view.findViewById<ImageView>(R.id.btnClose)
-        val tvReviewAmount = view.findViewById<TextView>(R.id.tvReviewAmount)
-        val tvReviewCurrency = view.findViewById<TextView>(R.id.tvReviewCurrency)
-        val tvReviewRecipient = view.findViewById<TextView>(R.id.tvReviewRecipient)
-        val tvReviewUid = view.findViewById<TextView>(R.id.tvReviewUid)
-        val tvReviewFee = view.findViewById<TextView>(R.id.tvReviewFee)
-        val btnConfirm = view.findViewById<MaterialButton>(R.id.btnConfirm)
+    override fun onViewCreated(
+        view: View,
+        savedInstanceState: Bundle?
+    ) {
+        val btnClose =
+            view.findViewById<ImageView>(
+                R.id.btnClose
+            )
 
-        tvReviewAmount.text = df.format(amount)
-        tvReviewCurrency.text = currency
-        tvReviewRecipient.text = recipientDisplay
-        tvReviewUid.text = receiverIdentifier
-        tvReviewFee.text = "${df.format(fee)} $currency"
+        val tvReviewAmount =
+            view.findViewById<TextView>(
+                R.id.tvReviewAmount
+            )
 
-        btnClose.setOnClickListener { dismiss() }
+        val tvReviewCurrency =
+            view.findViewById<TextView>(
+                R.id.tvReviewCurrency
+            )
+
+        val tvReviewRecipient =
+            view.findViewById<TextView>(
+                R.id.tvReviewRecipient
+            )
+
+        val tvReviewUid =
+            view.findViewById<TextView>(
+                R.id.tvReviewUid
+            )
+
+        val tvReviewFee =
+            view.findViewById<TextView>(
+                R.id.tvReviewFee
+            )
+
+        val tvReviewTotal =
+            view.findViewById<TextView>(
+                R.id.tvReviewTotal
+            )
+
+        val rowReviewNote =
+            view.findViewById<View>(
+                R.id.rowReviewNote
+            )
+
+        val tvReviewNote =
+            view.findViewById<TextView>(
+                R.id.tvReviewNote
+            )
+
+        val btnConfirm =
+            view.findViewById<MaterialButton>(
+                R.id.btnConfirm
+            )
+
+        tvReviewAmount.text =
+            df.format(amount)
+
+        tvReviewCurrency.text =
+            currency
+
+        tvReviewRecipient.text =
+            recipientDisplay
+
+        tvReviewUid.text =
+            receiverIdentifier
+
+        tvReviewFee.text =
+            "${df.format(fee)} $currency"
+
+        tvReviewTotal.text =
+            "${df.format(totalDebit)} $currency"
+
+        val cleanNote =
+            note
+                ?.trim()
+                ?.takeIf {
+                    it.isNotBlank()
+                }
+
+        if (cleanNote == null) {
+            rowReviewNote.visibility =
+                View.GONE
+        } else {
+            rowReviewNote.visibility =
+                View.VISIBLE
+
+            tvReviewNote.text =
+                cleanNote
+        }
+
+        btnClose.setOnClickListener {
+            dismiss()
+        }
 
         btnConfirm.setOnClickListener {
-            if (confirmLocked) return@setOnClickListener
+            if (confirmLocked) {
+                return@setOnClickListener
+            }
 
             confirmLocked = true
             btnConfirm.isEnabled = false
             btnConfirm.alpha = 0.7f
 
             onConfirm()
+
             dismissAllowingStateLoss()
         }
     }
