@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -63,7 +64,7 @@
                     android:paddingTop="6dp"
                     android:paddingEnd="12dp"
                     android:paddingBottom="6dp"
-                    android:text="Verified Personal"
+                    android:text="SSP wallet"
                     android:textColor="@color/paypal_blue"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -72,10 +73,10 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:text="Your account limits help keep JeezPay secure while giving you room to send, receive, and withdraw safely."
+                    android:lineSpacingExtra="4dp"
+                    android:text="These values are loaded from JeezPay's current South Sudanese Pound transfer configuration."
                     android:textColor="@color/text_secondary"
-                    android:textSize="15sp"
-                    android:lineSpacingExtra="4dp" />
+                    android:textSize="15sp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -88,13 +89,12 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <!-- Limit cards -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="18dp"
             app:cardBackgroundColor="@color/card_white"
+            app:cardCornerRadius="18dp"
             app:strokeColor="@color/card_stroke_soft"
             app:strokeWidth="1dp">
 
@@ -107,15 +107,16 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Daily transfer limit"
+                    android:text="Minimum per transfer"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
                 <TextView
+                    android:id="@+id/tvMinTransferValue"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="5,000 USD equivalent"
+                    android:text="Loading..."
                     android:textColor="@color/text_primary"
                     android:textSize="20sp"
                     android:textStyle="bold" />
@@ -126,8 +127,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="18dp"
             app:cardBackgroundColor="@color/card_white"
+            app:cardCornerRadius="18dp"
             app:strokeColor="@color/card_stroke_soft"
             app:strokeWidth="1dp">
 
@@ -140,66 +141,37 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Single transfer limit"
+                    android:text="Maximum per transfer"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
                 <TextView
+                    android:id="@+id/tvMaxTransferValue"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="1,000 USD equivalent"
+                    android:text="Loading..."
                     android:textColor="@color/text_primary"
                     android:textSize="20sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:cardCornerRadius="18dp"
-            app:cardBackgroundColor="@color/card_white"
-            app:strokeColor="@color/card_stroke_soft"
-            app:strokeWidth="1dp">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Monthly wallet activity"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="25,000 USD equivalent"
-                    android:textColor="@color/text_primary"
-                    android:textSize="20sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="USDT withdrawals"
+            android:text="Fees"
             android:textColor="@color/text_primary"
             android:textSize="18sp"
             android:textStyle="bold" />
+
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardCornerRadius="18dp"
             app:cardBackgroundColor="@color/card_white"
+            app:cardCornerRadius="18dp"
             app:strokeColor="@color/card_stroke_soft"
             app:strokeWidth="1dp">
 
@@ -212,15 +184,16 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="USDT withdrawal limit"
+                    android:text="Transfer fee"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
                 <TextView
+                    android:id="@+id/tvTransferFeeValue"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="2,000 USDT daily • Minimum 5 USDT"
+                    android:text="Loading..."
                     android:textColor="@color/text_primary"
                     android:textSize="20sp"
                     android:textStyle="bold" />
@@ -230,7 +203,7 @@
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="16dp"
             app:cardBackgroundColor="@color/bg_soft_blue"
             app:cardCornerRadius="18dp"
             app:cardElevation="0dp">
@@ -238,12 +211,13 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:lineSpacingExtra="3dp"
                 android:padding="16dp"
-                android:text="Higher limits may be available for business accounts after additional review."
+                android:text="Additional KYC, security, compliance, risk, or operational controls may apply to individual accounts and transactions."
                 android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                android:lineSpacingExtra="3dp" />
+                android:textSize="14sp" />
         </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
+
 </androidx.core.widget.NestedScrollView>

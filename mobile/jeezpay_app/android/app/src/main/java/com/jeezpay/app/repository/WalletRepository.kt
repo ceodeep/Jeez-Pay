@@ -16,6 +16,7 @@ import com.jeezpay.app.network.dto.CryptoDepositAddressResponse
 import com.jeezpay.app.network.dto.CryptoDepositsResponse
 import com.jeezpay.app.network.dto.TransferQuoteRequest
 import com.jeezpay.app.network.dto.TransferQuoteResponse
+import com.jeezpay.app.network.dto.TransferSettingsResponse
 import com.jeezpay.app.network.dto.CryptoWithdrawRequest
 import com.jeezpay.app.network.dto.CryptoWithdrawResponse
 import com.jeezpay.app.network.dto.WithdrawalsResponse
@@ -146,6 +147,14 @@ class WalletRepository {
             api.cryptoDeposits(token, network)
         }
     }
+    suspend fun transferSettingsSafe(
+        currency: String
+    ): ApiResult<TransferSettingsResponse> {
+        return safeApiCall {
+            api.transferSettings(currency)
+        }
+    }
+
     suspend fun transferQuoteSafe(
         currency: String,
         amount: Double

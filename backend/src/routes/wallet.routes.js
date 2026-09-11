@@ -952,6 +952,59 @@ totalDebited: Number(totalDebit),
     return res.status(500).json({ message: "Transfer failed" });
   }
 });
+/**
+ * GET /wallet/transfer-settings?currency=SSP
+ *
+ * Returns the same currency_settings values enforced by transfers.
+ * This endpoint is read-only and is protected by the wallet product policy.
+ */
+router.get("/transfer-settings", authMiddleware, async (req, res) => {
+  try {
+    const currency = normalizeCurrency(req.query.currency);
+
+    if (!currency) {
+      return res.status(400).json({
+        message: "currency is required",
+      });
+    }
+
+    const settings = await getCurrencySettings(currency);
+
+    if (!settings) {
+      return res.status(404).json({
+        message: "Currency settings not found",
+      });
+    }
+
+    if (!settings.is_enabled) {
+      return res.status(400).json({
+        message: `${currency} transfers are disabled`,
+      });
+    }
+
+    return res.json({
+      currency,
+      feePercent: Number(settings.fee_percent || 0),
+      flatFee: Number(settings.flat_fee || 0),
+      minTransfer:
+        settings.min_transfer == null
+          ? null
+          : Number(settings.min_transfer),
+      maxTransfer:
+        settings.max_transfer == null
+          ? null
+          : Number(settings.max_transfer),
+      isEnabled: Boolean(settings.is_enabled),
+    });
+  } catch (err) {
+    console.error("transfer-settings crash:", err);
+
+    return res.status(500).json({
+      message: "Failed to load transfer settings",
+    });
+  }
+});
+
 router.post("/transfer-quote", authMiddleware, async (req, res) => {
   try {
     const currency = String(req.body.currency || "").trim().toUpperCase();

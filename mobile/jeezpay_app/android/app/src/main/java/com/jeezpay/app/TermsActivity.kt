@@ -12,58 +12,95 @@ class TermsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_info_page)
 
         findViewById<TextView>(R.id.tvTitle).text = "Terms & Conditions"
+        findViewById<TextView>(R.id.tvInfoSubtitle).text =
+            "Terms for using JeezPay's SSP wallet and payment services."
 
         findViewById<TextView>(R.id.tvContent).text = """
-Last updated: May 2026
+Last updated: September 11, 2026
 
-Welcome to JeezPay. By creating an account or using JeezPay services, you agree to these Terms & Conditions.
+Welcome to JeezPay. By creating an account or using JeezPay, you agree to these Terms & Conditions.
 
 1. Account Registration
-You must provide accurate and complete information when creating your account. You are responsible for keeping your phone number, password, PIN, and account access secure.
+You must provide accurate, complete, and current information when creating or maintaining your JeezPay account.
 
-2. Wallet Services
-JeezPay allows users to hold supported wallet balances, send money, receive money, swap supported currencies, deposit supported digital assets, and request bill or service payments where available.
+You are responsible for protecting your account credentials, password, transaction PIN, device access, and other authentication information.
 
-3. USDT Deposits
-USDT deposits are currently supported only through the TRON/TRC20 network. You must send only USDT TRC20 to the deposit address shown in the app. Sending unsupported tokens, wrong networks, or other assets may result in permanent loss.
+You must not allow another person to use your JeezPay account in a way that violates these Terms or applicable law.
 
-Minimum credited USDT deposit: 10 USDT. Deposits below the minimum may not be credited automatically and may require manual review.
+2. JeezPay Services
+JeezPay provides digital wallet and payment services for supported products.
 
-4. Network Fees
-Blockchain/network fees are paid by the sender or the relevant network participant. JeezPay does not receive TRON network fees charged by external wallets or blockchain networks.
+For the current South Sudan launch, the supported wallet currency is the South Sudanese Pound (SSP).
 
-5. Transactions
-You are responsible for reviewing all transaction details before confirming. Completed wallet transfers, swaps, deposits, and service requests may not be reversible, except where JeezPay support can process a correction or refund according to internal rules.
+Depending on service availability and your account eligibility, JeezPay may allow you to hold an SSP balance, send and receive money, make merchant payments, and use approved cash-in or cash-out services.
 
-6. PIN and Security
-Your PIN is used to protect sensitive actions. Do not share your PIN, password, OTP, or account access with anyone. JeezPay will not be responsible for losses caused by user negligence, shared credentials, or unauthorized access resulting from poor account security.
+A service is available only when JeezPay makes it available to your account through the app or another authorized JeezPay channel.
 
-7. KYC and Compliance
-JeezPay may require identity verification before allowing certain services. We may reject, limit, suspend, or close accounts if information is false, incomplete, suspicious, or required by law, compliance rules, or risk controls.
+3. Transactions
+You are responsible for reviewing the recipient, merchant, amount, currency, fee, and other transaction details before confirming a transaction.
+
+Once a transaction has been successfully processed, it may not be reversible. A correction, reversal, refund, or adjustment may be made only when permitted by JeezPay's systems, applicable rules, the relevant transaction type, or applicable law.
+
+Do not send money to a person, merchant, or account unless you have verified that the transaction details are correct.
+
+4. Cash-In and Cash-Out
+Cash-in or cash-out services may be available through approved JeezPay agents, merchants, financial partners, or other methods specifically presented by JeezPay.
+
+Availability, operating hours, fees, transaction limits, identity requirements, and processing times may vary.
+
+You should use only channels identified or approved by JeezPay for these services.
+
+5. Fees and Transaction Limits
+JeezPay may apply transaction fees, minimum transaction amounts, maximum transaction amounts, account limits, security controls, or other service limits.
+
+Where applicable, relevant transaction information should be displayed or enforced before a transaction is completed.
+
+Limits and fees may differ by service, account status, verification status, risk controls, or operational requirements and may be updated from time to time.
+
+6. PIN and Account Security
+Sensitive JeezPay actions may require a transaction PIN, biometric confirmation, password, or other security check.
+
+Biometric confirmation, where supported, is a device security mechanism and does not remove JeezPay's transaction authorization or security requirements.
+
+Never share your password, PIN, authentication codes, or account access with another person.
+
+7. Identity Verification and Compliance
+JeezPay may require identity verification or additional information before enabling or continuing certain services.
+
+JeezPay may delay, reject, review, restrict, or suspend transactions or accounts when necessary for identity verification, fraud prevention, security, risk management, legal requirements, compliance controls, or investigation of suspicious activity.
 
 8. Prohibited Use
-You may not use JeezPay for fraud, scams, money laundering, terrorism financing, illegal gambling, unauthorized financial activity, stolen funds, sanctions evasion, or any activity prohibited by law.
+You must not use JeezPay for fraud, scams, theft, money laundering, terrorism financing, sanctions evasion, illegal gambling, unauthorized financial activity, unlawful goods or services, abuse of another person's account, or any activity prohibited by applicable law.
 
-9. Bills & Services
-Bills and service payments may be processed manually or through third-party providers. Some requests may take time to complete. JeezPay may reject and refund a request if it cannot be fulfilled.
+You must not attempt to bypass transaction limits, security controls, identity checks, account restrictions, or other JeezPay safeguards.
 
-10. Fees and Limits
-JeezPay may apply fees, exchange rates, minimum amounts, maximum limits, and service charges. Applicable fees or rates should be shown before confirmation where possible.
+9. Merchants and Agents
+JeezPay may support transactions involving approved merchants or agents.
 
-11. Account Suspension
-JeezPay may temporarily or permanently restrict accounts for suspicious activity, policy violations, security risks, legal requirements, chargeback risk, or abuse of the platform.
+A merchant or agent may have its own operating procedures, service availability, or lawful requirements. JeezPay may restrict or suspend a merchant, agent, or transaction when required for security, risk, compliance, or operational reasons.
 
-12. Availability
-JeezPay services may be interrupted due to maintenance, network issues, provider downtime, blockchain congestion, security incidents, or circumstances beyond our control.
+10. Account Restrictions
+JeezPay may temporarily or permanently restrict access to an account or service because of suspected fraud, unauthorized access, false or incomplete information, security risks, prohibited activity, legal requirements, compliance obligations, abuse of the platform, or other serious violations of these Terms.
 
-13. Limitation of Liability
-JeezPay is not responsible for losses caused by incorrect information entered by the user, wrong wallet networks, third-party provider failures, network delays, unauthorized account access, or events outside JeezPay’s reasonable control.
+Where appropriate, JeezPay may request additional information before restoring access.
 
-14. Updates to Terms
-JeezPay may update these Terms & Conditions from time to time. Continued use of the app means you accept the updated terms.
+11. Service Availability
+JeezPay services may occasionally be unavailable because of maintenance, telecommunications or internet failures, infrastructure issues, third-party service interruptions, security incidents, operational restrictions, or circumstances outside JeezPay's reasonable control.
 
-15. Contact
-For support, contact JeezPay through the official support channels provided in the app.
+JeezPay does not guarantee uninterrupted availability of every service.
+
+12. Responsibility and Liability
+To the extent permitted by applicable law, JeezPay is not responsible for losses caused by incorrect transaction information entered or approved by the user, unauthorized access resulting from compromised user credentials or devices, misuse of an account, third-party outages, or events outside JeezPay's reasonable control.
+
+Nothing in these Terms excludes responsibility that cannot lawfully be excluded.
+
+13. Changes to Services or Terms
+JeezPay may update, add, restrict, or discontinue services and may update these Terms when necessary.
+
+The latest Terms will be made available through JeezPay with their effective or last-updated date.
+
+14. Contact
+For questions about your account, transactions, or these Terms, contact JeezPay through the official support channels provided by JeezPay.
         """.trimIndent()
 
         findViewById<View>(R.id.btnBack).setOnClickListener {

@@ -13,51 +13,85 @@ class PrivacyActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.tvTitle).text = "Privacy Policy"
         findViewById<TextView>(R.id.tvInfoSubtitle).text =
-            "How JeezPay collects, protects, and uses your information."
+            "How JeezPay collects, uses, and protects your information."
 
         findViewById<TextView>(R.id.tvContent).text = """
-Last updated: May 2026
+Last updated: September 11, 2026
 
-JeezPay respects your privacy. This Privacy Policy explains what information we collect, how we use it, and how we protect it.
+JeezPay respects your privacy. This Privacy Policy explains how information is collected, used, shared, and protected when you use JeezPay.
 
 1. Information We Collect
-We may collect your name, phone number, account type, country code, referral code, login details, wallet activity, transaction history, service requests, device information, and KYC information where required.
+We may collect information you provide when creating or using your account, including your name, phone number, email address, account details, login information, and other information you submit to JeezPay.
 
-2. KYC and Identity Data
-When identity verification is required, JeezPay may collect documents, images, personal details, and verification status. This information is used for compliance, fraud prevention, and account security.
+We may also collect information about your use of the service, including SSP wallet balances, transfers, merchant payments, cash-in or cash-out activity where available, transaction references, timestamps, device information, security events, and support communications.
 
-3. Wallet and Transaction Data
-We collect wallet balances, deposits, transfers, swaps, service payments, transaction references, blockchain deposit records, and related activity needed to operate JeezPay services.
+2. Identity Verification
+JeezPay may require identity verification before certain financial services can be used.
 
-4. How We Use Your Information
-Your information is used to create and secure your account, process transactions, verify identity, prevent fraud, provide support, manage service requests, improve the app, and comply with legal or regulatory obligations.
+Where verification is required, we may collect identity information, identification documents, document images, a selfie or portrait image, verification results, and related information needed to confirm identity, protect accounts, prevent fraud, and meet legal or compliance requirements.
+
+3. Wallet and Transaction Information
+JeezPay records information required to operate your SSP wallet and process transactions. This may include transaction amounts, sender and recipient information, merchant or agent information where applicable, fees, references, transaction status, and account balances.
+
+Financial transaction records may be retained even after an account is closed when required for security, accounting, dispute resolution, fraud prevention, or legal and compliance purposes.
+
+4. How We Use Information
+We may use your information to:
+
+• create and manage your JeezPay account;
+• provide SSP wallet and payment services;
+• process and record transfers and payments;
+• provide cash-in or cash-out services where available;
+• verify identity and account eligibility;
+• protect accounts and confirm sensitive actions;
+• detect, investigate, and prevent fraud or misuse;
+• enforce transaction, security, and compliance controls;
+• provide customer support;
+• maintain and improve JeezPay; and
+• comply with applicable legal and regulatory obligations.
 
 5. Security
-We use reasonable technical and organizational safeguards, including access controls, secure backend systems, encrypted connections where available, and restricted admin permissions. You are responsible for protecting your password, PIN, OTPs, and device access.
+JeezPay uses technical and organizational safeguards designed to protect account and transaction information. These may include access controls, secure network connections, authentication controls, transaction PIN protection, restricted administrative access, monitoring, and other security measures.
 
-6. Data Sharing
-JeezPay does not sell your personal information. We may share information with service providers, compliance partners, payment or telecom providers, blockchain infrastructure providers, fraud prevention tools, or authorities when required by law or necessary to provide services.
+No system can guarantee absolute security. You are responsible for protecting your password, PIN, device access, and any authentication information associated with your account.
 
-7. Blockchain Transactions
-Blockchain transactions may be publicly visible on the relevant blockchain network. JeezPay cannot remove or alter blockchain records once they are confirmed.
+6. Sharing of Information
+JeezPay does not sell your personal information.
+
+Information may be shared when reasonably necessary with service providers that support JeezPay operations, identity verification, fraud prevention, payment processing, communications, infrastructure, security, or customer support.
+
+Information may also be disclosed when required by applicable law, a lawful request, legal process, regulatory obligation, fraud investigation, security requirement, or to protect JeezPay, its users, or others from harm.
+
+7. Agents and Merchants
+When you use JeezPay with an authorized merchant or agent, information necessary to complete, verify, reconcile, or support that transaction may be shared with the relevant merchant or agent.
+
+They should receive only information reasonably necessary for the relevant JeezPay service or transaction.
 
 8. Data Retention
-We keep information for as long as needed to provide services, comply with legal obligations, resolve disputes, prevent fraud, and maintain accurate financial records.
+JeezPay retains information for as long as reasonably necessary to provide services, maintain financial and security records, resolve disputes, prevent fraud, enforce agreements, and satisfy legal, accounting, or compliance obligations.
 
-9. Account Security
-If you believe your account, password, PIN, or device has been compromised, contact JeezPay support immediately and change your credentials where possible.
+Different categories of information may be retained for different periods.
 
-10. User Rights
-Depending on applicable laws, you may request correction, review, or deletion of certain personal information. Some records may need to be retained for compliance, security, or financial reporting.
+9. Account and Device Security
+If you believe your account, password, PIN, phone, or device has been compromised, contact JeezPay support as soon as possible and change your credentials where available.
+
+JeezPay may temporarily restrict an account or transaction when necessary to investigate suspicious or potentially unauthorized activity.
+
+10. Your Information
+Subject to applicable law and record-retention requirements, you may request access to or correction of certain personal information associated with your JeezPay account.
+
+Some financial, security, compliance, fraud-prevention, or transaction records may need to be retained even when other account information can be changed or deleted.
 
 11. Children
-JeezPay is not intended for children or users who are not legally permitted to use financial services in their jurisdiction.
+JeezPay is intended only for people legally permitted to open and use a financial-services account. JeezPay is not intended for children who are not legally eligible to use the service.
 
-12. Updates to This Policy
-We may update this Privacy Policy from time to time. Continued use of JeezPay means you accept the updated policy.
+12. Changes to This Policy
+JeezPay may update this Privacy Policy when its services, legal obligations, security practices, or data-processing activities change.
+
+The latest version will be made available through JeezPay with its effective or last-updated date.
 
 13. Contact
-For privacy or support questions, contact JeezPay through the official support channels provided in the app.
+For privacy, account, or support questions, contact JeezPay through the official support channels provided by JeezPay.
         """.trimIndent()
 
         findViewById<View>(R.id.btnBack).setOnClickListener {

@@ -1,4 +1,4 @@
-﻿package com.jeezpay.app.network.dto
+package com.jeezpay.app.network.dto
 
 import com.google.gson.annotations.SerializedName
 
@@ -151,6 +151,15 @@ data class TransferQuoteResponse(
     val amount: Double? = null,
     val fee: Double? = null,
     val totalDebit: Double? = null,
+    val feePercent: Double? = null,
+    val flatFee: Double? = null,
+    val minTransfer: Double? = null,
+    val maxTransfer: Double? = null,
+    val isEnabled: Boolean? = null
+)
+
+data class TransferSettingsResponse(
+    val currency: String? = null,
     val feePercent: Double? = null,
     val flatFee: Double? = null,
     val minTransfer: Double? = null,

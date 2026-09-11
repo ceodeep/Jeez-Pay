@@ -235,6 +235,23 @@ async function walletProductPolicy(req, res, next) {
       return next();
     }
 
+    if (req.method === "GET" && path === "/transfer-settings") {
+      const currency = normalizeCurrency(
+        req.query?.currency || defaultCurrency
+      );
+
+      if (await rejectDisabledCurrency(res, currency)) return;
+
+      const allowed = await requireCapability(
+        res,
+        currency,
+        CAPABILITIES.P2P_TRANSFER
+      );
+      if (!allowed) return;
+
+      return next();
+    }
+
     if (path === "/transfer" || path === "/transfer-quote") {
       defaultBodyCurrency(req, defaultCurrency);
 
