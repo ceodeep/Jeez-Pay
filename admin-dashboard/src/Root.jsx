@@ -1,44 +1,24 @@
 import App from "./App";
+import AdminV2 from "./v2/AdminV2";
 import KycV3ReviewPage from "./pages/KycV3ReviewPage";
 
+/**
+ * Route map
+ *   /            → the new operations console (v2)
+ *   /classic     → the previous admin, kept until every screen is ported
+ *   /kyc-review  → the international KYC reviewer workspace
+ */
 export default function Root() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   const hash = String(window.location.hash || "").toLowerCase();
-  const isKycWorkspace = path === "/kyc-review" || hash === "#/kyc-review";
-  const hasAdminSession = Boolean(localStorage.getItem("admin_token"));
 
-  if (isKycWorkspace) {
+  if (path === "/kyc-review" || hash === "#/kyc-review") {
     return <KycV3ReviewPage />;
   }
 
-  return (
-    <>
-      <App />
-      {hasAdminSession && (
-        <button
-          type="button"
-          onClick={() => {
-            window.location.href = "/#/kyc-review";
-          }}
-          style={{
-            position: "fixed",
-            right: 18,
-            bottom: 18,
-            zIndex: 9999,
-            border: "none",
-            borderRadius: 999,
-            padding: "11px 16px",
-            background: "#0f172a",
-            color: "#fff",
-            fontWeight: 800,
-            boxShadow: "0 10px 30px rgba(15,23,42,.25)",
-            cursor: "pointer",
-          }}
-          title="Open the international KYC reviewer workspace"
-        >
-          KYC Review Workspace
-        </button>
-      )}
-    </>
-  );
+  if (path === "/classic" || hash === "#/classic") {
+    return <App />;
+  }
+
+  return <AdminV2 />;
 }

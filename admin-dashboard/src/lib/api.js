@@ -12,4 +12,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * A rejected token used to leave the dashboard looking signed-in but empty.
+ * Any 401 on an authenticated call now drops the token and returns to login.
+ */
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401 && localStorage.getItem("admin_token")) {
+      localStorage.removeItem("admin_token");
+      window.dispatchEvent(new Event("admin:unauthorized"));
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default api;
