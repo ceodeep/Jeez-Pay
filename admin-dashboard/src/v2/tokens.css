@@ -1,0 +1,51 @@
+/* JeezPay Admin — design tokens ("Ledger") */
+
+:root {
+  --paper: #fafaf7;
+  --surface: #ffffff;
+  --surface-2: #f4f3ee;
+  --surface-3: #efeee8;
+
+  --ink: #15181c;
+  --muted: #6a6f78;
+  --faint: #9aa0a6;
+
+  --line: #e6e4de;
+  --line-strong: #d8d5cc;
+
+  --accent: #0b6b45;
+  --accent-ink: #0a5a3a;
+  --accent-wash: #eaf3ee;
+  --accent-line: #cde3d7;
+
+  --danger: #a82a1e;
+  --danger-wash: #fbedeb;
+  --danger-line: #e4c4bf;
+
+  --warn: #8a5a00;
+  --warn-wash: #faf3e4;
+  --warn-line: #ebdcc0;
+
+  --info: #1f5c8b;
+  --info-wash: #eef5fa;
+  --info-line: #c9dcea;
+
+  --rail: #12140f;
+  --rail-2: #1b1e18;
+  --rail-line: #262a22;
+  --rail-text: #bfc5b7;
+  --rail-dim: #8e948a;
+
+  --radius: 6px;
+  --radius-lg: 10px;
+  --drawer-w: 424px;
+  --rail-w: 236px;
+  --topbar-h: 52px;
+  --mobnav-h: 58px;
+
+  --shadow-drawer: -18px 0 44px -28px rgba(20, 24, 28, 0.4);
+  --shadow-pop: 0 12px 32px -12px rgba(20, 24, 28, 0.28);
+
+  --font: "IBM Plex Sans", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
