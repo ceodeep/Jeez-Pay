@@ -3,9 +3,12 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
-  font-family: Inter, Arial, sans-serif;
-  background: #f8fafc;
-  color: #0f172a;
+  font-family: "IBM Plex Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 13px;
+  background: #fafaf7;
+  color: #15181c;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -17,44 +20,26 @@ button,
 select,
 textarea {
   font: inherit;
+  color: inherit;
 }
 
 button {
-  transition: 0.18s ease;
+  cursor: pointer;
 }
 
-button:hover {
-  transform: translateY(-1px);
-  filter: brightness(0.98);
+a {
+  color: inherit;
 }
 
-button:disabled {
-  transform: none;
-  opacity: 0.65;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: #2563eb !important;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+/* scrolling always works, the bar never shows */
+html,
+body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  width: 0;
+  height: 0;
+  display: none;
 }

@@ -1,202 +1,75 @@
-import {
-  useState,
-} from "react";
+import { useState } from "react";
 
 import api from "../lib/api";
 
-const fieldStyle = {
-  width: "100%",
-  boxSizing: "border-box",
-  height: 48,
-  padding: "0 14px",
-  borderRadius: 14,
-  border: "1px solid #dbe2ea",
-  background: "#f8fafc",
-  color: "#0f172a",
-  fontSize: 15,
-  outline: "none",
-};
-
-export default function LoginPage({
-  onLogin,
-}) {
-  const [
-    identifier,
-    setIdentifier,
-  ] = useState("");
-
-  const [
-    password,
-    setPassword,
-  ] = useState("");
-
-  const [
-    challengeToken,
-    setChallengeToken,
-  ] = useState("");
-
-  const [
-    mfaCode,
-    setMfaCode,
-  ] = useState("");
-
-  const [
-    recoveryCode,
-    setRecoveryCode,
-  ] = useState("");
-
-  const [
-    useRecovery,
-    setUseRecovery,
-  ] = useState(false);
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
-
-  const [
-    error,
-    setError,
-  ] = useState("");
+export default function LoginPage({ onLogin }) {
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [challengeToken, setChallengeToken] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   function finishLogin(token) {
-    if (!token) {
-      throw new Error(
-        "Authentication token missing"
-      );
-    }
-
-    localStorage.setItem(
-      "admin_token",
-      token
-    );
-
+    if (!token) throw new Error("Authentication token missing");
+    localStorage.setItem("admin_token", token);
     onLogin(token);
   }
 
-  async function submitPassword(
-    event
-  ) {
+  async function submitPassword(event) {
     event.preventDefault();
-
     setLoading(true);
     setError("");
-
     try {
-      const res =
-        await api.post(
-          "/auth/login",
-          {
-            identifier:
-              identifier.trim(),
+      const res = await api.post("/auth/login", {
+        identifier: identifier.trim(),
+        password,
+      });
 
-            password,
-          }
-        );
-
-      if (
-        res.data
-          ?.mfaRequired
-      ) {
-        if (
-          !res.data
-            ?.challengeToken
-        ) {
-          throw new Error(
-            "MFA challenge missing"
-          );
-        }
-
-        setChallengeToken(
-          res.data
-            .challengeToken
-        );
-
+      if (res.data?.mfaRequired) {
+        if (!res.data?.challengeToken) throw new Error("MFA challenge missing");
+        setChallengeToken(res.data.challengeToken);
         setPassword("");
         setMfaCode("");
         setRecoveryCode("");
         setUseRecovery(false);
-
         return;
       }
 
-      finishLogin(
-        res.data?.token
-      );
+      finishLogin(res.data?.token);
     } catch (err) {
-      setError(
-        err?.response
-          ?.data?.message ||
-          err?.message ||
-          "Login failed"
-      );
+      setError(err?.response?.data?.message || err?.message || "Login failed");
     } finally {
       setLoading(false);
     }
   }
 
-  async function submitMfa(
-    event
-  ) {
+  async function submitMfa(event) {
     event.preventDefault();
 
-    if (
-      !useRecovery &&
-      !/^\d{6}$/.test(
-        mfaCode
-      )
-    ) {
-      setError(
-        "Enter the 6-digit authenticator code."
-      );
-
+    if (!useRecovery && !/^\d{6}$/.test(mfaCode)) {
+      setError("Enter the 6-digit authenticator code.");
       return;
     }
-
-    if (
-      useRecovery &&
-      !recoveryCode.trim()
-    ) {
-      setError(
-        "Enter one recovery code."
-      );
-
+    if (useRecovery && !recoveryCode.trim()) {
+      setError("Enter one recovery code.");
       return;
     }
 
     setLoading(true);
     setError("");
-
     try {
-      const body = {
-        challengeToken,
-      };
+      const body = { challengeToken };
+      if (useRecovery) body.recoveryCode = recoveryCode.trim();
+      else body.token = mfaCode;
 
-      if (useRecovery) {
-        body.recoveryCode =
-          recoveryCode.trim();
-      } else {
-        body.token =
-          mfaCode;
-      }
-
-      const res =
-        await api.post(
-          "/auth/admin-mfa/verify-login",
-          body
-        );
-
-      finishLogin(
-        res.data?.token
-      );
+      const res = await api.post("/auth/admin-mfa/verify-login", body);
+      finishLogin(res.data?.token);
     } catch (err) {
-      setError(
-        err?.response
-          ?.data?.message ||
-          err?.message ||
-          "MFA verification failed"
-      );
+      setError(err?.response?.data?.message || err?.message || "MFA verification failed");
     } finally {
       setLoading(false);
     }
@@ -210,350 +83,185 @@ export default function LoginPage({
     setError("");
   }
 
-  const mfaMode =
-    !!challengeToken;
+  const mfaMode = !!challengeToken;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        background:
-          "linear-gradient(135deg, #0f172a 0%, #111827 35%, #e5e7eb 35%, #f8fafc 100%)",
-        padding: 24,
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          background: "#ffffff",
-          borderRadius: 24,
-          padding: 32,
-          boxShadow:
-            "0 25px 60px rgba(15,23,42,0.16)",
-          border:
-            "1px solid rgba(15,23,42,0.06)",
-        }}
-      >
-        <div
-          style={{
-            marginBottom: 28,
-          }}
-        >
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: 16,
-              background: "#0f172a",
-              color: "#ffffff",
-              display: "grid",
-              placeItems: "center",
-              fontWeight: 800,
-              fontSize: 18,
-              marginBottom: 16,
-            }}
-          >
-            JP
+    <div className="login">
+      <aside className="login__brand">
+        <div className="login__brandtop">
+          <div className="login__brandmark">J</div>
+          <div>
+            <span className="login__word">JeezPay</span>
+            <span className="login__kicker">Admin console</span>
           </div>
-
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 28,
-              fontWeight: 800,
-              color: "#0f172a",
-            }}
-          >
-            {mfaMode
-              ? "Verify MFA"
-              : "JeezPay Admin"}
-          </h1>
-
-          <p
-            style={{
-              margin:
-                "8px 0 0",
-              color: "#64748b",
-              fontSize: 14,
-              lineHeight: 1.5,
-            }}
-          >
-            {mfaMode
-              ? "Password accepted. Complete multi-factor authentication to open the admin session."
-              : "Sign in to manage JeezPay administrative operations."}
-          </p>
         </div>
 
-        {!mfaMode ? (
-          <form
-            onSubmit={
-              submitPassword
-            }
-            style={{
-              display: "grid",
-              gap: 16,
-            }}
-          >
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#334155",
-                }}
-              >
-                Email or phone
-              </label>
+        <div className="login__brandmid">
+          <p className="login__live">
+            <i />
+            Production
+          </p>
+          <div className="login__pitch">
+            <h2>Work the queue, not the dashboard.</h2>
+            <p>
+              KYC decisions, payouts, merchant requests and the ledgers behind them — one console for the
+              people who clear the work.
+            </p>
+            <ul className="login__facts">
+              <li>
+                <i />
+                <span>
+                  <b>Every decision is audited</b> with operator, target and IP.
+                </span>
+              </li>
+              <li>
+                <i />
+                <span>
+                  <b>Payout approvals broadcast on-chain</b> and cannot be undone.
+                </span>
+              </li>
+            </ul>
+          </div>
+        </div>
 
-              <input
-                value={identifier}
-                onChange={(e) =>
-                  setIdentifier(
-                    e.target.value
-                  )
-                }
-                placeholder="admin@example.com or +211..."
-                autoComplete="username"
-                style={fieldStyle}
-              />
-            </div>
+        <div className="login__foot">
+          Restricted access · sessions expire automatically · sign out on shared machines
+        </div>
+      </aside>
 
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#334155",
-                }}
-              >
-                Password
-              </label>
+      <main className="login__panel">
+        <div className="login__card">
+          <div className="login__form">
+            <h1 className="login__title">{mfaMode ? "Two-factor check" : "Sign in"}</h1>
+            <p className="login__sub">
+              {mfaMode
+                ? "Password accepted. Enter the current code from your authenticator app."
+                : "Admin email or phone number. You’ll confirm a 6-digit code next."}
+            </p>
 
-              <input
-                type="password"
-                value={password}
-                onChange={(e) =>
-                  setPassword(
-                    e.target.value
-                  )
-                }
-                placeholder="Enter password"
-                autoComplete="current-password"
-                style={fieldStyle}
-              />
-            </div>
-
-            {error ? (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  color: "#b91c1c",
-                  border:
-                    "1px solid #fecaca",
-                  padding:
-                    "12px 14px",
-                  borderRadius: 14,
-                  fontSize: 14,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                height: 50,
-                borderRadius: 14,
-                border: "none",
-                background:
-                  loading
-                    ? "#334155"
-                    : "#0f172a",
-                color: "#ffffff",
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              {loading
-                ? "Signing in..."
-                : "Sign in"}
-            </button>
-          </form>
-        ) : (
-          <form
-            onSubmit={submitMfa}
-            style={{
-              display: "grid",
-              gap: 16,
-            }}
-          >
-            {!useRecovery ? (
-              <div>
-                <label
-                  style={{
-                    display:
-                      "block",
-                    marginBottom: 8,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#334155",
-                  }}
-                >
-                  Authenticator code
+          {!mfaMode ? (
+            <form onSubmit={submitPassword} noValidate>
+              <div className="login__field">
+                <label className="login__label" htmlFor="login-id">
+                  Email or phone
                 </label>
-
                 <input
-                  value={mfaCode}
-                  onChange={(e) =>
-                    setMfaCode(
-                      e.target.value
-                        .replace(
-                          /\D/g,
-                          ""
-                        )
-                        .slice(
-                          0,
-                          6
-                        )
-                    )
-                  }
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="000000"
-                  maxLength={6}
-                  style={{
-                    ...fieldStyle,
-                    letterSpacing: 5,
-                    fontWeight: 800,
-                    fontSize: 18,
-                  }}
+                  id="login-id"
+                  className="login__input mono"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                  placeholder="you@jeezpay.co or +211…"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck="false"
+                  required
                 />
               </div>
-            ) : (
-              <div>
-                <label
-                  style={{
-                    display:
-                      "block",
-                    marginBottom: 8,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "#334155",
-                  }}
-                >
-                  Recovery code
-                </label>
 
+              <div className="login__field">
+                <div className="login__labelrow">
+                  <label className="login__label" htmlFor="login-password">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    className="login__reveal"
+                    onClick={() => setShowPassword((value) => !value)}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
                 <input
-                  value={
-                    recoveryCode
-                  }
-                  onChange={(e) =>
-                    setRecoveryCode(
-                      e.target.value
-                    )
-                  }
-                  autoComplete="off"
-                  placeholder="XXXX-XXXX-XXXX-XXXX"
-                  style={fieldStyle}
+                  id="login-password"
+                  className="login__input"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  required
                 />
               </div>
-            )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setUseRecovery(
-                  !useRecovery
-                );
-                setError("");
-              }}
-              style={{
-                justifySelf:
-                  "start",
-                border: "none",
-                background:
-                  "transparent",
-                color: "#334155",
-                cursor: "pointer",
-                padding: 0,
-                fontWeight: 700,
-              }}
-            >
-              {useRecovery
-                ? "Use authenticator code"
-                : "Use a recovery code"}
-            </button>
+              {error ? <div className="login__error" role="alert">{error}</div> : null}
 
-            {error ? (
-              <div
-                style={{
-                  background: "#fef2f2",
-                  color: "#b91c1c",
-                  border:
-                    "1px solid #fecaca",
-                  padding:
-                    "12px 14px",
-                  borderRadius: 14,
-                  fontSize: 14,
-                }}
-              >
-                {error}
+              <button type="submit" className="login__submit" disabled={loading}>
+                {loading ? "Signing in…" : "Sign in"}
+              </button>
+
+              <p className="login__hintline">
+                Locked out? A super admin has to reset the password — a reset also ends open sessions.
+              </p>
+            </form>
+          ) : (
+            <form onSubmit={submitMfa} noValidate>
+              {!useRecovery ? (
+                <div className="login__field">
+                  <label className="login__label" htmlFor="login-otp">
+                    Authenticator code
+                  </label>
+                  <input
+                    id="login-otp"
+                    className="login__input login__otp"
+                    value={mfaCode}
+                    onChange={(event) =>
+                      setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="000000"
+                    maxLength={6}
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div className="login__field">
+                  <label className="login__label" htmlFor="login-recovery">
+                    Recovery code
+                  </label>
+                  <input
+                    id="login-recovery"
+                    className="login__input mono"
+                    value={recoveryCode}
+                    onChange={(event) => setRecoveryCode(event.target.value)}
+                    autoComplete="off"
+                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                  />
+                </div>
+              )}
+
+              {error ? <div className="login__error" role="alert">{error}</div> : null}
+
+              <button type="submit" className="login__submit" disabled={loading}>
+                {loading ? "Verifying…" : "Verify and sign in"}
+              </button>
+
+              <div className="login__alt">
+                <button
+                  type="button"
+                  className="login__link"
+                  onClick={() => {
+                    setUseRecovery((prev) => !prev);
+                    setError("");
+                  }}
+                >
+                  {useRecovery ? "Use authenticator code" : "Use a recovery code"}
+                </button>
+                <button
+                  type="button"
+                  className="login__link login__link--quiet"
+                  onClick={restartLogin}
+                  disabled={loading}
+                >
+                  Back to password
+                </button>
               </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                height: 50,
-                borderRadius: 14,
-                border: "none",
-                background:
-                  loading
-                    ? "#334155"
-                    : "#0f172a",
-                color: "#ffffff",
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              {loading
-                ? "Verifying..."
-                : "Verify and sign in"}
-            </button>
-
-            <button
-              type="button"
-              disabled={loading}
-              onClick={
-                restartLogin
-              }
-              style={{
-                border: "none",
-                background:
-                  "transparent",
-                color: "#64748b",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Back to password
-            </button>
-          </form>
-        )}
-      </div>
+            </form>
+          )}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
