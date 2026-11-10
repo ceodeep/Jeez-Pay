@@ -143,7 +143,6 @@ a {
   gap: 15px;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .nav__group {
