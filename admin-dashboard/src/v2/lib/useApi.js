@@ -9,6 +9,10 @@ export function useApi(loader, key = "", fallbackError = "") {
   const loaderRef = useRef(loader);
   loaderRef.current = loader;
 
+  /* callers sometimes pass an array of deps; normalise so identity changes
+     don't retrigger the effect on every render */
+  const dep = Array.isArray(key) ? key.join("|") : String(key);
+
   const seq = useRef(0);
   const alive = useRef(true);
 
@@ -50,7 +54,7 @@ export function useApi(loader, key = "", fallbackError = "") {
 
   useEffect(() => {
     reload();
-  }, [key, reload]);
+  }, [dep, reload]);
 
   return { ...state, reload };
 }

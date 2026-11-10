@@ -4,22 +4,26 @@ import { useApi } from "../lib/useApi";
 import DataTable from "../ui/DataTable";
 import { EmptyState } from "../ui/Bits";
 
-function summarize(row) {
-  const parts = [];
-  if (row.status) parts.push(String(row.status));
-  if (row.network) parts.push(String(row.network));
-  if (row.message) parts.push(String(row.message).slice(0, 60));
-  if (row.error) parts.push(String(row.error).slice(0, 60));
-  if (parts.length === 0) {
-    const keys = Object.keys(row).filter(
-      (key) => !["id", "created_at"].includes(key) && row[key] != null
-    );
-    return keys
-      .slice(0, 3)
-      .map((key) => `${key}: ${String(row[key]).slice(0, 32)}`)
-      .join(" · ");
+const HIDDEN = new Set(["id", "created_at", "_key", "operation"]);
+
+function renderValue(value) {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "[unserialisable]";
+    }
   }
-  return parts.join(" · ");
+  return String(value);
+}
+
+function details(row) {
+  return Object.keys(row)
+    .filter((key) => !HIDDEN.has(key) && row[key] != null && row[key] !== "")
+    .slice(0, 4)
+    .map((key) => `${key}: ${renderValue(row[key]).slice(0, 90)}`)
+    .join(" · ");
 }
 
 export default function ScannerLogsPage() {
@@ -50,7 +54,14 @@ export default function ScannerLogsPage() {
       label: "Event",
       width: "78%",
       wrap: true,
-      render: (row) => <span style={{ fontSize: 11.5 }}>{summarize(row) || "—"}</span>,
+      render: (row) => (
+        <div className="cellstack">
+          <div className="cell-title mono" style={{ fontSize: 11.5 }}>
+            {row.operation || row.status || "event"}
+          </div>
+          {details(row) ? <div className="cell-sub mono">{details(row)}</div> : null}
+        </div>
+      ),
     },
   ];
 
@@ -73,14 +84,14 @@ export default function ScannerLogsPage() {
           onRetry={list.reload}
           empty={<EmptyState title="No scanner events">The scanner has not logged anything yet.</EmptyState>}
           footer={
-            <>
+            <div className="tfoot">
               <span>
                 Showing <b>{rows.length}</b> events
               </span>
-              <button type="button" className="btn btn--ghost" onClick={() => list.reload()}>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => list.reload()}>
                 Refresh
               </button>
-            </>
+            </div>
           }
         />
       </div>

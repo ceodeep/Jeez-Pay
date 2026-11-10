@@ -1,10 +1,6 @@
 import { useState } from "react";
-import {
-  BellIcon,
-  MenuIcon,
-  SearchIcon,
-} from "./ui/Bits";
-import { CLASSIC_URL, MOBILE_TABS, NAV, PAGE_TITLES } from "./lib/nav";
+import { MenuIcon, SearchIcon } from "./ui/Bits";
+import { MOBILE_TABS, NAV, PAGE_TITLES } from "./lib/nav";
 
 function initials(label) {
   const parts = String(label || "A")
@@ -18,6 +14,11 @@ function initials(label) {
     .toUpperCase();
 }
 
+function groupLabel(page) {
+  const group = NAV.find((entry) => entry.items.some((item) => item.key === page));
+  return group ? group.label : "Operations";
+}
+
 export default function Shell({
   page,
   onNavigate,
@@ -27,6 +28,7 @@ export default function Shell({
   drawerOpen,
   onCloseDrawer,
   onSearch,
+  onLogout,
   children,
 }) {
   const [menu, setMenu] = useState(false);
@@ -104,17 +106,14 @@ export default function Shell({
         </div>
 
         <div className="rail__foot">
-          <div className="rail__shift">
-            Classic screens still live at <b>/classic</b>
-          </div>
-          <a className="nav__item" href={CLASSIC_URL}>
-            Open classic admin
-          </a>
           <div className="rail__me">
             <div className="avatar">{initials(admin?.phone || admin?.name)}</div>
             <em>{admin?.name || admin?.phone || "Admin"}</em>
             <span>{admin?.role || "admin"}</span>
           </div>
+          <button type="button" className="rail__out" onClick={onLogout}>
+            Sign out
+          </button>
         </div>
       </aside>
 
@@ -139,7 +138,7 @@ export default function Shell({
           </button>
 
           <div className="crumb">
-            <span>Operations</span>
+            <span>{groupLabel(page)}</span>
             <span>/</span>
             <b>{PAGE_TITLES[page] || "Today"}</b>
           </div>
@@ -149,7 +148,7 @@ export default function Shell({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Find a user by phone or ID"
+              placeholder="Search users"
               aria-label="Find a user by phone or ID"
             />
             <span className="kbd">↵</span>
@@ -160,8 +159,8 @@ export default function Shell({
             <i className="dot" />
             LIVE
           </div>
-          <button type="button" className="iconbtn" aria-label="Notifications" disabled>
-            <BellIcon />
+          <button type="button" className="iconbtn signoutbtn" aria-label="Sign out" onClick={onLogout}>
+            <span aria-hidden="true">⏻</span>
           </button>
         </header>
 

@@ -13,6 +13,15 @@ import TransactionsPage from "./pages/TransactionsPage";
 import UsersPage from "./pages/UsersPage";
 import AuditLogsPage from "./pages/AuditLogsPage";
 import ScannerLogsPage from "./pages/ScannerLogsPage";
+import WalletViewPage from "./pages/WalletViewPage";
+import CompanyWalletPage from "./pages/CompanyWalletPage";
+import WalletAdjustPage from "./pages/WalletAdjustPage";
+import TreasuryPage from "./pages/TreasuryPage";
+import ExchangeRatesPage from "./pages/ExchangeRatesPage";
+import CurrencySettingsPage from "./pages/CurrencySettingsPage";
+import ReferralRewardsPage from "./pages/ReferralRewardsPage";
+import RolesPage from "./pages/RolesPage";
+import SettingsPage from "./pages/SettingsPage";
 import "./app.css";
 
 const KNOWN = [
@@ -21,8 +30,17 @@ const KNOWN = [
   "withdrawals",
   "serviceRequests",
   "transactions",
+  "walletView",
+  "companyWallet",
+  "walletAdjust",
+  "treasury",
+  "exchangeRates",
+  "currencies",
   "users",
+  "roles",
+  "referral",
   "auditLogs",
+  "settings",
   "scannerLogs",
 ];
 
@@ -160,6 +178,7 @@ export default function AdminV2() {
           setUserSearch(value);
           navigate("users");
         }}
+        onLogout={logout}
       >
         {me.error && !me.data ? (
           <div style={{ padding: 24 }}>
@@ -193,6 +212,15 @@ export default function AdminV2() {
           <ServiceRequestsPage focusId={focusId} onDrawerChange={reportDrawer} />
         ) : null}
         {activePage === "transactions" ? <TransactionsPage /> : null}
+        {activePage === "walletView" ? <WalletViewPage /> : null}
+        {activePage === "companyWallet" ? <CompanyWalletPage /> : null}
+        {activePage === "walletAdjust" ? <WalletAdjustPage /> : null}
+        {activePage === "treasury" ? <TreasuryPage /> : null}
+        {activePage === "exchangeRates" ? <ExchangeRatesPage /> : null}
+        {activePage === "currencies" ? <CurrencySettingsPage /> : null}
+        {activePage === "roles" ? <RolesPage /> : null}
+        {activePage === "referral" ? <ReferralRewardsPage /> : null}
+        {activePage === "settings" ? <SettingsPage /> : null}
         {activePage === "users" ? (
           <UsersPage
             focusId={focusId}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import api from "../lib/api";
-import { ageOf, fmtAmount, fmtDate, fmtInt, shortAddress } from "../lib/format";
+import { ageOf, errText, fmtAmount, fmtDate, fmtInt, shortAddress } from "../lib/format";
 import { useApi } from "../lib/useApi";
 import DataTable from "../ui/DataTable";
 import { Chip, EmptyState, Stat } from "../ui/Bits";
@@ -41,6 +41,10 @@ export default function TodayPage({ onNavigate, reloadKey }) {
 
     return {
       stats: settle(statsRes) || {},
+      statsError:
+        statsRes.status === "rejected"
+          ? errText(statsRes.reason, "Dashboard totals unavailable")
+          : "",
       kyc: settle(kycRes) || [],
       withdrawals: settle(wdRes) || [],
       requests: (settle(svcRes) || []).filter(
@@ -201,6 +205,15 @@ export default function TodayPage({ onNavigate, reloadKey }) {
           suffix="SSP"
         />
       </div>
+
+      {data.statsError ? (
+        <div className="formnote formnote--warn" style={{ margin: "10px 18px 0" }}>
+          Totals couldn’t load ({data.statsError}). The queue below is still live.{" "}
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => feed.reload()}>
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       <div className="tabs" role="tablist">
         {TABS.map((item) => (

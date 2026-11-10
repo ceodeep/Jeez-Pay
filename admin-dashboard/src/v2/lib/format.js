@@ -29,6 +29,18 @@ export function fmtInt(value) {
   return n.toLocaleString("en-US");
 }
 
+/** Exchange rates need precision below 1 (0.0017 must not read as 0.00). */
+export function fmtRate(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  const digits = abs > 0 && abs < 1 ? 6 : 2;
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: digits,
+  });
+}
+
 export function fmtDate(value) {
   if (!value) return "—";
   const d = new Date(value);

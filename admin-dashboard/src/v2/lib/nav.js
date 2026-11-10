@@ -5,6 +5,15 @@ export const PAGE_PERMISSIONS = {
   serviceRequests: "transactions.view",
   transactions: "transactions.view",
   users: "users.view",
+  walletView: "wallets.view",
+  companyWallet: "wallets.view",
+  walletAdjust: "wallets.adjust",
+  treasury: "wallets.adjust",
+  exchangeRates: "currency_settings.view",
+  currencies: "currency_settings.view",
+  referral: "settings.view",
+  roles: "users.role.update",
+  settings: "settings.view",
   auditLogs: "audit_logs.view",
   scannerLogs: "wallets.adjust",
 };
@@ -22,15 +31,30 @@ export const NAV = [
   },
   {
     label: "Money",
-    items: [{ key: "transactions", label: "Transactions" }],
+    items: [
+      { key: "transactions", label: "Transactions" },
+      { key: "walletView", label: "Wallet view" },
+      { key: "companyWallet", label: "Company wallet" },
+      { key: "walletAdjust", label: "Adjust wallet" },
+      { key: "treasury", label: "Treasury" },
+      { key: "exchangeRates", label: "Exchange rates" },
+      { key: "currencies", label: "Currency settings" },
+    ],
   },
   {
     label: "People",
-    items: [{ key: "users", label: "Users" }],
+    items: [
+      { key: "users", label: "Users" },
+      { key: "roles", label: "Roles & access" },
+      { key: "referral", label: "Referral rewards" },
+    ],
   },
   {
     label: "System",
-    items: [{ key: "auditLogs", label: "Audit log" }],
+    items: [
+      { key: "auditLogs", label: "Audit log" },
+      { key: "settings", label: "Settings" },
+    ],
   },
 ];
 
@@ -39,26 +63,20 @@ export const PAGE_TITLES = {
   kyc: "KYC review",
   withdrawals: "Withdrawals",
   serviceRequests: "Service requests",
-  transactions: "Transactions",
-  users: "Users",
-  auditLogs: "Audit log",
   scannerLogs: "Scanner logs",
+  transactions: "Transactions",
+  walletView: "Wallet view",
+  companyWallet: "Company wallet",
+  walletAdjust: "Adjust wallet",
+  treasury: "Treasury",
+  exchangeRates: "Exchange rates",
+  currencies: "Currency settings",
+  users: "Users",
+  roles: "Roles & access",
+  referral: "Referral rewards",
+  auditLogs: "Audit log",
+  settings: "Settings",
 };
-
-/* Screens that still live in the classic admin (/classic). */
-export const CLASSIC_PAGES = [
-  "Wallet view",
-  "Company wallet",
-  "Wallet adjustment",
-  "Treasury operations",
-  "Exchange rates",
-  "Currency settings",
-  "Referral rewards",
-  "Roles & permissions",
-  "System settings",
-];
-
-export const CLASSIC_URL = "/classic";
 
 export const MOBILE_TABS = ["dashboard", "kyc", "withdrawals", "serviceRequests"];
 
