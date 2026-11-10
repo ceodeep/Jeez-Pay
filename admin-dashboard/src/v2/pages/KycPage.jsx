@@ -28,7 +28,6 @@ export default function KycPage({ focusId, onDrawerChange }) {
   const [term, setTerm] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [busy, setBusy] = useState("");
-  const [note, setNote] = useState("");
 
   const listKey = `${tab}|${term}`;
 
@@ -94,10 +93,9 @@ export default function KycPage({ focusId, onDrawerChange }) {
         await api.post("/admin/kyc/approve", { userId });
         toast("KYC approved", "ok");
       } else {
-        await api.post("/admin/kyc/reject", { userId, reason: note.trim() || undefined });
+        await api.post("/admin/kyc/reject", { userId });
         toast("KYC rejected", "ok");
       }
-      setNote("");
       setSelectedId(null);
       await Promise.all([list.reload(true), summary.reload(true)]);
     } catch (err) {
@@ -323,14 +321,12 @@ export default function KycPage({ focusId, onDrawerChange }) {
               </div>
             </div>
 
-            <div>
-              <div className="sect">Decision note (optional)</div>
-              <textarea
-                className="textarea"
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="Context for the audit trail"
-              />
+            <div className="flag">
+              <i />
+              <div>
+                Approving unlocks wallet access for this user. Rejections can be re-submitted — the
+                KYC API does not store a rejection reason yet.
+              </div>
             </div>
           </div>
         ) : null}
